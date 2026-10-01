@@ -1,3 +1,3 @@
 # THIGAS Coder Android
 
-Aplicativo Android para acessar o THIGAS Coder online. O APK é gerado pelo GitHub Actions.
+APK online para Android 8.0 ou superior. Consulte LEIA-ME.md. Compilação em Actions > Gerar APK THIGAS.
