@@ -42,18 +42,18 @@ public class MainActivity extends Activity {
         super.onCreate(saved);
         getWindow().setStatusBarColor(Color.WHITE);getWindow().setNavigationBarColor(Color.WHITE);
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
-        LinearLayout root=new LinearLayout(this);root.setOrientation(1);root.setBackgroundColor(Color.rgb(247,250,255));
+        LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(Color.rgb(247,250,255));
         root.setOnApplyWindowInsetsListener((v,insets)->{
             if(Build.VERSION.SDK_INT>=30){android.graphics.Insets b=insets.getInsets(WindowInsets.Type.systemBars()|WindowInsets.Type.ime());v.setPadding(b.left,b.top,b.right,b.bottom);}
             else v.setPadding(insets.getSystemWindowInsetLeft(),insets.getSystemWindowInsetTop(),insets.getSystemWindowInsetRight(),insets.getSystemWindowInsetBottom());
             return insets;
         });
         LinearLayout header=new LinearLayout(this);header.setGravity(Gravity.CENTER_VERTICAL);header.setPadding(dp(12),dp(8),dp(8),dp(8));header.setBackgroundColor(Color.WHITE);
-        header.addView(cat(48));LinearLayout titles=new LinearLayout(this);titles.setOrientation(1);
+        header.addView(cat(48));LinearLayout titles=new LinearLayout(this);titles.setOrientation(LinearLayout.VERTICAL);
         TextView title=text("THIGAS Coder",21);title.setTypeface(null,Typeface.BOLD);titles.addView(title);
         status=text("Assistente de programação · online",12);titles.addView(status);header.addView(titles,new LinearLayout.LayoutParams(0,-2,1));
         Button fresh=button("Nova");fresh.setContentDescription("Nova conversa");header.addView(fresh);root.addView(header);
-        scroll=new ScrollView(this);scroll.setFillViewport(true);messages=new LinearLayout(this);messages.setOrientation(1);messages.setPadding(dp(16),dp(16),dp(16),dp(16));scroll.addView(messages);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
+        scroll=new ScrollView(this);scroll.setFillViewport(true);messages=new LinearLayout(this);messages.setOrientation(LinearLayout.VERTICAL);messages.setPadding(dp(16),dp(16),dp(16),dp(16));scroll.addView(messages);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
         LinearLayout composer=new LinearLayout(this);composer.setGravity(Gravity.BOTTOM);composer.setPadding(dp(12),dp(8),dp(12),dp(12));composer.setBackgroundColor(Color.WHITE);
         input=new EditText(this);input.setHint("Pergunte ou cole seu código…");input.setTextColor(ink);input.setTextSize(16);input.setMinLines(1);input.setMaxLines(5);input.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE|android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);input.setBackground(shape(Color.rgb(240,245,252)));input.setPadding(dp(12),dp(10),dp(12),dp(10));composer.addView(input,new LinearLayout.LayoutParams(0,-2,1));
         send=button("Enviar");composer.addView(send);root.addView(composer);
@@ -63,7 +63,7 @@ public class MainActivity extends Activity {
         fresh.setOnClickListener(v->new AlertDialog.Builder(this).setMessage("Iniciar uma nova conversa? O histórico atual será removido deste aparelho.").setNegativeButton("Cancelar",null).setPositiveButton("Nova conversa",(a,b)->{stop();history=new JSONArray();save();redraw();}).show());
     }
     private void welcome(){
-        LinearLayout intro=new LinearLayout(this);intro.setOrientation(1);intro.setGravity(Gravity.CENTER);intro.setPadding(0,dp(24),0,dp(20));intro.addView(cat(140));
+        LinearLayout intro=new LinearLayout(this);intro.setOrientation(LinearLayout.VERTICAL);intro.setGravity(Gravity.CENTER);intro.setPadding(0,dp(24),0,dp(20));intro.addView(cat(140));
         TextView heading=text("Vamos criar algo?",25);heading.setTypeface(null,Typeface.BOLD);intro.addView(heading);
         TextView sub=text("Escreva, entenda e corrija códigos\ncom o THIGAS.",16);sub.setGravity(Gravity.CENTER);sub.setPadding(0,dp(10),0,dp(18));intro.addView(sub);
         for(String suggestion:new String[]{"Crie uma função Python que some dois números.","Explique let e const em JavaScript.","Como começar um jogo Match-3?"}){Button b=button(suggestion);b.setOnClickListener(v->{input.setText(suggestion);submit();});intro.addView(b,new LinearLayout.LayoutParams(-1,-2));}messages.addView(intro);
@@ -71,7 +71,7 @@ public class MainActivity extends Activity {
     private void redraw(){messages.removeAllViews();if(history.length()==0)welcome();else for(int i=0;i<history.length();i++){JSONObject m=history.optJSONObject(i);if(m!=null)bubble(m.optString("role"),m.optString("content"));}bottom();}
     private void bottom(){scroll.post(()->scroll.fullScroll(View.FOCUS_DOWN));}
     private LinearLayout bubble(String role,String body){
-        LinearLayout box=new LinearLayout(this);box.setOrientation(1);box.setPadding(dp(14),dp(12),dp(14),dp(12));box.setBackground(shape(role.equals("user")?Color.rgb(223,238,255):Color.WHITE));
+        LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);box.setPadding(dp(14),dp(12),dp(14),dp(12));box.setBackground(shape(role.equals("user")?Color.rgb(223,238,255):Color.WHITE));
         LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=dp(12);box.setLayoutParams(lp);messages.addView(box);
         LinearLayout label=new LinearLayout(this);label.setGravity(Gravity.CENTER_VERTICAL);if(!role.equals("user"))label.addView(cat(28));TextView who=text(role.equals("user")?"Você":"THIGAS",12);who.setTypeface(null,Typeface.BOLD);label.addView(who);box.addView(label);render(box,body);return box;
     }
