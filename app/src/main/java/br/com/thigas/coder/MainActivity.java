@@ -18,7 +18,7 @@ import java.util.concurrent.*;
 import java.util.regex.*;
 
 public class MainActivity extends Activity {
-    private static final String BASE="https://thiagollipe-thigas-coder.hf.space";
+    private static final String BASE="https://thigas-coder-gateway.onrender.com";
     private final ExecutorService worker=Executors.newSingleThreadExecutor();
     private volatile HttpURLConnection active;
     private volatile int generation=0;
@@ -95,25 +95,47 @@ public class MainActivity extends Activity {
         if(question.length()>10000){Toast.makeText(this,"Envie um trecho de código menor.",Toast.LENGTH_LONG).show();return;}
         JSONArray previous=new JSONArray();try{for(int i=Math.max(0,history.length()-12);i<history.length();i++){JSONObject old=history.getJSONObject(i);previous.put(new JSONObject().put("role",old.getString("role")).put("content",new JSONArray().put(new JSONObject().put("type","text").put("text",old.getString("content")))));}}catch(JSONException ignored){}
         if(history.length()==0)messages.removeAllViews();append("user",question);bubble("user",question);input.setText("");
-        busy=true;send.setText("Parar");status.setText("Consultando THIGAS… pode haver fila de GPU");pending=bubble("assistant","Aguardando resposta…");bottom();final int id=++generation;
+        busy=true;send.setText("Parar");status.setText("Consultando THIGAS online…");pending=bubble("assistant","Aguardando resposta…");bottom();final int id=++generation;
         worker.execute(()->{try{String answer=request(question,previous,id);runOnUiThread(()->{if(generation!=id)return;busy=false;send.setText("Enviar");status.setText("Assistente de programação · online");if(pending!=null)render(pending,answer);pending=null;append("assistant",answer);bottom();});}
             catch(Exception ex){runOnUiThread(()->{if(generation!=id)return;busy=false;send.setText("Enviar");status.setText("Não foi possível obter a resposta");if(pending!=null)render(pending,"Falha na consulta. Confira a conexão e a disponibilidade ou cota de GPU do THIGAS online.\n\n"+ex.getMessage());pending=null;});}});
     }
     private HttpURLConnection connect(String path,int id)throws Exception{
-        if(generation!=id)throw new IOException("Consulta interrompida");HttpURLConnection c=(HttpURLConnection)new URL(BASE+path).openConnection();c.setConnectTimeout(20000);c.setReadTimeout(65000);c.setRequestProperty("User-Agent","THIGAS-Android/2.0");active=c;return c;
+        if(generation!=id)throw new IOException("Consulta interrompida");HttpURLConnection c=(HttpURLConnection)new URL(BASE+path).openConnection();c.setConnectTimeout(20000);c.setReadTimeout(180000);c.setRequestProperty("User-Agent","THIGAS-Android/2.0");active=c;return c;
     }
     private String request(String question,JSONArray previous,int id)throws Exception{
-        HttpURLConnection post=connect("/gradio_api/call/responder",id);String event;
-        try{post.setRequestMethod("POST");post.setDoOutput(true);post.setRequestProperty("Content-Type","application/json");byte[] raw=new JSONObject().put("data",new JSONArray().put(question).put(previous)).toString().getBytes(StandardCharsets.UTF_8);try(OutputStream out=post.getOutputStream()){out.write(raw);}if(post.getResponseCode()!=200)throw new IOException("HTTP "+post.getResponseCode());StringBuilder b=new StringBuilder();try(BufferedReader reader=new BufferedReader(new InputStreamReader(post.getInputStream(),StandardCharsets.UTF_8))){String line;while((line=reader.readLine())!=null)b.append(line);}event=new JSONObject(b.toString()).getString("event_id");}finally{post.disconnect();}
-        if(!event.matches("[A-Za-z0-9_-]+"))throw new IOException("Identificador de consulta inválido");
-        HttpURLConnection stream=connect("/gradio_api/call/responder/"+event,id);
-        try{if(stream.getResponseCode()!=200)throw new IOException("HTTP "+stream.getResponseCode());try(BufferedReader reader=new BufferedReader(new InputStreamReader(stream.getInputStream(),StandardCharsets.UTF_8))){String line,type="";StringBuilder data=new StringBuilder();long deadline=System.currentTimeMillis()+240000;
-            while((line=reader.readLine())!=null){if(generation!=id)throw new IOException("Consulta interrompida");if(System.currentTimeMillis()>deadline)throw new IOException("Tempo de espera excedido");
-                if(line.startsWith("event:"))type=line.substring(6).trim();else if(line.startsWith("data:"))data.append(line.substring(5).trim());else if(line.isEmpty()){
-                    if(type.equals("error"))throw new IOException("O servidor recusou a consulta. Tente pelo site para verificar sua cota.");
-                    if(type.equals("complete")){String answer=extract(new JSONArray(data.toString()));if(answer.isEmpty())throw new IOException("Resposta vazia");return answer;}type="";data.setLength(0);
-                }
-            }}throw new IOException("Conexão encerrada antes da resposta");}finally{stream.disconnect();if(active==stream)active=null;}
+        HttpURLConnection connection=connect("/chat",id);
+        try{
+            connection.setRequestMethod("POST");
+            connection.setDoOutput(true);
+            connection.setRequestProperty("Content-Type","application/json; charset=UTF-8");
+            connection.setRequestProperty("Accept","application/json");
+            JSONObject payload=new JSONObject()
+                .put("message",question)
+                .put("history",previous);
+            byte[] raw=payload.toString().getBytes(StandardCharsets.UTF_8);
+            try(OutputStream out=connection.getOutputStream()){out.write(raw);}
+            int code=connection.getResponseCode();
+            InputStream stream=code>=400?connection.getErrorStream():connection.getInputStream();
+            if(stream==null)throw new IOException("Resposta vazia do servidor");
+            StringBuilder body=new StringBuilder();
+            try(BufferedReader reader=new BufferedReader(new InputStreamReader(stream,StandardCharsets.UTF_8))){
+                String line;
+                while((line=reader.readLine())!=null)body.append(line);
+            }
+            JSONObject result;
+            try{result=new JSONObject(body.toString());}
+            catch(JSONException parse){throw new IOException("Resposta inválida do servidor");}
+            if(code<200||code>=300){
+                String error=result.optString("error","HTTP "+code);
+                throw new IOException(error);
+            }
+            String answer=result.optString("answer","").trim();
+            if(answer.isEmpty())throw new IOException("Resposta vazia do servidor");
+            return answer;
+        }finally{
+            connection.disconnect();
+            if(active==connection)active=null;
+        }
     }
     private String extract(JSONArray result){JSONArray chat=result.optJSONArray(0);if(chat==null)return "";for(int i=chat.length()-1;i>=0;i--){JSONObject m=chat.optJSONObject(i);if(m==null||!m.optString("role").equals("assistant"))continue;Object c=m.opt("content");if(c instanceof String)return (String)c;if(c instanceof JSONArray){StringBuilder b=new StringBuilder();JSONArray blocks=(JSONArray)c;for(int j=0;j<blocks.length();j++){JSONObject block=blocks.optJSONObject(j);if(block!=null&&block.optString("type").equals("text"))b.append(block.optString("text"));}return b.toString();}}return "";}
     @Override protected void onDestroy(){stop();worker.shutdownNow();super.onDestroy();}
