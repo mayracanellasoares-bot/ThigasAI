@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: thigas-coder-gateway
+    runtime: python
+    plan: free
+    region: virginia
+    buildCommand: pip install -r server/requirements.txt
+    startCommand: gunicorn --chdir server app:app --bind 0.0.0.0:$PORT
+    healthCheckPath: /health
+    envVars:
+      - key: MARITACA_API_KEY
+        sync: false
+      - key: MARITACA_MODEL
+        value: sabiazinho-4
+      - key: MARITACA_URL
+        value: https://chat.maritaca.ai/api/chat/completions
