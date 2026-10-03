@@ -139,11 +139,13 @@ def chat():
                 "Content-Type": "application/json",
             },
             json=payload,
-            timeout=60,
+            timeout=75,
         )
     except requests.Timeout:
+        app.logger.warning("Timeout ao consultar a Maritaca")
         return jsonify({"error": "A Maritaca demorou para responder."}), 504
-    except requests.RequestException:
+    except requests.RequestException as exc:
+        app.logger.warning("Falha de conexão com a Maritaca: %s", exc.__class__.__name__)
         return jsonify({"error": "Não foi possível conectar à Maritaca."}), 502
 
     if upstream.status_code == 401:
