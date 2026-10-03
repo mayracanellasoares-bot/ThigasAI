@@ -14,3 +14,9 @@ services:
         value: sabiazinho-4
       - key: MARITACA_URL
         value: https://chat.maritaca.ai/api/chat/completions
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_WEBHOOK_SECRET
+        sync: false
+      - key: TELEGRAM_WEBHOOK_URL
+        value: https://thigas-coder-gateway.onrender.com/telegram/webhook
