@@ -13,14 +13,19 @@ MARITACA_URL = os.getenv(
 ).strip()
 MARITACA_MODEL = os.getenv("MARITACA_MODEL", "sabiazinho-4").strip()
 MARITACA_API_KEY = os.getenv("MARITACA_API_KEY", "").strip()
+try:
+    MARITACA_MAX_TOKENS = int(os.getenv("MARITACA_MAX_TOKENS", "3072"))
+except ValueError:
+    MARITACA_MAX_TOKENS = 3072
 
 SYSTEM_PROMPT = """
 Você é o THIGAS Coder, assistente de programação configurado por Thiago Fillipe Soares.
 
 Responda sempre em português do Brasil.
 Ajude a criar, explicar, revisar e corrigir códigos.
+Produza respostas completas e úteis, sem encerrar antes de concluir o raciocínio ou o código.
 Quando corrigir um código:
-1. Explique brevemente o problema.
+1. Explique a causa do problema de forma clara.
 2. Entregue o código completo corrigido.
 3. Inclua testes quando forem úteis.
 4. Nunca diga que executou testes se eles não foram executados.
@@ -112,8 +117,8 @@ def chat():
     if not question:
         return jsonify({"error": "Envie uma pergunta no campo message."}), 400
 
-    if len(question) > 12000:
-        return jsonify({"error": "A pergunta excede o limite de 12000 caracteres."}), 413
+    if len(question) > 60000:
+        return jsonify({"error": "A mensagem ou arquivo excede o limite de 60000 caracteres."}), 413
 
     if not MARITACA_API_KEY:
         return jsonify({"error": "MARITACA_API_KEY não configurada no servidor."}), 503
@@ -122,7 +127,7 @@ def chat():
         "model": MARITACA_MODEL,
         "messages": build_messages(question, body.get("history", [])),
         "temperature": 0.2,
-        "max_tokens": 1536,
+        "max_tokens": MARITACA_MAX_TOKENS,
         "stream": False,
     }
 
@@ -134,7 +139,7 @@ def chat():
                 "Content-Type": "application/json",
             },
             json=payload,
-            timeout=35,
+            timeout=60,
         )
     except requests.Timeout:
         return jsonify({"error": "A Maritaca demorou para responder."}), 504
