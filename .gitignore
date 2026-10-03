@@ -1,4 +1,9 @@
-.gradle/
-**/build/
-local.properties
+.venv/
+__pycache__/
+*.py[cod]
+.env
+.env.*
+*.log
+node_modules/
+coverage/
 *.apk

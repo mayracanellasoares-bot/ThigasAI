@@ -1,33 +1,29 @@
-# THIGAS Coder para Android
+# Instalar e usar o THIGAS AI
 
-Este projeto gera um APK de teste que abre seu THIGAS online em uma WebView. O Qwen permanece no Hugging Face; internet, disponibilidade do Space e cotas de GPU continuam necessárias. Não contém chave de API nem pesos do modelo. Android mínimo: 8.0.
+Abra **https://thigas-coder-gateway.onrender.com/** no navegador.
 
-## Gerar pelo GitHub sem Android Studio
+## No Android
 
-1. Crie um repositório PUBLIC no https://github.com/new chamado `thigas-coder-android`.
-2. Extraia este ZIP no Windows. Abra a pasta THIGAS_Coder_Android.
-3. No GitHub, use Add file > Upload files. Envie o CONTEÚDO dessa pasta: app, build.gradle, settings.gradle, gradle.properties e LEIA-ME.md. Não envie o ZIP nem a pasta externa inteira. Commit changes.
-4. Para garantir que o workflow seja incluído, use Add file > Create new file no repositório. Nomeie `.github/workflows/android.yml`. Copie todo o conteúdo do arquivo `GERAR_APK.txt` deste pacote e confirme Commit changes. Se o workflow já foi enviado, pule esta etapa.
-5. Abra Actions > Gerar APK THIGAS. Se não começar automaticamente, clique Run workflow > Run workflow. Aguarde a conclusão verde.
-6. Abra a execução concluída e, em Artifacts, baixe THIGAS-Coder-APK (precisa estar conectado ao GitHub). Extraia o ZIP baixado: dentro estará app-debug.apk.
-7. Transfira app-debug.apk para o Android, abra e permita a instalação por esse aplicativo quando solicitado.
+1. Abra o link no Chrome, fora do navegador interno de aplicativos.
+2. Toque em **INSTALAR**. Se as instruções aparecerem, use o menu **⋮ → Instalar aplicativo** ou **Adicionar à tela inicial**.
+3. Confirme a instalação e abra **THIGAS AI** pelo ícone do aparelho.
 
-O fluxo usa runner Ubuntu padrão. Execução em repositórios públicos é gratuita nas regras atuais do GitHub. O artefato fica disponível por 7 dias; depois disso, gere novamente ou guarde o APK baixado.
+O APK antigo instalado no aparelho é independente: desinstale-o pelas configurações do Android quando terminar de migrar. O site não consegue removê-lo remotamente.
 
-## Conferir no celular
+## No computador
 
-- Abra o aplicativo: deve aparecer o chat THIGAS.
-- Pergunte: "Crie uma função Python que some dois números".
-- Teste Recarregar, teclado, rotação da tela e voltar.
-- Sem internet: deve aparecer Tentar novamente. Reconecte e toque no botão.
-- Se login ou cota da GPU impedir o uso, tente Abrir no navegador.
+Abra o site no Chrome ou Edge e use o botão de instalação na barra de endereço. O PWA abre em uma janela própria. Também é possível continuar acessando pelo navegador.
 
-## Limites e manutenção
+## Arquivos e conversas
 
-APK de teste, assinado com chave de debug pelo build. Para atualizar uma instalação com assinatura diferente, pode ser necessário desinstalar a anterior. Para distribuição contínua, configure assinatura de release estável.
+O clipe aceita arquivos de texto e código UTF-8 até 256 KiB. Mensagem e arquivo juntos: até 60.000 caracteres. Imagens, PDF e ZIP não são interpretados. Use **COPIAR** ou **BAIXAR** nos blocos de código das respostas.
 
-O APK não corrige erros do app.py. Seu Space precisa abrir normalmente. URL configurada: https://thiagollipe-thigas-coder.hf.space/ . Se o Space for renomeado, altere APP_URL em app/src/main/java/br/com/thigas/coder/MainActivity.java.
+O histórico e as preferências ficam salvos neste navegador/dispositivo. Não são sincronizados entre aparelhos. **LIMPAR** apaga o histórico local.
 
-Verificação entregue: XML e estrutura do pacote conferidos; compilação e lint ocorrerão no GitHub Actions. Não foi executado em emulador ou dispositivo nesta entrega.
+## Internet e atualização
 
-Versões: JDK 17, Gradle 8.9, Android Gradle Plugin 8.7.3, SDK 35. Com Android SDK e Gradle instalados localmente, rode `gradle :app:lintDebug :app:assembleDebug`.
+Após a primeira visita online, com o cache preparado, a interface e o histórico podem abrir sem internet. Para conversar com a IA, conecte-se à internet. Não há reenvio automático de perguntas ao reconectar.
+
+Quando surgir **Nova versão disponível**, use **ATUALIZAR**. A página pede confirmação se houver uma pergunta não enviada ou uma consulta em andamento. O histórico já salvo permanece.
+
+As respostas usam a Maritaca AI e consomem saldo no servidor. Não envie senhas, chaves de API ou dados sensíveis. A hospedagem gratuita pode demorar para despertar.

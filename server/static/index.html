@@ -5,17 +5,27 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#030a04">
   <meta name="description" content="THIGAS AI: assistente de programação em um terminal retro ASCII.">
+  <meta name="application-name" content="THIGAS AI">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="THIGAS AI">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>THIGAS AI — Terminal ASCII</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/static/icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/chat.css?v=crt1">
-  <script src="/static/chat.js?v=crt1" defer></script>
+  <link rel="stylesheet" href="/static/chat.css?v=pwa1">
+  <script src="/static/chat.js?v=pwa1" defer></script>
+  <script src="/static/pwa.js?v=pwa1" defer></script>
 </head>
 <body class="theme-green">
   <header class="site-header">
     <h1 class="crt-text">🤖 THIGAS AI</h1>
     <nav class="toolbar" aria-label="Controles do terminal">
+      <button id="btn-install" class="retro-btn" type="button">INSTALAR</button>
       <button id="btn-theme" class="retro-btn" type="button">TEMA: VERDE</button>
       <button id="btn-scanlines" class="retro-btn" type="button" aria-pressed="true">CRT: ON</button>
       <button id="btn-sound" class="retro-btn" type="button" aria-pressed="false">SOM: OFF</button>
@@ -25,6 +35,10 @@
   </header>
 
   <main id="terminal" class="crt-container scanlines crt-text" aria-label="Terminal THIGAS AI">
+    <div id="pwa-update" class="update-notice" role="status" hidden>
+      <span>Nova versão disponível.</span>
+      <button id="btn-update" class="retro-btn" type="button">ATUALIZAR</button>
+    </div>
     <div class="terminal-bar">
       <span id="connection-status" role="status">VERIFICANDO SERVIDOR…</span>
       <span class="power-indicator"><span id="power-lamp" class="lamp"></span>THIGAS-v2.0</span>
@@ -84,6 +98,18 @@
     <h3>Privacidade e limites</h3>
     <p>Seu texto, anexos enviados e parte do histórico são encaminhados à Maritaca para gerar a resposta. Não envie senhas, chaves de API ou dados sensíveis. O histórico fica no armazenamento deste navegador; não é sincronizado com o Telegram.</p>
     <p>O uso da API consome o saldo do responsável pelo servidor. A hospedagem gratuita pode precisar de tempo para despertar. Uma falha não gera uma tentativa automática.</p>
+    <p>Use INSTALAR para adicionar o THIGAS à tela inicial. Depois do primeiro carregamento online, a tela e o histórico podem abrir sem internet. Para gerar novas respostas, conecte-se à internet.</p>
   </dialog>
+
+  <dialog id="install-modal" aria-labelledby="install-title">
+    <div class="dialog-header"><h2 id="install-title">[ INSTALAR THIGAS AI ]</h2><button id="btn-close-install" class="retro-btn" type="button" aria-label="Fechar instruções de instalação">×</button></div>
+    <p>O THIGAS agora é instalado pelo navegador. Não é necessário baixar um APK.</p>
+    <p><strong>Android:</strong> abra este site no Chrome. No menu ⋮, escolha <strong>Instalar aplicativo</strong> ou <strong>Adicionar à tela inicial</strong>.</p>
+    <p><strong>Computador:</strong> use o botão de instalação na barra de endereço do Chrome ou Edge.</p>
+    <p><strong>iPhone/iPad:</strong> abra no Safari e use Compartilhar → Adicionar à Tela de Início.</p>
+    <p>Se você abriu pelo Telegram ou outro aplicativo, abra o link no navegador para instalar. A opção depende do navegador e pode aparecer após um novo carregamento.</p>
+    <p>O histórico fica neste navegador. Respostas novas exigem internet e consomem o saldo da API.</p>
+  </dialog>
+  <noscript>Ative o JavaScript para conversar com o THIGAS e instalar o PWA.</noscript>
 </body>
 </html>

@@ -191,6 +191,24 @@ def index():
     return response
 
 
+@app.get("/manifest.webmanifest")
+def manifest():
+    response = app.send_static_file("manifest.webmanifest")
+    response.headers["Content-Type"] = "application/manifest+json; charset=utf-8"
+    response.headers["Cache-Control"] = "no-cache"
+    return response
+
+
+@app.get("/sw.js")
+def service_worker():
+    response = app.send_static_file("sw.js")
+    response.headers["Content-Type"] = "text/javascript; charset=utf-8"
+    response.headers["Cache-Control"] = "no-cache"
+    response.headers["Service-Worker-Allowed"] = "/"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
 @app.get("/api")
 def api_info():
     return jsonify(

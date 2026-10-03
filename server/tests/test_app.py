@@ -1,6 +1,7 @@
 import importlib.util
 import os
 import sys
+import struct
 from pathlib import Path
 import unittest
 from unittest.mock import patch
@@ -41,6 +42,39 @@ class GatewayTests(unittest.TestCase):
             with self.subTest(asset=asset):
                 self.assertEqual(self.get("/static/" + asset).status_code, 200)
         self.assertEqual(self.get("/static/../app.py").status_code, 404)
+
+    def test_pwa_manifest_and_installation_metadata(self):
+        response = self.get("/manifest.webmanifest")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.mimetype, "application/manifest+json")
+        manifest = response.get_json()
+        self.assertEqual(manifest["name"], "THIGAS AI")
+        self.assertEqual(manifest["display"], "standalone")
+        self.assertEqual(manifest["start_url"], "/")
+        self.assertEqual(manifest["scope"], "/")
+        self.assertFalse(manifest["prefer_related_applications"])
+        self.assertEqual({icon["sizes"] for icon in manifest["icons"]}, {"192x192", "512x512"})
+        html = self.get("/").get_data(as_text=True)
+        self.assertIn('rel="manifest" href="/manifest.webmanifest"', html)
+        self.assertIn('id="btn-install"', html)
+
+    def test_pwa_png_icons_match_manifest_dimensions(self):
+        for size in (192, 512):
+            response = self.get(f"/static/icons/icon-{size}.png")
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.mimetype, "image/png")
+            data = response.get_data()
+            self.assertEqual(data[:8], b"\x89PNG\r\n\x1a\n")
+            self.assertEqual(struct.unpack(">II", data[16:24]), (size, size))
+
+    def test_worker_scope_and_freshness_headers(self):
+        response = self.get("/sw.js")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.mimetype, "text/javascript")
+        self.assertEqual(response.headers["Service-Worker-Allowed"], "/")
+        self.assertEqual(response.headers["Cache-Control"], "no-cache")
+        self.assertEqual(response.headers["X-Content-Type-Options"], "nosniff")
+        self.assertIn("thigas-pwa-", response.get_data(as_text=True))
 
     def test_metadata_moved_without_changing_contract(self):
         data = self.get("/api").get_json()

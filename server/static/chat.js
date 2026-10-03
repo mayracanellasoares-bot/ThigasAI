@@ -197,7 +197,8 @@
   }
 
   function applySettings() {
-    document.body.className = "theme-" + settings.theme;
+    document.body.classList.remove(...THEMES.map(theme => "theme-" + theme));
+    document.body.classList.add("theme-" + settings.theme);
     byId("terminal").classList.toggle("scanlines", settings.crt);
     byId("btn-theme").textContent = "TEMA: " + THEME_NAMES[settings.theme];
     byId("btn-scanlines").textContent = "CRT: " + (settings.crt ? "ON" : "OFF");
@@ -292,6 +293,10 @@
     const raw = input.value.trim();
     const command = attachment ? { handled: false, question: raw } : handleCommand(raw);
     if (command.handled) { input.value = ""; resizeInput(); return; }
+    if (navigator.onLine === false) {
+      info("Você está sem internet. O histórico continua disponível; conecte-se para pedir uma nova resposta.", true);
+      return;
+    }
     let message;
     try { message = composeMessage(command.question, attachment); }
     catch (error) { info(error.message, true); beep("error"); return; }
@@ -356,17 +361,37 @@
   }
 
   async function checkHealth() {
+    if (navigator.onLine === false) { showOffline(); return; }
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 60000);
     try {
       const response = await fetch("/health", { signal: controller.signal, cache: "no-store" });
       const data = await response.json();
+      if (navigator.onLine === false) { showOffline(); return; }
       if (!response.ok || data.status !== "ok") throw new Error("health");
       byId("connection-status").textContent = "SERVIDOR DISPONÍVEL";
       byId("power-lamp").classList.add("online");
-    } catch (_) { byId("connection-status").textContent = "SERVIDOR NÃO VERIFICADO"; }
+    } catch (_) {
+      if (navigator.onLine === false) showOffline();
+      else {
+        byId("connection-status").textContent = "SERVIDOR NÃO VERIFICADO";
+        byId("power-lamp").classList.remove("online");
+      }
+    }
     finally { clearTimeout(timeout); }
   }
+
+  function showOffline() {
+    document.body.classList.add("is-offline");
+    byId("connection-status").textContent = "OFFLINE — HISTÓRICO DISPONÍVEL";
+    byId("power-lamp").classList.remove("online");
+  }
+
+  window.addEventListener("offline", showOffline);
+  window.addEventListener("online", () => {
+    document.body.classList.remove("is-offline");
+    void checkHealth();
+  });
 
   const savedSettings = readSaved(SETTINGS_KEY);
   if (savedSettings && typeof savedSettings === "object") {

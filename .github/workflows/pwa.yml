@@ -1,0 +1,35 @@
+name: Verificar PWA THIGAS
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["server/**", "scripts/**", ".github/workflows/pwa.yml"]
+  pull_request:
+    paths: ["server/**", "scripts/**", ".github/workflows/pwa.yml"]
+permissions:
+  contents: read
+jobs:
+  testes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: pip install -r server/requirements.txt
+      - run: python -m unittest discover -s server/tests -v
+      - run: node --test server/tests/*.test.cjs
+      - name: Verificar sintaxe
+        run: |
+          node --check server/static/chat.js
+          node --check server/static/pwa.js
+          node --check server/static/sw.js
+      - name: Impedir retorno do build Android
+        run: |
+          test ! -d app
+          test ! -f .github/workflows/android.yml
+          test ! -f build.gradle
