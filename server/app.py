@@ -186,6 +186,13 @@ def add_cors(response):
 
 @app.get("/")
 def index():
+    response = app.send_static_file("index.html")
+    response.headers["Cache-Control"] = "no-cache"
+    return response
+
+
+@app.get("/api")
+def api_info():
     return jsonify(
         {
             "name": "THIGAS Coder Gateway",

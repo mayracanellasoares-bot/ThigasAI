@@ -1,0 +1,111 @@
+import importlib.util
+import os
+import sys
+from pathlib import Path
+import unittest
+from unittest.mock import patch
+
+
+SERVER = Path(__file__).resolve().parents[1]
+spec = importlib.util.spec_from_file_location("thigas_test_app", SERVER / "app.py")
+gateway = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = gateway
+# Não registra webhooks nem lê credenciais reais durante a suíte.
+with patch.dict(os.environ, {"TELEGRAM_BOT_TOKEN": "", "MARITACA_API_KEY": ""}):
+    spec.loader.exec_module(gateway)
+
+
+class GatewayTests(unittest.TestCase):
+    def setUp(self):
+        gateway.app.config["TESTING"] = True
+        self.client = gateway.app.test_client()
+
+    def get(self, path):
+        response = self.client.get(path)
+        self.addCleanup(response.close)
+        return response
+
+    def test_root_serves_real_chat_layout(self):
+        response = self.get("/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.mimetype, "text/html")
+        self.assertEqual(response.headers["Cache-Control"], "no-cache")
+        html = response.get_data(as_text=True)
+        for marker in ('lang="pt-BR"', "CYBERNETIC ASCII INTELLIGENCE", 'id="chat-form"', 'id="file-input"'):
+            self.assertIn(marker, html)
+        self.assertNotIn("cdn.tailwindcss.com", html)
+        self.assertNotIn("PixelWizard", html)
+
+    def test_assets_exist_and_are_safe_paths(self):
+        for asset in ("chat.js", "chat.css"):
+            with self.subTest(asset=asset):
+                self.assertEqual(self.get("/static/" + asset).status_code, 200)
+        self.assertEqual(self.get("/static/../app.py").status_code, 404)
+
+    def test_metadata_moved_without_changing_contract(self):
+        data = self.get("/api").get_json()
+        self.assertEqual(data["endpoint"], "/chat")
+        self.assertEqual(data["telegram_webhook"], "/telegram/webhook")
+
+    def test_health_and_cors_preserved(self):
+        response = self.get("/health")
+        self.assertEqual(response.get_json()["status"], "ok")
+        self.assertEqual(response.headers["Access-Control-Allow-Origin"], "*")
+        self.assertEqual(self.client.options("/chat").status_code, 204)
+
+    def test_chat_contract_for_browser_and_apk(self):
+        history = [{"role": "user", "content": "Olá"}, {"role": "assistant", "content": "Olá!"}]
+        with patch.object(gateway, "ask_maritaca", return_value="```python\nprint(1)\n```") as ask:
+            response = self.client.post("/chat", json={"message": " Ajude ", "history": history})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["answer"], "```python\nprint(1)\n```")
+        self.assertIn("model", response.get_json())
+        ask.assert_called_once_with("Ajude", history)
+
+    def test_legacy_question_field_preserved(self):
+        with patch.object(gateway, "ask_maritaca", return_value="OK") as ask:
+            self.assertEqual(self.client.post("/chat", json={"question": "teste"}).status_code, 200)
+        ask.assert_called_once_with("teste", [])
+
+    def test_chat_rejects_empty_and_oversized_messages_without_api_call(self):
+        with patch.object(gateway, "ask_maritaca") as ask:
+            self.assertEqual(self.client.post("/chat", json={"message": " "}).status_code, 400)
+            self.assertEqual(self.client.post("/chat", json={"message": "a" * 60001}).status_code, 413)
+            self.assertEqual(self.client.post("/chat", data="not-json").status_code, 400)
+        ask.assert_not_called()
+
+    def test_provider_errors_keep_status(self):
+        for status in (429, 502, 503, 504):
+            with self.subTest(status=status), patch.object(gateway, "ask_maritaca", side_effect=gateway.GatewayError("Falha", status)):
+                response = self.client.post("/chat", json={"message": "teste"})
+                self.assertEqual(response.status_code, status)
+                self.assertEqual(response.get_json(), {"error": "Falha"})
+
+    def test_server_never_sends_secret_to_browser(self):
+        with patch.object(gateway, "MARITACA_API_KEY", "fake-secret-test"), patch.object(gateway, "TELEGRAM_BOT_TOKEN", "fake-telegram-test"):
+            for path in ("/", "/api", "/health", "/static/chat.js"):
+                response = self.get(path)
+                self.assertNotIn("fake-secret-test", response.get_data(as_text=True))
+                self.assertNotIn("fake-telegram-test", response.get_data(as_text=True))
+
+    def test_telegram_missing_configuration(self):
+        self.assertEqual(self.client.post("/telegram/webhook", json={}).status_code, 503)
+
+    def test_telegram_secret_validation_and_background_dispatch_preserved(self):
+        update = {"message": {"chat": {"id": 1}, "text": "teste"}}
+        with patch.object(gateway, "TELEGRAM_BOT_TOKEN", "fake"), patch.object(gateway, "TELEGRAM_WEBHOOK_SECRET", "secret"), patch.object(gateway.telegram_executor, "submit") as submit:
+            self.assertEqual(self.client.post("/telegram/webhook", json=update).status_code, 403)
+            response = self.client.post("/telegram/webhook", json=update, headers={"X-Telegram-Bot-Api-Secret-Token": "secret"})
+            self.assertEqual(response.get_json(), {"ok": True})
+            submit.assert_called_once_with(gateway.process_telegram_update, update)
+
+    def test_telegram_start_does_not_call_provider(self):
+        update = {"message": {"chat": {"id": 100}, "text": "/start"}}
+        with patch.object(gateway, "telegram_send_message") as send, patch.object(gateway, "ask_maritaca") as ask:
+            gateway.process_telegram_update(update)
+        send.assert_called_once()
+        ask.assert_not_called()
+
+
+if __name__ == "__main__":
+    unittest.main()
