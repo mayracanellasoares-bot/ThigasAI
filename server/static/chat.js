@@ -1,4 +1,4 @@
-/* THIGAS CRT: UI local; geração de respostas exclusivamente pelo POST /chat. */
+/* THIGAS AI: interface local; geração de respostas exclusivamente pelo POST /chat. */
 (function () {
   "use strict";
 
@@ -401,7 +401,7 @@
   }
   applySettings();
   history = sanitizeHistory(readSaved(STORAGE_KEY));
-  info("Terminal THIGAS pronto. Pergunte normalmente ou use /help. Não envie senhas ou chaves de API.");
+  info("THIGAS AI pronto. Pergunte normalmente ou use /help. Não envie senhas ou chaves de API.");
   for (const message of history) renderMessage(message.role, message.content);
   if (history.length) info("Histórico restaurado deste navegador.");
   byId("chat-form").addEventListener("submit", send);

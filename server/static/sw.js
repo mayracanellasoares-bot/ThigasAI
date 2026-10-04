@@ -1,13 +1,13 @@
 "use strict";
 
 const CACHE_PREFIX = "thigas-pwa-";
-const CACHE_NAME = CACHE_PREFIX + "v1";
+const CACHE_NAME = CACHE_PREFIX + "v2";
 const APP_SHELL = [
   "/",
   "/manifest.webmanifest",
-  "/static/chat.css?v=pwa1",
-  "/static/chat.js?v=pwa1",
-  "/static/pwa.js?v=pwa1",
+  "/static/chat.css?v=llama2",
+  "/static/chat.js?v=llama2",
+  "/static/pwa.js?v=llama2",
   "/static/icons/icon.svg",
   "/static/icons/icon-192.png",
   "/static/icons/icon-512.png",
@@ -26,7 +26,6 @@ if (typeof module !== "undefined" && module.exports) {
 
 if (typeof self !== "undefined" && self.addEventListener) {
   self.addEventListener("install", event => {
-    // Só recursos públicos da interface. Mensagens, anexos e API nunca entram no cache.
     event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL)));
   });
 
@@ -50,7 +49,6 @@ if (typeof self !== "undefined" && self.addEventListener) {
       await cache.put("/", response.clone());
       return response;
     });
-    // Se o Render estiver despertando, a interface salva abre sem aguardar toda a inicialização.
     event.waitUntil(network.catch(() => undefined));
     let timeout;
     try {

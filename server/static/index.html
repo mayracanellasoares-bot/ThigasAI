@@ -3,113 +3,172 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#030a04">
-  <meta name="description" content="THIGAS AI: assistente de programação em um terminal retro ASCII.">
+  <meta name="theme-color" content="#0b0b0b">
+  <meta name="description" content="THIGAS AI: assistente de IA e programação com interface inspirada na WebUI do llama.cpp/llamafile.">
   <meta name="application-name" content="THIGAS AI">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="THIGAS AI">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>THIGAS AI — Terminal ASCII</title>
+  <title>THIGAS AI</title>
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/static/icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/chat.css?v=pwa1">
-  <script src="/static/chat.js?v=pwa1" defer></script>
-  <script src="/static/pwa.js?v=pwa1" defer></script>
+  <link rel="stylesheet" href="/static/chat.css?v=llama2">
+  <script src="/static/chat.js?v=llama2" defer></script>
+  <script src="/static/pwa.js?v=llama2" defer></script>
 </head>
 <body class="theme-green">
-  <header class="site-header">
-    <h1 class="crt-text">🤖 THIGAS AI</h1>
-    <nav class="toolbar" aria-label="Controles do terminal">
-      <button id="btn-install" class="retro-btn" type="button">INSTALAR</button>
-      <button id="btn-theme" class="retro-btn" type="button">TEMA: VERDE</button>
-      <button id="btn-scanlines" class="retro-btn" type="button" aria-pressed="true">CRT: ON</button>
-      <button id="btn-sound" class="retro-btn" type="button" aria-pressed="false">SOM: OFF</button>
-      <button id="btn-clear" class="retro-btn" type="button">LIMPAR</button>
-      <button id="btn-help" class="retro-btn" type="button" aria-haspopup="dialog">AJUDA</button>
-    </nav>
-  </header>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="Navegação principal">
+      <div class="brand">
+        <img src="/static/icons/icon.svg" alt="" class="brand-icon">
+        <div class="brand-copy">
+          <strong>THIGAS AI</strong>
+          <span>coder</span>
+        </div>
+      </div>
 
-  <main id="terminal" class="crt-container scanlines crt-text" aria-label="Terminal THIGAS AI">
-    <div id="pwa-update" class="update-notice" role="status" hidden>
-      <span>Nova versão disponível.</span>
-      <button id="btn-update" class="retro-btn" type="button">ATUALIZAR</button>
-    </div>
-    <div class="terminal-bar">
-      <span id="connection-status" role="status">VERIFICANDO SERVIDOR…</span>
-      <span class="power-indicator"><span id="power-lamp" class="lamp"></span>THIGAS-v2.0</span>
-    </div>
-    <div id="chat-scroll" tabindex="0" aria-label="Conversa">
-      <div class="banner-wrap" aria-hidden="true">
-<pre class="ascii-banner">#========================================================================================#
-#  _____ _  _ ___ ___   _   ___   _   ___                                                #
-# |_   _| || |_ _| __| /_\ / __| /_\ |_ _|                                               #
-#   | | | __ || || _ \/ _ \\__ \/ _ \ | |                                                #
-#   |_| |_||_|___|___/_/ \_\___/_/ \_\___|                                               #
-#                                                                                        #
-#                            CYBERNETIC ASCII INTELLIGENCE                               #
-#========================================================================================#</pre>
-      </div>
-      <div id="chat-logs" role="log" aria-live="polite" aria-relevant="additions" aria-label="Mensagens"></div>
-    </div>
+      <button id="btn-clear" class="new-chat-btn" type="button">
+        <span aria-hidden="true">＋</span>
+        <span>Novo chat</span>
+      </button>
 
-    <section class="composer" aria-label="Enviar mensagem">
-      <div id="attachment-preview" class="attachment-preview" hidden>
-        <span id="attachment-label"></span>
-        <button id="btn-remove-file" class="retro-btn" type="button" aria-label="Remover anexo">×</button>
+      <nav class="sidebar-nav" aria-label="Opções">
+        <button id="btn-install" class="sidebar-btn" type="button">
+          <span class="nav-icon" aria-hidden="true">↓</span>
+          <span>Instalar aplicativo</span>
+        </button>
+        <button id="btn-help" class="sidebar-btn" type="button" aria-haspopup="dialog">
+          <span class="nav-icon" aria-hidden="true">?</span>
+          <span>Ajuda</span>
+        </button>
+        <button id="btn-privacy" class="sidebar-btn" type="button">
+          <span class="nav-icon" aria-hidden="true">◉</span>
+          <span>Privacidade</span>
+        </button>
+      </nav>
+
+      <div class="legacy-controls" aria-hidden="true">
+        <button id="btn-theme" type="button">TEMA: VERDE</button>
+        <button id="btn-scanlines" type="button" aria-pressed="true">CRT: ON</button>
+        <button id="btn-sound" type="button" aria-pressed="false">SOM: OFF</button>
       </div>
-      <form id="chat-form">
-        <button type="button" id="btn-attach" class="retro-btn attach-btn" aria-label="Anexar arquivo de texto ou código" title="Anexar texto ou código">📎</button>
-        <span class="prompt-sign" aria-hidden="true">&gt;</span>
-        <label class="sr-only" for="chat-input">Sua mensagem</label>
-        <textarea id="chat-input" rows="1" maxlength="60000" placeholder="Pergunte ou cole seu código…" autocomplete="off" spellcheck="false"></textarea>
-        <button id="btn-send" type="submit" class="retro-btn send-btn">ENVIAR</button>
-      </form>
-      <input type="file" id="file-input" hidden accept=".txt,.md,.py,.js,.mjs,.cjs,.ts,.tsx,.jsx,.json,.yaml,.yml,.toml,.csv,.xml,.html,.css,.scss,.sh,.ps1,.bat,.c,.h,.cpp,.hpp,.cs,.java,.go,.rs,.rb,.php,.sql,.kt,.swift,.dart,.lua,.r">
-      <div class="input-hints">
-        <span>ENTER: enviar · SHIFT+ENTER: nova linha</span>
-        <span id="request-status" role="status">PRONTO<span class="cursor-blink" aria-hidden="true"> ▉</span></span>
+
+      <div class="sidebar-bottom">
+        <div class="server-state">
+          <span id="power-lamp" class="lamp" aria-hidden="true"></span>
+          <div>
+            <span id="connection-status" role="status">Verificando servidor…</span>
+            <small>THIGAS v2.0</small>
+          </div>
+        </div>
       </div>
+    </aside>
+
+    <section class="workspace">
+      <header class="chat-header">
+        <div class="mobile-brand">
+          <img src="/static/icons/icon.svg" alt="" class="mobile-brand-icon">
+          <strong>THIGAS AI</strong>
+        </div>
+        <div class="model-chip" title="Assistente ativo">
+          <span class="model-dot"></span>
+          <span>THIGAS Coder</span>
+          <span class="chevron" aria-hidden="true">⌄</span>
+        </div>
+        <div class="header-actions">
+          <span class="header-badge">online</span>
+        </div>
+      </header>
+
+      <main id="terminal" class="chat-panel" aria-label="Conversa com THIGAS AI">
+        <div id="pwa-update" class="update-notice" role="status" hidden>
+          <span>Nova versão disponível.</span>
+          <button id="btn-update" class="compact-btn" type="button">Atualizar</button>
+        </div>
+
+        <div id="chat-scroll" tabindex="0" aria-label="Conversa">
+          <section class="welcome" aria-label="Boas-vindas">
+            <div class="welcome-mark">
+              <img src="/static/icons/icon.svg" alt="">
+            </div>
+            <h1>Como posso ajudar?</h1>
+            <p>Converse com o THIGAS, envie código ou anexe um arquivo de texto.</p>
+          </section>
+          <div id="chat-logs" role="log" aria-live="polite" aria-relevant="additions" aria-label="Mensagens"></div>
+        </div>
+
+        <section class="composer-wrap" aria-label="Enviar mensagem">
+          <div id="attachment-preview" class="attachment-preview" hidden>
+            <span id="attachment-label"></span>
+            <button id="btn-remove-file" class="attachment-remove" type="button" aria-label="Remover anexo">×</button>
+          </div>
+
+          <form id="chat-form" class="composer">
+            <button type="button" id="btn-attach" class="icon-btn attach-btn" aria-label="Anexar arquivo de texto ou código" title="Anexar arquivo">
+              <span aria-hidden="true">＋</span>
+            </button>
+            <label class="sr-only" for="chat-input">Sua mensagem</label>
+            <textarea id="chat-input" rows="1" maxlength="60000" placeholder="Envie uma mensagem para o THIGAS…" autocomplete="off" spellcheck="false"></textarea>
+            <button id="btn-send" type="submit" class="send-btn" aria-label="Enviar mensagem" title="Enviar">
+              <span class="send-arrow" aria-hidden="true">↑</span>
+              <span class="send-label">Enviar</span>
+            </button>
+          </form>
+
+          <div class="composer-footer">
+            <span>Enter para enviar · Shift+Enter para nova linha</span>
+            <span id="request-status" role="status">Pronto</span>
+          </div>
+        </section>
+      </main>
+
+      <footer class="site-footer">
+        <span>THIGAS AI pode cometer erros. Verifique informações importantes.</span>
+        <span id="clock-display" aria-label="Hora local"></span>
+      </footer>
     </section>
-  </main>
-
-  <footer class="site-footer">
-    <span>ASCII &amp; ANSI LOVE · <span id="clock-display"></span></span>
-    <span>Conversa salva neste navegador · <button id="btn-privacy" class="text-btn" type="button">Privacidade</button></span>
-  </footer>
+  </div>
 
   <dialog id="help-modal" aria-labelledby="help-title">
-    <div class="dialog-header"><h2 id="help-title">[ MANUAL DO TERMINAL ]</h2><button id="btn-close-help" class="retro-btn" type="button" aria-label="Fechar ajuda">×</button></div>
-    <p>Escreva normalmente para conversar com o THIGAS. As respostas vêm da Maritaca AI, pelo servidor — não são simuladas.</p>
+    <div class="dialog-header">
+      <div>
+        <span class="dialog-kicker">THIGAS AI</span>
+        <h2 id="help-title">Ajuda e privacidade</h2>
+      </div>
+      <button id="btn-close-help" class="dialog-close" type="button" aria-label="Fechar ajuda">×</button>
+    </div>
+    <p>Escreva normalmente para conversar com o THIGAS. As respostas vêm da IA configurada no servidor.</p>
     <dl>
-      <dt>/help ou /ajuda</dt><dd>Mostrar este manual.</dd>
-      <dt>/clear ou /novo</dt><dd>Apagar a conversa deste navegador.</dd>
-      <dt>/theme green|amber|cyan|pink</dt><dd>Mudar o fósforo do monitor.</dd>
-      <dt>/sound</dt><dd>Ligar ou desligar os sons.</dd>
-      <dt>/cat</dt><dd>Mostrar um gato ASCII.</dd>
-      <dt>/thigas pergunta</dt><dd>Enviar uma pergunta à IA.</dd>
+      <dt>/help ou /ajuda</dt><dd>Abre esta ajuda.</dd>
+      <dt>/clear ou /novo</dt><dd>Apaga a conversa salva neste navegador.</dd>
+      <dt>/theme green|amber|cyan|pink</dt><dd>Comando legado de tema.</dd>
+      <dt>/sound</dt><dd>Liga ou desliga os sons.</dd>
+      <dt>/cat</dt><dd>Mostra um gato ASCII.</dd>
+      <dt>/thigas pergunta</dt><dd>Envia uma pergunta à IA.</dd>
     </dl>
-    <p>📎 Anexe texto ou código UTF-8 até 256 KiB. Mensagem e anexo juntos: até 60.000 caracteres. Imagens, PDF e ZIP não são interpretados nesta versão.</p>
-    <p>Blocos de código nas respostas podem ser copiados ou baixados. O site não executa códigos nem testes.</p>
-    <h3>Privacidade e limites</h3>
-    <p>Seu texto, anexos enviados e parte do histórico são encaminhados à Maritaca para gerar a resposta. Não envie senhas, chaves de API ou dados sensíveis. O histórico fica no armazenamento deste navegador; não é sincronizado com o Telegram.</p>
-    <p>O uso da API consome o saldo do responsável pelo servidor. A hospedagem gratuita pode precisar de tempo para despertar. Uma falha não gera uma tentativa automática.</p>
-    <p>Use INSTALAR para adicionar o THIGAS à tela inicial. Depois do primeiro carregamento online, a tela e o histórico podem abrir sem internet. Para gerar novas respostas, conecte-se à internet.</p>
+    <p>Você pode anexar texto ou código UTF-8 de até 256 KiB. Mensagem e anexo juntos podem ter até 60.000 caracteres. Imagens, PDF e ZIP ainda não são interpretados nesta versão.</p>
+    <p>Blocos de código podem ser copiados ou baixados. A interface não executa os códigos automaticamente.</p>
+    <h3>Privacidade</h3>
+    <p>Seu texto, anexos enviados e parte do histórico são encaminhados ao provedor de IA configurado no servidor para gerar a resposta. Não envie senhas, chaves de API ou dados sensíveis.</p>
+    <p>O histórico fica salvo apenas neste navegador. O PWA pode abrir a interface sem internet depois do primeiro carregamento, mas novas respostas exigem conexão.</p>
   </dialog>
 
   <dialog id="install-modal" aria-labelledby="install-title">
-    <div class="dialog-header"><h2 id="install-title">[ INSTALAR THIGAS AI ]</h2><button id="btn-close-install" class="retro-btn" type="button" aria-label="Fechar instruções de instalação">×</button></div>
-    <p>O THIGAS agora é instalado pelo navegador. Não é necessário baixar um APK.</p>
-    <p><strong>Android:</strong> abra este site no Chrome. No menu ⋮, escolha <strong>Instalar aplicativo</strong> ou <strong>Adicionar à tela inicial</strong>.</p>
-    <p><strong>Computador:</strong> use o botão de instalação na barra de endereço do Chrome ou Edge.</p>
-    <p><strong>iPhone/iPad:</strong> abra no Safari e use Compartilhar → Adicionar à Tela de Início.</p>
-    <p>Se você abriu pelo Telegram ou outro aplicativo, abra o link no navegador para instalar. A opção depende do navegador e pode aparecer após um novo carregamento.</p>
-    <p>O histórico fica neste navegador. Respostas novas exigem internet e consomem o saldo da API.</p>
+    <div class="dialog-header">
+      <div>
+        <span class="dialog-kicker">PWA</span>
+        <h2 id="install-title">Instalar THIGAS AI</h2>
+      </div>
+      <button id="btn-close-install" class="dialog-close" type="button" aria-label="Fechar instruções de instalação">×</button>
+    </div>
+    <p>O THIGAS pode ser instalado diretamente pelo navegador, sem APK.</p>
+    <p><strong>Android:</strong> abra no Chrome e use o menu ⋮ → <strong>Instalar aplicativo</strong> ou <strong>Adicionar à tela inicial</strong>.</p>
+    <p><strong>Computador:</strong> use o botão de instalação disponível na barra de endereço do Chrome ou Edge.</p>
+    <p><strong>iPhone/iPad:</strong> abra no Safari e escolha Compartilhar → Adicionar à Tela de Início.</p>
   </dialog>
-  <noscript>Ative o JavaScript para conversar com o THIGAS e instalar o PWA.</noscript>
+
+  <noscript>Ative o JavaScript para conversar com o THIGAS.</noscript>
 </body>
 </html>
