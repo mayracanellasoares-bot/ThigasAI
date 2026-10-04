@@ -14,8 +14,8 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/static/icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
-  <link rel="stylesheet" href="/static/chat.css?v=llama3">
-  <script src="/static/chat.js?v=llama3" defer></script>
+  <link rel="stylesheet" href="/static/chat.css?v=docs1">
+  <script src="/static/chat.js?v=docs1" defer></script>
   <script src="/static/pwa.js?v=llama2" defer></script>
 </head>
 <body class="theme-green">
@@ -98,7 +98,12 @@
               <img src="/static/icons/icon.svg" alt="">
             </div>
             <h1>Como posso ajudar?</h1>
-            <p>Converse com o THIGAS, envie código ou anexe um arquivo de texto.</p>
+            <p>Converse, programe e analise documentos no mesmo lugar.</p>
+            <div class="starter-actions" aria-label="Sugestões">
+              <button type="button" class="starter-chip" data-prompt="Analise este documento e faça um resumo objetivo.">Resumir documento</button>
+              <button type="button" class="starter-chip" data-prompt="Revise este código, encontre bugs e proponha correções.">Revisar código</button>
+              <button type="button" class="starter-chip" data-prompt="Explique este conteúdo de forma simples e passo a passo.">Explicar conteúdo</button>
+            </div>
           </section>
           <div id="chat-logs" role="log" aria-live="polite" aria-relevant="additions" aria-label="Mensagens"></div>
         </div>
@@ -110,16 +115,17 @@
           </div>
 
           <form id="chat-form" class="composer">
-            <button type="button" id="btn-attach" class="icon-btn attach-btn" aria-label="Anexar arquivo de texto ou código" title="Anexar arquivo">
+            <button type="button" id="btn-attach" class="icon-btn attach-btn" aria-label="Anexar documento, texto ou código" title="Anexar documento, texto ou código">
               <span aria-hidden="true">＋</span>
             </button>
             <label class="sr-only" for="chat-input">Sua mensagem</label>
-            <textarea id="chat-input" rows="1" maxlength="60000" placeholder="Envie uma mensagem para o THIGAS…" autocomplete="off" spellcheck="false"></textarea>
+            <textarea id="chat-input" rows="1" maxlength="60000" placeholder="Mensagem, código ou pergunta sobre o documento…" autocomplete="off" spellcheck="false"></textarea>
             <button id="btn-send" type="submit" class="send-btn" aria-label="Enviar mensagem" title="Enviar">
               <span class="send-arrow" aria-hidden="true">↑</span>
               <span class="send-label">Enviar</span>
             </button>
           </form>
+          <input type="file" id="file-input" hidden accept=".pdf,.docx,.xlsx,.pptx,.txt,.md,.py,.js,.mjs,.cjs,.ts,.tsx,.jsx,.json,.yaml,.yml,.toml,.csv,.xml,.html,.css,.scss,.sh,.ps1,.bat,.c,.h,.cpp,.hpp,.cs,.java,.go,.rs,.rb,.php,.sql,.kt,.swift,.dart,.lua,.r">
 
           <div class="composer-footer">
             <span>Enter para enviar · Shift+Enter para nova linha</span>
@@ -152,7 +158,7 @@
       <dt>/cat</dt><dd>Mostra um gato ASCII.</dd>
       <dt>/thigas pergunta</dt><dd>Envia uma pergunta à IA.</dd>
     </dl>
-    <p>Você pode anexar texto ou código UTF-8 de até 256 KiB. Mensagem e anexo juntos podem ter até 60.000 caracteres. Imagens, PDF e ZIP ainda não são interpretados nesta versão.</p>
+    <p>Você pode anexar PDF, DOCX, XLSX, PPTX, texto e código. Documentos podem ter até 8 MB; o texto extraído é limitado para caber na consulta. PDFs digitalizados somente como imagem ainda exigem OCR. ZIP e executáveis não são aceitos.</p>
     <p>Blocos de código podem ser copiados ou baixados. A interface não executa os códigos automaticamente.</p>
     <h3>Privacidade</h3>
     <p>Seu texto, anexos enviados e parte do histórico são encaminhados ao provedor de IA configurado no servidor para gerar a resposta. Não envie senhas, chaves de API ou dados sensíveis.</p>

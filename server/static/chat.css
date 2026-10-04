@@ -844,3 +844,57 @@ body.light-mode dialog h3 { color: #202024; }
 body.light-mode dl { background: #f6f6f7; }
 body.light-mode dt { color: #242428; }
 body.light-mode dd { color: #66666b; }
+
+/* Refinos de layout e anexos */
+.chat-panel::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 110px;
+  pointer-events: none;
+  background: linear-gradient(to bottom, transparent, var(--bg) 58%);
+  z-index: 1;
+}
+#chat-scroll, .composer-wrap { position: relative; z-index: 2; }
+.sidebar { box-shadow: 10px 0 35px rgba(0,0,0,.06); }
+.model-chip { border-radius: 999px; }
+.header-badge { text-transform: uppercase; letter-spacing: .06em; font-size: 10px; }
+.welcome { max-width: 760px; }
+.welcome p { max-width: 520px; }
+.starter-actions {
+  margin: 24px auto 0;
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.starter-chip {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 9px 13px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.starter-chip:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
+.attachment-preview {
+  border-radius: 14px;
+  box-shadow: 0 8px 28px rgba(0,0,0,.12);
+}
+.composer {
+  border-radius: 22px;
+  padding: 9px;
+}
+#chat-input { padding-left: 6px; }
+.log-entry.assistant { padding-right: 36px; }
+.log-entry.assistant .message-text { max-width: 760px; }
+@media (max-width: 780px) {
+  .starter-actions { margin-top: 18px; gap: 6px; }
+  .starter-chip { padding: 8px 10px; font-size: 11px; }
+  .log-entry.assistant { padding-right: 0; }
+  .chat-panel::after { height: 96px; }
+}

@@ -1,10 +1,16 @@
 import os
 import threading
+from io import BytesIO
+from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 import requests
+from docx import Document
 from flask import Flask, jsonify, request
+from openpyxl import load_workbook
+from pypdf import PdfReader
+from pptx import Presentation
 
 app = Flask(__name__)
 app.config["JSON_AS_ASCII"] = False
@@ -174,6 +180,104 @@ def ask_maritaca(question: str, history: Any) -> str:
         )
 
     return answer
+
+
+
+MAX_DOCUMENT_BYTES = 8 * 1024 * 1024
+MAX_EXTRACTED_CHARACTERS = 52000
+DOCUMENT_EXTENSIONS = {".pdf", ".docx", ".xlsx", ".pptx"}
+
+
+def _limited_join(parts: list[str], limit: int = MAX_EXTRACTED_CHARACTERS) -> tuple[str, bool]:
+    output: list[str] = []
+    total = 0
+    truncated = False
+    for raw in parts:
+        text = str(raw or "").strip()
+        if not text:
+            continue
+        remaining = limit - total
+        if remaining <= 0:
+            truncated = True
+            break
+        piece = text[:remaining]
+        output.append(piece)
+        total += len(piece) + 1
+        if len(text) > len(piece):
+            truncated = True
+            break
+    return "\n".join(output).strip(), truncated
+
+
+def extract_document_text(filename: str, data: bytes) -> tuple[str, bool]:
+    extension = Path(filename or "").suffix.lower()
+    if extension not in DOCUMENT_EXTENSIONS:
+        raise ValueError("Formato de documento não suportado.")
+    parts: list[str] = []
+    if extension == ".pdf":
+        reader = PdfReader(BytesIO(data))
+        for page in reader.pages[:150]:
+            parts.append(page.extract_text() or "")
+    elif extension == ".docx":
+        document = Document(BytesIO(data))
+        parts.extend(paragraph.text for paragraph in document.paragraphs)
+        for table in document.tables:
+            for row in table.rows:
+                parts.append(" | ".join(cell.text for cell in row.cells))
+    elif extension == ".xlsx":
+        workbook = load_workbook(BytesIO(data), read_only=True, data_only=True)
+        try:
+            for worksheet in workbook.worksheets[:20]:
+                parts.append(f"[Planilha: {worksheet.title}]")
+                for row_index, row in enumerate(worksheet.iter_rows(values_only=True), start=1):
+                    if row_index > 10000:
+                        parts.append("[Planilha truncada após 10.000 linhas]")
+                        break
+                    values = [str(value) for value in row if value not in (None, "")]
+                    if values:
+                        parts.append(" | ".join(values))
+        finally:
+            workbook.close()
+    elif extension == ".pptx":
+        presentation = Presentation(BytesIO(data))
+        for slide_index, slide in enumerate(presentation.slides[:200], start=1):
+            parts.append(f"[Slide {slide_index}]")
+            for shape in slide.shapes:
+                if hasattr(shape, "text") and shape.text:
+                    parts.append(shape.text)
+    text, truncated = _limited_join(parts)
+    if not text:
+        if extension == ".pdf":
+            raise ValueError("Não encontrei texto no PDF. Ele pode ser digitalizado como imagem e exigir OCR.")
+        raise ValueError("Não encontrei texto legível nesse documento.")
+    return text, truncated
+
+
+@app.post("/document/extract")
+def extract_document():
+    upload = request.files.get("file")
+    if upload is None or not upload.filename:
+        return jsonify({"error": "Envie um documento no campo file."}), 400
+    filename = upload.filename.replace("\\", "/").split("/")[-1][:180]
+    extension = Path(filename).suffix.lower()
+    if extension not in DOCUMENT_EXTENSIONS:
+        return jsonify({"error": "Formato não suportado. Use PDF, DOCX, XLSX ou PPTX."}), 415
+    data = upload.read(MAX_DOCUMENT_BYTES + 1)
+    if len(data) > MAX_DOCUMENT_BYTES:
+        return jsonify({"error": "O documento excede o limite de 8 MB."}), 413
+    try:
+        text, truncated = extract_document_text(filename, data)
+    except (ValueError, KeyError) as exc:
+        return jsonify({"error": str(exc)}), 422
+    except Exception:
+        app.logger.exception("Falha ao extrair documento")
+        return jsonify({"error": "Não foi possível ler esse documento."}), 422
+    return jsonify({
+        "filename": filename,
+        "text": text,
+        "truncated": truncated,
+        "characters": len(text),
+    })
 
 
 @app.after_request

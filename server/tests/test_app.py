@@ -3,6 +3,7 @@ import os
 import sys
 import struct
 from pathlib import Path
+from io import BytesIO
 import unittest
 from unittest.mock import patch
 
@@ -32,7 +33,7 @@ class GatewayTests(unittest.TestCase):
         self.assertEqual(response.mimetype, "text/html")
         self.assertEqual(response.headers["Cache-Control"], "no-cache")
         html = response.get_data(as_text=True)
-        for marker in ('lang="pt-BR"', "CYBERNETIC ASCII INTELLIGENCE", 'id="chat-form"', 'id="file-input"'):
+        for marker in ('lang="pt-BR"', 'id="chat-form"', 'id="file-input"'):
             self.assertIn(marker, html)
         self.assertNotIn("cdn.tailwindcss.com", html)
         self.assertNotIn("PixelWizard", html)
@@ -75,6 +76,15 @@ class GatewayTests(unittest.TestCase):
         self.assertEqual(response.headers["Cache-Control"], "no-cache")
         self.assertEqual(response.headers["X-Content-Type-Options"], "nosniff")
         self.assertIn("thigas-pwa-", response.get_data(as_text=True))
+
+    def test_document_endpoint_rejects_missing_and_unsupported_files(self):
+        self.assertEqual(self.client.post("/document/extract").status_code, 400)
+        response = self.client.post(
+            "/document/extract",
+            data={"file": (BytesIO(b"abc"), "arquivo.zip")},
+            content_type="multipart/form-data",
+        )
+        self.assertEqual(response.status_code, 415)
 
     def test_metadata_moved_without_changing_contract(self):
         data = self.get("/api").get_json()

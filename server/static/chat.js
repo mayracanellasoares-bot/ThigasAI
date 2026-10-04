@@ -3,12 +3,14 @@
   "use strict";
 
   const MAX_MESSAGE = 60000;
-  const MAX_FILE_BYTES = 256 * 1024;
+  const MAX_FILE_BYTES = 8 * 1024 * 1024;
+  const MAX_TEXT_FILE_BYTES = 512 * 1024;
   const STORAGE_KEY = "thigas.crt.history.v1";
   const SETTINGS_KEY = "thigas.crt.settings.v1";
   const THEMES = ["green", "amber", "cyan", "pink"];
   const THEME_NAMES = { green: "VERDE", amber: "ÂMBAR", cyan: "CIANO", pink: "ROSA" };
   const TEXT_EXTENSIONS = new Set("txt md py js mjs cjs ts tsx jsx json yaml yml toml csv xml html css scss sh ps1 bat c h cpp hpp cs java go rs rb php sql kt swift dart lua r".split(" "));
+  const DOCUMENT_EXTENSIONS = new Set("pdf docx xlsx pptx".split(" "));
 
   function safeFilename(name) {
     return String(name || "arquivo.txt").replace(/[\r\n\t<>\x00-\x1f]/g, "_").slice(0, 160);
@@ -16,12 +18,17 @@
 
   function validateFile(file) {
     if (!file) throw new Error("Selecione um arquivo.");
-    if (file.size > MAX_FILE_BYTES) throw new Error("O arquivo excede 256 KiB. Envie apenas o trecho necessário.");
     const extension = String(file.name || "").split(".").pop().toLowerCase();
     const mime = String(file.type || "").toLowerCase();
-    if (!TEXT_EXTENSIONS.has(extension) && !mime.startsWith("text/") && !["application/json", "application/xml"].includes(mime)) {
-      throw new Error("Envie texto ou código em UTF-8. Imagens, PDF, ZIP e modelos não são lidos nesta versão.");
+    if (DOCUMENT_EXTENSIONS.has(extension)) {
+      if (file.size > MAX_FILE_BYTES) throw new Error("O documento excede 8 MB.");
+      return "document";
     }
+    if (file.size > MAX_TEXT_FILE_BYTES) throw new Error("Arquivos de texto ou código podem ter até 512 KiB.");
+    if (!TEXT_EXTENSIONS.has(extension) && !mime.startsWith("text/") && !["application/json", "application/xml"].includes(mime)) {
+      throw new Error("Formato não suportado. Use PDF, DOCX, XLSX, PPTX, texto ou código.");
+    }
+    return "text";
   }
 
   function composeMessage(question, attachment) {
@@ -74,6 +81,17 @@
     return "thigas_codigo_" + index + "." + (extensions[String(language).toLowerCase()] || "txt");
   }
 
+  async function extractDocument(fetcher, file, signal) {
+    const form = new FormData();
+    form.append("file", file);
+    const response = await fetcher("/document/extract", { method: "POST", body: form, signal });
+    let data;
+    try { data = await response.json(); } catch (_) { throw new Error("O servidor não conseguiu interpretar o documento."); }
+    if (!response.ok) throw new Error(typeof data.error === "string" ? data.error : "Falha ao ler o documento.");
+    if (!data || typeof data.text !== "string" || !data.text.trim()) throw new Error("O documento não contém texto legível.");
+    return { name: safeFilename(data.filename || file.name), text: data.text.trim(), truncated: data.truncated === true };
+  }
+
   async function requestChat(fetcher, message, history, signal) {
     const response = await fetcher("/chat", {
       method: "POST",
@@ -93,7 +111,7 @@
 
   // Exportações puras permitem testar o contrato sem DOM, API externa ou saldo.
   if (typeof module !== "undefined" && module.exports) {
-    module.exports = { MAX_MESSAGE, MAX_FILE_BYTES, safeFilename, validateFile, composeMessage, sanitizeHistory, apiHistory, splitCodeBlocks, codeFilename, requestChat };
+    module.exports = { MAX_MESSAGE, MAX_FILE_BYTES, MAX_TEXT_FILE_BYTES, safeFilename, validateFile, composeMessage, sanitizeHistory, apiHistory, splitCodeBlocks, codeFilename, extractDocument, requestChat };
   }
   if (typeof document === "undefined") return;
 
@@ -359,13 +377,22 @@
     readingFile = true;
     setBusy();
     try {
-      validateFile(file);
-      const text = new TextDecoder("utf-8", { fatal: true }).decode(await file.arrayBuffer());
+      const kind = validateFile(file);
+      let next;
+      if (kind === "document") {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 60000);
+        try { next = await extractDocument(window.fetch.bind(window), file, controller.signal); }
+        finally { clearTimeout(timeout); }
+      } else {
+        const text = new TextDecoder("utf-8", { fatal: true }).decode(await file.arrayBuffer());
+        next = { name: safeFilename(file.name), text };
+      }
       if (epoch !== readingEpoch) return;
-      const next = { name: safeFilename(file.name), text };
       composeMessage(input.value, next);
       attachment = next;
-      byId("attachment-label").textContent = "📎 " + next.name + " · " + text.length.toLocaleString("pt-BR") + " caracteres";
+      const ext = next.name.includes(".") ? next.name.split(".").pop().toUpperCase() : "TXT";
+      byId("attachment-label").textContent = "📎 " + ext + " · " + next.name + " · " + next.text.length.toLocaleString("pt-BR") + " caracteres" + (next.truncated ? " · conteúdo truncado" : "");
       byId("attachment-preview").hidden = false;
     } catch (error) {
       if (epoch !== readingEpoch) return;
@@ -439,6 +466,11 @@
   byId("btn-attach").addEventListener("click", () => byId("file-input").click());
   byId("file-input").addEventListener("change", selectFile);
   byId("btn-remove-file").addEventListener("click", removeAttachment);
+  document.querySelectorAll(".starter-chip").forEach(button => button.addEventListener("click", () => {
+    input.value = button.dataset.prompt || "";
+    resizeInput();
+    input.focus();
+  }));
   function updateClock() { byId("clock-display").textContent = now(); }
   updateClock();
   setInterval(updateClock, 30000);
