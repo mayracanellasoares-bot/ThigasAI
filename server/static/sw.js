@@ -1,12 +1,12 @@
 "use strict";
 
 const CACHE_PREFIX = "thigas-pwa-";
-const CACHE_NAME = CACHE_PREFIX + "v2";
+const CACHE_NAME = CACHE_PREFIX + "v3";
 const APP_SHELL = [
   "/",
   "/manifest.webmanifest",
-  "/static/chat.css?v=llama2",
-  "/static/chat.js?v=llama2",
+  "/static/chat.css?v=llama3",
+  "/static/chat.js?v=llama3",
   "/static/pwa.js?v=llama2",
   "/static/icons/icon.svg",
   "/static/icons/icon-192.png",

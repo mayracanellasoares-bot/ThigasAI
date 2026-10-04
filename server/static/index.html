@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#0b0b0b">
+  <meta name="theme-color" content="#0b0b0b" id="theme-color-meta">
   <meta name="description" content="THIGAS AI: assistente de IA e programação com interface inspirada na WebUI do llama.cpp/llamafile.">
   <meta name="application-name" content="THIGAS AI">
   <meta name="mobile-web-app-capable" content="yes">
@@ -14,8 +14,8 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/static/icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
-  <link rel="stylesheet" href="/static/chat.css?v=llama2">
-  <script src="/static/chat.js?v=llama2" defer></script>
+  <link rel="stylesheet" href="/static/chat.css?v=llama3">
+  <script src="/static/chat.js?v=llama3" defer></script>
   <script src="/static/pwa.js?v=llama2" defer></script>
 </head>
 <body class="theme-green">
@@ -38,6 +38,10 @@
         <button id="btn-install" class="sidebar-btn" type="button">
           <span class="nav-icon" aria-hidden="true">↓</span>
           <span>Instalar aplicativo</span>
+        </button>
+        <button id="btn-color-mode" class="sidebar-btn" type="button" aria-label="Alternar tema claro ou escuro" title="Alternar tema">
+          <span id="color-mode-icon" class="nav-icon" aria-hidden="true">☾</span>
+          <span id="color-mode-label">Tema: Escuro</span>
         </button>
         <button id="btn-help" class="sidebar-btn" type="button" aria-haspopup="dialog">
           <span class="nav-icon" aria-hidden="true">?</span>

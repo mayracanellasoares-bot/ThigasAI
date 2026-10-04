@@ -110,7 +110,7 @@
   let conversationEpoch = 0;
   let activeController = null;
   let audioContext = null;
-  let settings = { theme: "green", sound: false, crt: true };
+  let settings = { theme: "green", sound: false, crt: true, colorMode: "dark" };
 
   function readSaved(key) {
     try { return JSON.parse(localStorage.getItem(key) || "null"); } catch (_) { return null; }
@@ -205,6 +205,19 @@
     byId("btn-scanlines").setAttribute("aria-pressed", String(settings.crt));
     byId("btn-sound").textContent = "SOM: " + (settings.sound ? "ON" : "OFF");
     byId("btn-sound").setAttribute("aria-pressed", String(settings.sound));
+    document.body.classList.toggle("light-mode", settings.colorMode === "light");
+    const colorModeLabel = byId("color-mode-label");
+    const colorModeIcon = byId("color-mode-icon");
+    const colorModeButton = byId("btn-color-mode");
+    if (colorModeLabel) colorModeLabel.textContent = settings.colorMode === "light" ? "Tema: Claro" : "Tema: Escuro";
+    if (colorModeIcon) colorModeIcon.textContent = settings.colorMode === "light" ? "☀" : "☾";
+    if (colorModeButton) {
+      const nextMode = settings.colorMode === "light" ? "escuro" : "claro";
+      colorModeButton.setAttribute("aria-label", "Mudar para tema " + nextMode);
+      colorModeButton.title = "Mudar para tema " + nextMode;
+    }
+    const themeMeta = byId("theme-color-meta");
+    if (themeMeta) themeMeta.setAttribute("content", settings.colorMode === "light" ? "#f7f7f8" : "#0b0b0b");
     storeSaved(SETTINGS_KEY, settings);
   }
 
@@ -239,7 +252,9 @@
     byId("btn-send").disabled = busy;
     byId("btn-attach").disabled = busy;
     byId("btn-remove-file").disabled = requestActive;
-    byId("btn-send").textContent = requestActive ? "AGUARDE" : "ENVIAR";
+    const sendArrow = byId("btn-send").querySelector(".send-arrow");
+    if (sendArrow) sendArrow.textContent = requestActive ? "…" : "↑";
+    byId("btn-send").setAttribute("aria-label", requestActive ? "Aguardando resposta" : "Enviar mensagem");
     logs.setAttribute("aria-busy", String(requestActive));
     byId("request-status").textContent = requestActive ? "PROCESSANDO…" : readingFile ? "LENDO ARQUIVO…" : "PRONTO ▉";
   }
@@ -398,6 +413,7 @@
     if (THEMES.includes(savedSettings.theme)) settings.theme = savedSettings.theme;
     settings.sound = savedSettings.sound === true;
     settings.crt = savedSettings.crt !== false;
+    settings.colorMode = savedSettings.colorMode === "light" ? "light" : "dark";
   }
   applySettings();
   history = sanitizeHistory(readSaved(STORAGE_KEY));
@@ -410,6 +426,10 @@
     if (event.key === "Enter" && !event.shiftKey && !event.isComposing) { event.preventDefault(); byId("chat-form").requestSubmit(); }
   });
   byId("btn-theme").addEventListener("click", () => { settings.theme = THEMES[(THEMES.indexOf(settings.theme) + 1) % THEMES.length]; applySettings(); });
+  byId("btn-color-mode").addEventListener("click", () => {
+    settings.colorMode = settings.colorMode === "light" ? "dark" : "light";
+    applySettings();
+  });
   byId("btn-sound").addEventListener("click", () => { settings.sound = !settings.sound; applySettings(); beep(); });
   byId("btn-scanlines").addEventListener("click", () => { settings.crt = !settings.crt; applySettings(); });
   byId("btn-clear").addEventListener("click", clearConversation);
