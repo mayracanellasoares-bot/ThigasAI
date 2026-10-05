@@ -14,8 +14,8 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/static/icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
-  <link rel="stylesheet" href="/static/chat.css?v=docs1">
-  <script src="/static/chat.js?v=docs1" defer></script>
+  <link rel="stylesheet" href="/static/chat.css?v=history1">
+  <script src="/static/chat.js?v=history1" defer></script>
   <script src="/static/pwa.js?v=llama2" defer></script>
 </head>
 <body class="theme-green">
@@ -35,6 +35,10 @@
       </button>
 
       <nav class="sidebar-nav" aria-label="Opções">
+        <button id="btn-history" class="sidebar-btn" type="button" aria-haspopup="dialog">
+          <span class="nav-icon" aria-hidden="true">◷</span>
+          <span>Histórico</span>
+        </button>
         <button id="btn-install" class="sidebar-btn" type="button">
           <span class="nav-icon" aria-hidden="true">↓</span>
           <span>Instalar aplicativo</span>
@@ -152,7 +156,8 @@
     <p>Escreva normalmente para conversar com o THIGAS. As respostas vêm da IA configurada no servidor.</p>
     <dl>
       <dt>/help ou /ajuda</dt><dd>Abre esta ajuda.</dd>
-      <dt>/clear ou /novo</dt><dd>Apaga a conversa salva neste navegador.</dd>
+      <dt>/novo</dt><dd>Inicia uma nova conversa sem apagar as anteriores.</dd>
+      <dt>/clear</dt><dd>Apaga apenas a conversa atual do histórico local.</dd>
       <dt>/theme green|amber|cyan|pink</dt><dd>Comando legado de tema.</dd>
       <dt>/sound</dt><dd>Liga ou desliga os sons.</dd>
       <dt>/cat</dt><dd>Mostra um gato ASCII.</dd>
@@ -162,7 +167,19 @@
     <p>Blocos de código podem ser copiados ou baixados. A interface não executa os códigos automaticamente.</p>
     <h3>Privacidade</h3>
     <p>Seu texto, anexos enviados e parte do histórico são encaminhados ao provedor de IA configurado no servidor para gerar a resposta. Não envie senhas, chaves de API ou dados sensíveis.</p>
-    <p>O histórico fica salvo apenas neste navegador. O PWA pode abrir a interface sem internet depois do primeiro carregamento, mas novas respostas exigem conexão.</p>
+    <p>O histórico de conversas fica salvo apenas neste navegador, com até 30 conversas recentes. O PWA pode reabrir esse histórico sem internet depois do primeiro carregamento, mas novas respostas exigem conexão.</p>
+  </dialog>
+
+  <dialog id="history-modal" class="history-modal" aria-labelledby="history-title">
+    <div class="dialog-header">
+      <div>
+        <span class="dialog-kicker">THIGAS AI</span>
+        <h2 id="history-title">Histórico de conversas</h2>
+      </div>
+      <button id="btn-close-history" class="dialog-close" type="button" aria-label="Fechar histórico">×</button>
+    </div>
+    <p>As conversas ficam salvas somente neste navegador. Você pode reabrir ou excluir cada conversa.</p>
+    <div id="conversation-list" class="conversation-list" aria-live="polite"></div>
   </dialog>
 
   <dialog id="install-modal" aria-labelledby="install-title">
