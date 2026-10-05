@@ -6,7 +6,10 @@
   const MAX_FILE_BYTES = 8 * 1024 * 1024;
   const MAX_TEXT_FILE_BYTES = 512 * 1024;
   const STORAGE_KEY = "thigas.crt.history.v1";
+  const CONVERSATIONS_KEY = "thigas.conversations.v2";
+  const ACTIVE_CONVERSATION_KEY = "thigas.activeConversation.v2";
   const SETTINGS_KEY = "thigas.crt.settings.v1";
+  const MAX_SAVED_CONVERSATIONS = 30;
   const THEMES = ["green", "amber", "cyan", "pink"];
   const THEME_NAMES = { green: "VERDE", amber: "ÂMBAR", cyan: "CIANO", pink: "ROSA" };
   const TEXT_EXTENSIONS = new Set("txt md py js mjs cjs ts tsx jsx json yaml yml toml csv xml html css scss sh ps1 bat c h cpp hpp cs java go rs rb php sql kt swift dart lua r".split(" "));
@@ -120,7 +123,10 @@
   const logs = byId("chat-logs");
   const scroll = byId("chat-scroll");
   const modal = byId("help-modal");
+  const historyModal = byId("history-modal");
   let history = [];
+  let conversations = [];
+  let activeConversationId = null;
   let attachment = null;
   let requestActive = false;
   let readingFile = false;
@@ -138,6 +144,156 @@
     try { localStorage.setItem(key, JSON.stringify(value)); } catch (_) {
       byId("request-status").textContent = "ARMAZENAMENTO LOCAL INDISPONÍVEL";
     }
+  }
+
+  function conversationId() {
+    if (globalThis.crypto && typeof globalThis.crypto.randomUUID === "function") return globalThis.crypto.randomUUID();
+    return "chat-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
+  }
+
+  function conversationTitle(messages) {
+    const first = (messages || []).find(item => item && item.role === "user" && typeof item.content === "string");
+    if (!first) return "Nova conversa";
+    let title = first.content.split("\n")[0].replace(/^\s+|\s+$/g, "");
+    title = title.replace(/^\[ARQUIVO:[^\]]+\]\s*/i, "");
+    if (!title) title = "Conversa com THIGAS";
+    return title.length > 46 ? title.slice(0, 43) + "…" : title;
+  }
+
+  function normalizeConversation(value) {
+    if (!value || typeof value !== "object" || typeof value.id !== "string") return null;
+    const messages = sanitizeHistory(value.messages, 120000, 40);
+    if (!messages.length) return null;
+    return {
+      id: value.id.slice(0, 100),
+      title: typeof value.title === "string" && value.title.trim() ? value.title.trim().slice(0, 60) : conversationTitle(messages),
+      updatedAt: Number.isFinite(value.updatedAt) ? value.updatedAt : Date.now(),
+      messages,
+    };
+  }
+
+  function loadConversationStore() {
+    const saved = readSaved(CONVERSATIONS_KEY);
+    conversations = Array.isArray(saved) ? saved.map(normalizeConversation).filter(Boolean) : [];
+    conversations.sort((a, b) => b.updatedAt - a.updatedAt);
+    conversations = conversations.slice(0, MAX_SAVED_CONVERSATIONS);
+
+    if (!conversations.length) {
+      const legacy = sanitizeHistory(readSaved(STORAGE_KEY));
+      if (legacy.length) {
+        const migrated = { id: conversationId(), title: conversationTitle(legacy), updatedAt: Date.now(), messages: legacy };
+        conversations = [migrated];
+        storeSaved(CONVERSATIONS_KEY, conversations);
+      }
+    }
+
+    const preferredId = readSaved(ACTIVE_CONVERSATION_KEY);
+    const preferred = conversations.find(item => item.id === preferredId) || conversations[0] || null;
+    activeConversationId = preferred ? preferred.id : null;
+    history = preferred ? preferred.messages.slice() : [];
+  }
+
+  function persistConversation() {
+    history = sanitizeHistory(history, 120000, 40);
+    if (!history.length) return;
+    if (!activeConversationId) activeConversationId = conversationId();
+
+    const next = {
+      id: activeConversationId,
+      title: conversationTitle(history),
+      updatedAt: Date.now(),
+      messages: history.slice(),
+    };
+    conversations = [next, ...conversations.filter(item => item.id !== activeConversationId)]
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .slice(0, MAX_SAVED_CONVERSATIONS);
+    storeSaved(CONVERSATIONS_KEY, conversations);
+    storeSaved(ACTIVE_CONVERSATION_KEY, activeConversationId);
+    renderConversationList();
+  }
+
+  function renderConversationList() {
+    const list = byId("conversation-list");
+    if (!list) return;
+    list.replaceChildren();
+    if (!conversations.length) {
+      list.append(make("p", "history-empty", "Nenhuma conversa salva ainda."));
+      return;
+    }
+    for (const conversation of conversations) {
+      const row = make("div", "conversation-row" + (conversation.id === activeConversationId ? " active" : ""));
+      const open = make("button", "conversation-open");
+      open.type = "button";
+      const title = make("strong", "", conversation.title);
+      const date = make("span", "", new Date(conversation.updatedAt).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }));
+      open.append(title, date);
+      open.addEventListener("click", () => openConversation(conversation.id));
+      const remove = make("button", "conversation-delete", "×");
+      remove.type = "button";
+      remove.setAttribute("aria-label", "Excluir " + conversation.title);
+      remove.title = "Excluir conversa";
+      remove.addEventListener("click", () => deleteConversation(conversation.id));
+      row.append(open, remove);
+      list.append(row);
+    }
+  }
+
+  function showCurrentConversation() {
+    logs.replaceChildren();
+    for (const message of history) renderMessage(message.role, message.content);
+    if (history.length) scrollBottom();
+  }
+
+  function openConversation(id) {
+    if (requestActive || readingFile) {
+      info("Aguarde a operação atual terminar antes de trocar de conversa.", true);
+      return;
+    }
+    const conversation = conversations.find(item => item.id === id);
+    if (!conversation) return;
+    activeConversationId = conversation.id;
+    history = conversation.messages.slice();
+    storeSaved(ACTIVE_CONVERSATION_KEY, activeConversationId);
+    input.value = "";
+    removeAttachment();
+    resizeInput();
+    showCurrentConversation();
+    renderConversationList();
+    if (historyModal && historyModal.open) historyModal.close();
+    input.focus();
+  }
+
+  function startNewConversation() {
+    if (requestActive && activeController) activeController.abort();
+    conversationEpoch++;
+    readingEpoch++;
+    activeController = null;
+    requestActive = readingFile = false;
+    activeConversationId = null;
+    history = [];
+    storeSaved(ACTIVE_CONVERSATION_KEY, null);
+    logs.replaceChildren();
+    input.value = "";
+    removeAttachment();
+    resizeInput();
+    setBusy();
+    renderConversationList();
+    input.focus();
+  }
+
+  function deleteConversation(id) {
+    const conversation = conversations.find(item => item.id === id);
+    if (!conversation) return;
+    if (!window.confirm("Excluir esta conversa do histórico deste navegador?")) return;
+    conversations = conversations.filter(item => item.id !== id);
+    storeSaved(CONVERSATIONS_KEY, conversations);
+    if (activeConversationId === id) {
+      activeConversationId = null;
+      history = [];
+      storeSaved(ACTIVE_CONVERSATION_KEY, null);
+      logs.replaceChildren();
+    }
+    renderConversationList();
   }
 
   function scrollBottom() { scroll.scrollTop = scroll.scrollHeight; }
@@ -284,22 +440,14 @@
   }
 
   function clearConversation() {
-    if (logs.children.length > 1 && !window.confirm("Apagar a conversa salva neste navegador?")) return;
-    const wasActive = requestActive;
-    conversationEpoch++;
-    readingEpoch++;
-    if (activeController) activeController.abort();
-    activeController = null;
-    requestActive = readingFile = false;
-    history = [];
-    storeSaved(STORAGE_KEY, history);
-    logs.replaceChildren();
-    input.value = "";
-    removeAttachment();
-    resizeInput();
-    setBusy();
-    info("Conversa limpa." + (wasActive ? " A resposta foi descartada; a solicitação já enviada ainda pode consumir saldo." : " Pode enviar sua próxima pergunta."));
-    input.focus();
+    const currentId = activeConversationId;
+    if (currentId) {
+      const conversation = conversations.find(item => item.id === currentId);
+      if (conversation && !window.confirm("Apagar esta conversa do histórico deste navegador?")) return;
+      conversations = conversations.filter(item => item.id !== currentId);
+      storeSaved(CONVERSATIONS_KEY, conversations);
+    }
+    startNewConversation();
   }
 
   function handleCommand(value) {
@@ -308,7 +456,8 @@
     if (command.toLowerCase() === "/thigas") return { handled: false, question: args.join(" ") };
     switch (command.toLowerCase()) {
       case "/help": case "/ajuda": modal.showModal(); break;
-      case "/clear": case "/novo": clearConversation(); break;
+      case "/novo": startNewConversation(); break;
+      case "/clear": clearConversation(); break;
       case "/sound": settings.sound = !settings.sound; applySettings(); beep(); break;
       case "/theme":
         if (!THEMES.includes(args[0])) info("Use /theme green, amber, cyan ou pink.", true);
@@ -352,7 +501,7 @@
       pending.remove();
       renderMessage("assistant", answer);
       history = sanitizeHistory([...history, { role: "user", content: message }, { role: "assistant", content: answer }]);
-      storeSaved(STORAGE_KEY, history);
+      persistConversation();
       // Não apaga uma nova pergunta digitada enquanto a resposta estava chegando.
       if (input.value === originalText) input.value = "";
       if (attachment === originalAttachment) removeAttachment();
@@ -443,10 +592,10 @@
     settings.colorMode = savedSettings.colorMode === "light" ? "light" : "dark";
   }
   applySettings();
-  history = sanitizeHistory(readSaved(STORAGE_KEY));
-  info("THIGAS AI pronto. Pergunte normalmente ou use /help. Não envie senhas ou chaves de API.");
-  for (const message of history) renderMessage(message.role, message.content);
-  if (history.length) info("Histórico restaurado deste navegador.");
+  loadConversationStore();
+  showCurrentConversation();
+  renderConversationList();
+  if (!history.length) info("THIGAS AI pronto. Pergunte normalmente ou use /help. Não envie senhas ou chaves de API.");
   byId("chat-form").addEventListener("submit", send);
   input.addEventListener("input", resizeInput);
   input.addEventListener("keydown", event => {
@@ -459,7 +608,9 @@
   });
   byId("btn-sound").addEventListener("click", () => { settings.sound = !settings.sound; applySettings(); beep(); });
   byId("btn-scanlines").addEventListener("click", () => { settings.crt = !settings.crt; applySettings(); });
-  byId("btn-clear").addEventListener("click", clearConversation);
+  byId("btn-clear").addEventListener("click", startNewConversation);
+  byId("btn-history").addEventListener("click", () => { renderConversationList(); historyModal.showModal(); });
+  byId("btn-close-history").addEventListener("click", () => historyModal.close());
   byId("btn-help").addEventListener("click", () => modal.showModal());
   byId("btn-privacy").addEventListener("click", () => modal.showModal());
   byId("btn-close-help").addEventListener("click", () => modal.close());
