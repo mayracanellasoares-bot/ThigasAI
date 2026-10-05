@@ -898,3 +898,71 @@ body.light-mode dd { color: #66666b; }
   .log-entry.assistant { padding-right: 0; }
   .chat-panel::after { height: 96px; }
 }
+
+/* Histórico de conversas */
+.history-modal {
+  width: min(560px, calc(100% - 24px));
+}
+.conversation-list {
+  padding: 4px 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.conversation-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 38px;
+  align-items: stretch;
+  gap: 4px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+}
+.conversation-row:hover,
+.conversation-row.active {
+  border-color: var(--border);
+  background: var(--surface-2);
+}
+.conversation-open,
+.conversation-delete {
+  border: 0;
+  background: transparent;
+  color: var(--text);
+}
+.conversation-open {
+  min-width: 0;
+  padding: 11px 12px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.conversation-open strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 620;
+}
+.conversation-open span {
+  color: var(--muted);
+  font-size: 10px;
+}
+.conversation-delete {
+  border-radius: 9px;
+  color: var(--muted);
+  font-size: 20px;
+}
+.conversation-delete:hover {
+  background: var(--surface-3);
+  color: var(--danger);
+}
+.history-empty {
+  margin: 12px 6px 4px;
+  color: var(--muted);
+  text-align: center;
+  font-size: 13px;
+}
+body.light-mode .conversation-row:hover,
+body.light-mode .conversation-row.active {
+  background: #ededee;
+}
