@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 
 SERVER = Path(__file__).resolve().parents[1]
+sys.path.insert(0,str(SERVER))
 spec = importlib.util.spec_from_file_location("thigas_test_app", SERVER / "app.py")
 gateway = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = gateway

@@ -104,7 +104,7 @@ test("offline abre a tela salva e entrega CSS sem solicitar inferência", async 
   const page = await harness.request("/", "GET", "navigate");
   assert.equal(await page.text(), "THIGAS HTML");
   const beforeAsset = calls;
-  const css = await harness.request("/static/chat.css?v=pwa1");
+  const css = await harness.request(worker.APP_SHELL.find(path => path.startsWith("/static/chat.css?")));
   assert.equal(await css.text(), "asset");
   assert.equal(calls, beforeAsset);
   assert.equal(await harness.request("/chat", "POST"), undefined);

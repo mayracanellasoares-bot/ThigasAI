@@ -20,3 +20,7 @@ services:
         sync: false
       - key: TELEGRAM_WEBHOOK_URL
         value: https://thigas-coder-gateway.onrender.com/telegram/webhook
+      - key: THIGAS_TELEGRAM_ALLOWED_USERS
+        sync: false
+      - key: THIGAS_DATA_DIR
+        value: /tmp/thigas-documents
