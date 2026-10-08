@@ -100,20 +100,31 @@ class GatewayTests(unittest.TestCase):
 
     def test_chat_contract_for_browser_and_apk(self):
         history = [{"role": "user", "content": "Olá"}, {"role": "assistant", "content": "Olá!"}]
-        with patch.object(gateway, "ask_maritaca", return_value="```python\nprint(1)\n```") as ask:
+        with patch.object(gateway, "ask_maritaca_result", return_value={
+            "answer": "```python\nprint(1)\n```",
+            "usage": {"prompt_tokens": 31, "completion_tokens": 42, "total_tokens": 73},
+            "finish_reason": "stop",
+        }) as ask:
             response = self.client.post("/chat", json={"message": " Ajude ", "history": history})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json()["answer"], "```python\nprint(1)\n```")
         self.assertIn("model", response.get_json())
+        self.assertEqual(response.get_json()["usage"], {"prompt_tokens": 31, "completion_tokens": 42, "total_tokens": 73})
+        self.assertEqual(response.get_json()["max_output_tokens"], 16384)
+        self.assertEqual(response.get_json()["finish_reason"], "stop")
         ask.assert_called_once_with("Ajude", history)
 
     def test_legacy_question_field_preserved(self):
-        with patch.object(gateway, "ask_maritaca", return_value="OK") as ask:
+        with patch.object(gateway, "ask_maritaca_result", return_value={
+            "answer": "OK",
+            "usage": {"prompt_tokens": None, "completion_tokens": None, "total_tokens": None},
+            "finish_reason": None,
+        }) as ask:
             self.assertEqual(self.client.post("/chat", json={"question": "teste"}).status_code, 200)
         ask.assert_called_once_with("teste", [])
 
     def test_chat_rejects_empty_and_oversized_messages_without_api_call(self):
-        with patch.object(gateway, "ask_maritaca") as ask:
+        with patch.object(gateway, "ask_maritaca_result") as ask:
             self.assertEqual(self.client.post("/chat", json={"message": " "}).status_code, 400)
             self.assertEqual(self.client.post("/chat", json={"message": "a" * 60001}).status_code, 413)
             self.assertEqual(self.client.post("/chat", data="not-json").status_code, 400)
@@ -121,7 +132,7 @@ class GatewayTests(unittest.TestCase):
 
     def test_provider_errors_keep_status(self):
         for status in (429, 502, 503, 504):
-            with self.subTest(status=status), patch.object(gateway, "ask_maritaca", side_effect=gateway.GatewayError("Falha", status)):
+            with self.subTest(status=status), patch.object(gateway, "ask_maritaca_result", side_effect=gateway.GatewayError("Falha", status)):
                 response = self.client.post("/chat", json={"message": "teste"})
                 self.assertEqual(response.status_code, status)
                 self.assertEqual(response.get_json(), {"error": "Falha"})
@@ -132,6 +143,48 @@ class GatewayTests(unittest.TestCase):
                 response = self.get(path)
                 self.assertNotIn("fake-secret-test", response.get_data(as_text=True))
                 self.assertNotIn("fake-telegram-test", response.get_data(as_text=True))
+
+    def test_maritaca_usage_comes_from_provider_not_character_estimates(self):
+        fake_response = unittest.mock.Mock()
+        fake_response.status_code = 200
+        fake_response.json.return_value = {
+            "choices": [{"message": {"content": "Saída real"}, "finish_reason": "length"}],
+            "usage": {"prompt_tokens": 128, "completion_tokens": 819, "total_tokens": 947},
+        }
+        with patch.object(gateway, "MARITACA_API_KEY", "fake-secret"), \
+             patch.object(gateway.requests, "post", return_value=fake_response) as request_post:
+            data = self.client.post("/chat", json={"message": "Olá"}).get_json()
+        self.assertEqual(data["usage"], {"prompt_tokens": 128, "completion_tokens": 819, "total_tokens": 947})
+        self.assertEqual(data["finish_reason"], "length")
+        self.assertEqual(data["answer"], "Saída real")
+        self.assertEqual(request_post.call_args.kwargs["json"]["max_tokens"], 16384)
+        self.assertEqual(request_post.call_args.kwargs["timeout"], (10, 165))
+
+    def test_missing_or_invalid_usage_is_null_not_fabricated(self):
+        for provided in (None, {}, {"prompt_tokens": "123", "completion_tokens": True, "total_tokens": -1}):
+            fake_response = unittest.mock.Mock()
+            fake_response.status_code = 200
+            fake_response.json.return_value = {
+                "choices": [{"message": {"content": "Resposta"}}],
+                **({"usage": provided} if provided is not None else {}),
+            }
+            with self.subTest(usage=provided), \
+                 patch.object(gateway, "MARITACA_API_KEY", "fake-secret"), \
+                 patch.object(gateway.requests, "post", return_value=fake_response):
+                data = self.client.post("/chat", json={"message": "Teste"}).get_json()
+                self.assertEqual(data["usage"], {"prompt_tokens": None, "completion_tokens": None, "total_tokens": None})
+                self.assertIsNone(data["finish_reason"])
+
+    def test_telegram_and_document_text_only_contract_preserved(self):
+        fake_response = unittest.mock.Mock()
+        fake_response.status_code = 200
+        fake_response.json.return_value = {
+            "choices": [{"message": {"content": "Apenas texto"}}],
+            "usage": {"prompt_tokens": 3, "completion_tokens": 5, "total_tokens": 8},
+        }
+        with patch.object(gateway, "MARITACA_API_KEY", "fake-secret"), \
+             patch.object(gateway.requests, "post", return_value=fake_response):
+            self.assertEqual(gateway.ask_maritaca("teste", []), "Apenas texto")
 
     def test_telegram_missing_configuration(self):
         self.assertEqual(self.client.post("/telegram/webhook", json={}).status_code, 503)
