@@ -4,6 +4,7 @@ import os
 import secrets
 import sqlite3
 import re
+import threading
 from contextlib import closing
 from datetime import timedelta
 from io import BytesIO
@@ -19,7 +20,8 @@ def install(app, gateway):
     origin = os.getenv('THIGAS_PUBLIC_URL', '').rstrip('/')
     secret = os.getenv('THIGAS_SESSION_SECRET', '')
     database = os.getenv('THIGAS_ACCOUNTS_DB', '')
-    ready = bool(len(secret) >= 32 and database and urlparse(origin).scheme == 'https' and urlparse(origin).netloc and urlparse(origin).path == '')
+    pg_url = os.getenv('DATABASE_URL', '').strip()
+    ready = bool(len(secret) >= 32 and (pg_url or database) and urlparse(origin).scheme == 'https' and urlparse(origin).netloc and urlparse(origin).path == '')
     if secret:
         app.secret_key = secret
     app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SECURE=True,
@@ -38,7 +40,27 @@ def install(app, gateway):
         if ready and cid and csecret:
             providers[name] = oauth.register(name, client_id=cid, client_secret=csecret, **spec)
 
+    schema_ready = False
+    schema_lock = threading.Lock()
+
     def db():
+        nonlocal schema_ready
+        if pg_url:
+            # Neon/PostgreSQL: one-time schema creation per server process.
+            import psycopg
+            con = psycopg.connect(pg_url, connect_timeout=10)
+            try:
+                if not schema_ready:
+                    with schema_lock:
+                        if not schema_ready:
+                            con.execute('CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, provider TEXT NOT NULL, subject TEXT NOT NULL, name TEXT NOT NULL, UNIQUE(provider,subject))')
+                            con.commit()
+                            schema_ready = True
+                return con
+            except Exception:
+                con.close()
+                raise
+        # SQLite remains available for local development and existing tests.
         path = Path(database)
         path.parent.mkdir(parents=True, exist_ok=True)
         con = sqlite3.connect(path, timeout=20)
@@ -47,12 +69,14 @@ def install(app, gateway):
         con.commit()
         return con
 
+    parameter = '%s' if pg_url else '?'
+
     def user():
         uid = session.get('uid') if ready else None
         if not uid:
             return None
         with closing(db()) as con:
-            row = con.execute('SELECT id,provider,name FROM users WHERE id=?', (uid,)).fetchone()
+            row = con.execute(f'SELECT id,provider,name FROM users WHERE id={parameter}', (uid,)).fetchone()
         return dict(zip(('id','provider','name'), row)) if row else None
 
     def owner():
@@ -120,9 +144,10 @@ def install(app, gateway):
                 raise ValueError('Missing identity')
             name = str(profile.get('name') or profile.get('login') or 'Usuário')[:100]
             with closing(db()) as con, con:
-                con.execute('INSERT OR IGNORE INTO users VALUES (?,?,?,?)', (secrets.token_hex(16),provider,str(subject),name))
-                con.execute('UPDATE users SET name=? WHERE provider=? AND subject=?', (name,provider,str(subject)))
-                uid = con.execute('SELECT id FROM users WHERE provider=? AND subject=?', (provider,str(subject))).fetchone()[0]
+                placeholders = ','.join([parameter] * 4)
+                con.execute(f'INSERT INTO users (id,provider,subject,name) VALUES ({placeholders}) ON CONFLICT(provider,subject) DO UPDATE SET name=excluded.name',
+                            (secrets.token_hex(16), provider, str(subject), name))
+                uid = con.execute(f'SELECT id FROM users WHERE provider={parameter} AND subject={parameter}', (provider,str(subject))).fetchone()[0]
             session.clear()
             session.update(uid=uid, csrf=secrets.token_urlsafe(32))
             session.permanent = True
@@ -142,7 +167,7 @@ def install(app, gateway):
         uid = user()['id']
         gateway['document_store'].clear(owner())
         with closing(db()) as con, con:
-            con.execute('DELETE FROM users WHERE id=?', (uid,))
+            con.execute(f'DELETE FROM users WHERE id={parameter}', (uid,))
         session.clear()
         return jsonify(ok=True)
 
