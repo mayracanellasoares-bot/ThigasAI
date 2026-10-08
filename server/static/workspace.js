@@ -12,7 +12,7 @@
     }
     const response = await fetch(path, options);
     let data; try { data = await response.json(); } catch (_) { data = {}; }
-    if (!response.ok) throw new Error(data.error || (response.status === 401 ? 'Entre novamente na sua conta.' : 'Não foi possível concluir. Recarregue a página e tente novamente.'));
+    if (!response.ok) throw new Error(data.error || (response.status === 401 ? 'Sessão indisponível. Recarregue a página.' : 'Não foi possível concluir. Recarregue a página e tente novamente.'));
     return data;
   }
   async function run(action) {
@@ -23,18 +23,10 @@
     finally { busy = false; document.querySelectorAll('button').forEach(button => { button.disabled = false; }); }
   }
   async function init() {
-    const data = await api('/auth/me'); csrf = data.csrf || '';
-    el('tools').hidden = !data.user;
-    el('logout').hidden = !data.user; el('delete-account').hidden = !data.user;
-    el('identity').textContent = data.user ? 'Conectado como '+data.user.name : 'Entre para criar seu cadastro e usar documentos.';
-    el('providers').replaceChildren();
-    if (!data.user) {
-      const labels = {google:'Entrar com Google',github:'Entrar com GitHub',meta:'Entrar com Facebook (Meta)'};
-      for (const provider of data.providers) {
-        const link = document.createElement('a'); link.href = '/auth/login/'+provider; link.textContent = labels[provider]; el('providers').append(link);
-      }
-      if (!data.providers.length) status('O responsável pelo site ainda precisa configurar o login social no servidor.');
-    }
+    const data = await api('/workspace/api/session');
+    if (!data.csrf) throw new Error('Não foi possível iniciar a sessão temporária.');
+    csrf = data.csrf;
+    status('Pronto. Nenhum cadastro necessário.');
   }
   el('upload').onclick = () => run(async () => {
     const file = el('file').files[0];
@@ -59,13 +51,8 @@
   }
   el('approve').onclick = () => run(() => decide(true));
   el('cancel').onclick = () => run(() => decide(false));
-  el('logout').onclick = () => run(async () => { await api('/workspace/api/logout',{}); location.reload(); });
-  el('delete-account').onclick = () => run(async () => {
-    if (!confirm('Excluir seu cadastro e todos os documentos temporários desta conta?')) return;
-    await api('/workspace/api/delete-account',{}); location.reload();
-  });
   el('clear').onclick = () => run(async () => {
-    if (!confirm('Apagar os arquivos e revisões temporários desta conta?')) return;
+    if (!confirm('Apagar os arquivos e revisões temporários desta sessão?')) return;
     await api('/workspace/api/clear',{}); location.reload();
   });
   init().catch(error => status(error.message));

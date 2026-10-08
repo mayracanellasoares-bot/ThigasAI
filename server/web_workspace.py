@@ -1,107 +1,57 @@
-"""Social identity and owner-scoped document tools for the browser."""
+"""Ferramentas de documentos sem cadastro, isoladas por sessão anônima."""
 import hmac
 import os
 import secrets
-import sqlite3
-import re
-import threading
 from contextlib import closing
 from datetime import timedelta
 from io import BytesIO
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import urlsplit
 
-from authlib.integrations.flask_client import OAuth
-from flask import abort, jsonify, redirect, request, session
+from flask import abort, jsonify, request, session
 import document_agent
 
 
 def install(app, gateway):
-    origin = os.getenv('THIGAS_PUBLIC_URL', '').rstrip('/')
     secret = os.getenv('THIGAS_SESSION_SECRET', '')
-    database = os.getenv('THIGAS_ACCOUNTS_DB', '')
-    pg_url = os.getenv('DATABASE_URL', '').strip()
-    ready = bool(len(secret) >= 32 and (pg_url or database) and urlparse(origin).scheme == 'https' and urlparse(origin).netloc and urlparse(origin).path == '')
-    if secret:
+    if len(secret) >= 32:
         app.secret_key = secret
-    app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SECURE=True,
-                      SESSION_COOKIE_SAMESITE='Lax', PERMANENT_SESSION_LIFETIME=timedelta(hours=12))
-    oauth = OAuth(app)
-    providers = {}
-    specs = {
-        'google': dict(server_metadata_url='https://accounts.google.com/.well-known/openid-configuration', client_kwargs={'scope': 'openid profile email', 'code_challenge_method': 'S256'}),
-        'github': dict(authorize_url='https://github.com/login/oauth/authorize', access_token_url='https://github.com/login/oauth/access_token', api_base_url='https://api.github.com/', client_kwargs={'scope': 'read:user', 'code_challenge_method': 'S256', 'token_endpoint_auth_method': 'client_secret_post'}),
-    }
-    version = os.getenv('META_GRAPH_VERSION', '')
-    if version and re.fullmatch(r'v\d+\.\d+', version):
-        specs['meta'] = dict(authorize_url=f'https://www.facebook.com/{version}/dialog/oauth', access_token_url=f'https://graph.facebook.com/{version}/oauth/access_token', api_base_url=f'https://graph.facebook.com/{version}/', client_kwargs={'scope': 'public_profile', 'token_endpoint_auth_method': 'client_secret_post'})
-    for name, spec in specs.items():
-        cid, csecret = os.getenv(name.upper()+'_CLIENT_ID'), os.getenv(name.upper()+'_CLIENT_SECRET')
-        if ready and cid and csecret:
-            providers[name] = oauth.register(name, client_id=cid, client_secret=csecret, **spec)
-
-    schema_ready = False
-    schema_lock = threading.Lock()
-
-    def db():
-        nonlocal schema_ready
-        if pg_url:
-            # Neon/PostgreSQL: one-time schema creation per server process.
-            import psycopg
-            con = psycopg.connect(pg_url, connect_timeout=10)
-            try:
-                if not schema_ready:
-                    with schema_lock:
-                        if not schema_ready:
-                            con.execute('CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, provider TEXT NOT NULL, subject TEXT NOT NULL, name TEXT NOT NULL, UNIQUE(provider,subject))')
-                            con.commit()
-                            schema_ready = True
-                return con
-            except Exception:
-                con.close()
-                raise
-        # SQLite remains available for local development and existing tests.
-        path = Path(database)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        con = sqlite3.connect(path, timeout=20)
-        os.chmod(path, 0o600)
-        con.execute('CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, provider TEXT NOT NULL, subject TEXT NOT NULL, name TEXT NOT NULL, UNIQUE(provider,subject))')
-        con.commit()
-        return con
-
-    parameter = '%s' if pg_url else '?'
-
-    def user():
-        uid = session.get('uid') if ready else None
-        if not uid:
-            return None
-        with closing(db()) as con:
-            row = con.execute(f'SELECT id,provider,name FROM users WHERE id={parameter}', (uid,)).fetchone()
-        return dict(zip(('id','provider','name'), row)) if row else None
+    app.config.update(
+        SESSION_COOKIE_HTTPONLY=True,
+        SESSION_COOKIE_SECURE=True,
+        SESSION_COOKIE_SAMESITE='Lax',
+        PERMANENT_SESSION_LIFETIME=timedelta(hours=24),
+    )
 
     def owner():
-        current = user()
-        if not current:
-            abort(401, description='Entre na sua conta para usar documentos.')
-        return 'web:'+current['id']
+        visitor = session.get('visitor')
+        if not isinstance(visitor, str) or len(visitor) != 48:
+            abort(403, description='Abra a área de documentos novamente para iniciar a sessão.')
+        return 'web-anon:' + visitor
 
     @app.before_request
     def protect_workspace():
-        if request.path.startswith('/workspace/api/'):
-            owner()
-            if request.method != 'GET':
-                expected = session.get('csrf', '')
-                if not expected or not hmac.compare_digest(request.headers.get('X-CSRF-Token',''), expected):
-                    abort(403, description='Sessão expirada. Recarregue a página.')
-        # Existing chat stays available until social login is configured.
-        if providers and request.path in ('/chat', '/document/extract') and request.method == 'POST':
-            owner()
-            if request.headers.get('Origin') != origin:
+        if not request.path.startswith('/workspace/api/'):
+            return
+        if len(secret) < 32:
+            return jsonify(error='Configure THIGAS_SESSION_SECRET no servidor para usar documentos.'), 503
+        if request.path == '/workspace/api/session':
+            return
+        owner()
+        if request.method not in ('GET', 'HEAD', 'OPTIONS'):
+            expected = session.get('csrf', '')
+            if not expected or not hmac.compare_digest(request.headers.get('X-CSRF-Token', ''), expected):
+                abort(403, description='Sessão expirada. Recarregue a página.')
+            # Browser requests must originate on the same host.
+            origin = request.headers.get('Origin')
+            # Compare hosts: Render may terminate TLS before forwarding to Flask.
+            if origin and (urlsplit(origin).scheme not in ('http', 'https') or
+                           urlsplit(origin).netloc != request.host):
                 abort(403, description='Origem não autorizada.')
 
     @app.after_request
     def private_response(response):
-        if request.path.startswith(('/auth/', '/workspace')):
+        if request.path.startswith('/workspace'):
             response.headers['Cache-Control'] = 'no-store'
             response.headers['X-Content-Type-Options'] = 'nosniff'
             response.headers['Referrer-Policy'] = 'no-referrer'
@@ -111,65 +61,14 @@ def install(app, gateway):
     def workspace():
         return app.send_static_file('workspace.html')
 
-    @app.get('/auth/me')
-    def me():
-        current = user()
-        if current and 'csrf' not in session:
+    @app.get('/workspace/api/session')
+    def anonymous_session():
+        if not session.get('visitor'):
+            session['visitor'] = secrets.token_hex(24)
+        if not session.get('csrf'):
             session['csrf'] = secrets.token_urlsafe(32)
-        return jsonify(user=current, providers=list(providers), csrf=session.get('csrf') if current else None)
-
-    @app.get('/auth/login/<provider>')
-    def login(provider):
-        if provider not in providers:
-            return 'Este login ainda não foi configurado pelo responsável pelo site.', 503
-        session.clear()
-        return providers[provider].authorize_redirect(origin+'/auth/callback/'+provider)
-
-    @app.get('/auth/callback/<provider>')
-    def callback(provider):
-        if provider not in providers:
-            abort(404)
-        try:
-            client = providers[provider]
-            token = client.authorize_access_token()  # Authlib validates state and OIDC nonce.
-            if provider == 'google':
-                profile = token.get('userinfo') or {}
-                subject = profile.get('sub')
-            else:
-                response = client.get('user' if provider == 'github' else 'me?fields=id,name', token=token)
-                response.raise_for_status()
-                profile = response.json()
-                subject = profile.get('id')
-            if not subject:
-                raise ValueError('Missing identity')
-            name = str(profile.get('name') or profile.get('login') or 'Usuário')[:100]
-            with closing(db()) as con, con:
-                placeholders = ','.join([parameter] * 4)
-                con.execute(f'INSERT INTO users (id,provider,subject,name) VALUES ({placeholders}) ON CONFLICT(provider,subject) DO UPDATE SET name=excluded.name',
-                            (secrets.token_hex(16), provider, str(subject), name))
-                uid = con.execute(f'SELECT id FROM users WHERE provider={parameter} AND subject={parameter}', (provider,str(subject))).fetchone()[0]
-            session.clear()
-            session.update(uid=uid, csrf=secrets.token_urlsafe(32))
-            session.permanent = True
-            return redirect('/workspace')
-        except Exception:
-            # Do not log tokens, authorization codes, or provider responses.
-            session.clear()
-            return 'Não foi possível concluir o login. Volte para /workspace e tente novamente.', 400
-
-    @app.post('/workspace/api/logout')
-    def logout():
-        session.clear()
-        return jsonify(ok=True)
-
-    @app.post('/workspace/api/delete-account')
-    def delete_account():
-        uid = user()['id']
-        gateway['document_store'].clear(owner())
-        with closing(db()) as con, con:
-            con.execute(f'DELETE FROM users WHERE id={parameter}', (uid,))
-        session.clear()
-        return jsonify(ok=True)
+        session.permanent = True
+        return jsonify(anonymous=True, csrf=session['csrf'])
 
     @app.post('/workspace/api/upload')
     def upload():
