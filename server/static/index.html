@@ -14,8 +14,8 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/static/icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
-  <link rel="stylesheet" href="/static/chat.css?v=anon1">
-  <script src="/static/chat.js?v=anon1" defer></script>
+  <link rel="stylesheet" href="/static/chat.css?v=tokens1">
+  <script src="/static/chat.js?v=tokens1" defer></script>
   <script src="/static/pwa.js?v=llama2" defer></script>
 </head>
 <body class="theme-green">
@@ -132,6 +132,13 @@
           </form>
           <input type="file" id="file-input" hidden accept=".pdf,.docx,.xlsx,.pptx,.txt,.md,.py,.js,.mjs,.cjs,.ts,.tsx,.jsx,.json,.yaml,.yml,.toml,.csv,.xml,.html,.css,.scss,.sh,.ps1,.bat,.c,.h,.cpp,.hpp,.cs,.java,.go,.rs,.rb,.php,.sql,.kt,.swift,.dart,.lua,.r">
 
+          <div class="token-meter" role="group" aria-label="Tokens medidos na última resposta">
+            <span>Última resposta</span>
+            <span>Enviados <strong id="tokens-input">—</strong></span>
+            <span>Recebidos <strong id="tokens-output">—</strong></span>
+            <span>Total <strong id="tokens-total">—</strong></span>
+            <small id="tokens-status">Aguardando dados reais da API</small>
+          </div>
           <div class="composer-footer">
             <span>Enter para enviar · Shift+Enter para nova linha</span>
             <span id="request-status" role="status">Pronto</span>
