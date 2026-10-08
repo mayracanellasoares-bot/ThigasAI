@@ -6,6 +6,7 @@ from contextlib import closing
 from datetime import timedelta
 from io import BytesIO
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from flask import abort, jsonify, request, session
 import document_agent
@@ -43,7 +44,9 @@ def install(app, gateway):
                 abort(403, description='Sessão expirada. Recarregue a página.')
             # Browser requests must originate on the same host.
             origin = request.headers.get('Origin')
-            if origin and origin != request.host_url.rstrip('/'):
+            # Compare hosts: Render may terminate TLS before forwarding to Flask.
+            if origin and (urlsplit(origin).scheme not in ('http', 'https') or
+                           urlsplit(origin).netloc != request.host):
                 abort(403, description='Origem não autorizada.')
 
     @app.after_request
