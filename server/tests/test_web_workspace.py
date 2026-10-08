@@ -166,10 +166,13 @@ class WorkspaceTests(unittest.TestCase):
         self.assertEqual(result.status_code, 400)
 
     def test_chat_does_not_require_auth(self):
-        @self.app.post('/chat')
+        # Register routes before the first request: Flask freezes setup after handling one.
+        app = Flask('public_chat_app')
+        install(app, self.gateway)
+        @app.post('/chat')
         def chat():
             return {'answer': 'ok'}
-        response = self.app.test_client().post('/chat', json={'message': 'olá'})
+        response = app.test_client().post('/chat', json={'message': 'olá'})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json['answer'], 'ok')
 
