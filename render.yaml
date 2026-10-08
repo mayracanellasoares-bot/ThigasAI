@@ -5,7 +5,7 @@ services:
     plan: free
     region: virginia
     buildCommand: pip install -r server/requirements.txt
-    startCommand: gunicorn --chdir server app:app --bind 0.0.0.0:$PORT --workers 1 --threads 2 --timeout 90 --graceful-timeout 90
+    startCommand: gunicorn --chdir server app:app --bind 0.0.0.0:$PORT --workers 1 --threads 2 --timeout 180 --graceful-timeout 180
     healthCheckPath: /health
     envVars:
       - key: MARITACA_API_KEY

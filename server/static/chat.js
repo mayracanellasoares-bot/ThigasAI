@@ -1,13 +1,13 @@
 /* THIGAS AI: interface local; geração de respostas exclusivamente pelo POST /chat. */
-(function () {
+(async function () {
   "use strict";
 
   const MAX_MESSAGE = 60000;
   const MAX_FILE_BYTES = 8 * 1024 * 1024;
   const MAX_TEXT_FILE_BYTES = 512 * 1024;
-  const STORAGE_KEY = "thigas.crt.history.v1";
-  const CONVERSATIONS_KEY = "thigas.conversations.v2";
-  const ACTIVE_CONVERSATION_KEY = "thigas.activeConversation.v2";
+  let STORAGE_KEY = "thigas.crt.history.v1";
+  let CONVERSATIONS_KEY = "thigas.conversations.v2";
+  let ACTIVE_CONVERSATION_KEY = "thigas.activeConversation.v2";
   const SETTINGS_KEY = "thigas.crt.settings.v1";
   const MAX_SAVED_CONVERSATIONS = 30;
   const THEMES = ["green", "amber", "cyan", "pink"];
@@ -117,6 +117,22 @@
     module.exports = { MAX_MESSAGE, MAX_FILE_BYTES, MAX_TEXT_FILE_BYTES, safeFilename, validateFile, composeMessage, sanitizeHistory, apiHistory, splitCodeBlocks, codeFilename, extractDocument, requestChat };
   }
   if (typeof document === "undefined") return;
+
+  // Load identity before rendering any saved conversation.
+  try {
+    const identityResponse = await fetch("/auth/me", {cache:"no-store", credentials:"same-origin", signal:AbortSignal.timeout(8000)});
+    if (!identityResponse.ok) throw new Error("identity unavailable");
+    const identity = await identityResponse.json();
+    if (identity.providers.length && !identity.user) { location.replace("/workspace"); return; }
+    if (identity.user) {
+      STORAGE_KEY += "." + identity.user.id;
+      CONVERSATIONS_KEY += "." + identity.user.id;
+      ACTIVE_CONVERSATION_KEY += "." + identity.user.id;
+    }
+  } catch (_) {
+    // Offline guest history remains local; signed-in namespaces are not opened.
+  }
+
 
   const byId = id => document.getElementById(id);
   const input = byId("chat-input");

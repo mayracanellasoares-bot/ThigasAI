@@ -73,3 +73,7 @@ Ao mudar a interface, altere a versão do cache em `server/static/sw.js`, os par
 O bot agora pode receber XLSX e preparar uma cópia editada por `/planilha`, com revisão e botões de confirmação. `/pdf` gera um PDF real. `/id` informa o ID para configurar a lista de usuários autorizados. Veja [configuração e limites](docs/TELEGRAM_DOCUMENTOS.md).
 
 As ferramentas exigem `THIGAS_TELEGRAM_ALLOWED_USERS` e `TELEGRAM_WEBHOOK_SECRET`. O armazenamento temporário e o plano gratuito atuais não constituem uma implantação 24/7; o guia descreve os componentes que ainda faltam.
+
+## Contas e documentos no navegador
+
+A área `/workspace` oferece cadastro via Google, GitHub e Facebook (Meta), envio de arquivos do aparelho e entrega de PDF, DOCX e XLSX revisado. Requer configuração OAuth e armazenamento persistente para cadastros de produção. Consulte [configuração e limites](docs/CONTAS_E_DOCUMENTOS.md).
