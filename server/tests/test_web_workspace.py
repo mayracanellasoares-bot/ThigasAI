@@ -27,7 +27,7 @@ class WorkspaceTests(unittest.TestCase):
         self.env = patch.dict(os.environ, env)
         self.env.start()
         self.addCleanup(self.env.stop)
-        self.app = Flask(__name__)
+        self.app = Flask(__name__, static_folder='../static')
         self.app.config['TESTING'] = True
         self.compose = Mock(return_value='# Documento\nConteúdo revisado.')
         self.store = document_agent.Store(self.tmp.name + '/files')
