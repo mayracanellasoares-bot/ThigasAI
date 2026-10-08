@@ -966,3 +966,18 @@ body.light-mode .conversation-row:hover,
 body.light-mode .conversation-row.active {
   background: #ededee;
 }
+
+/* Contadores somente com valores efetivamente reportados pelo provedor. */
+.token-meter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px 13px;
+  padding: 7px 2px;
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.token-meter strong { color: var(--text); font-weight: 650; }
+.token-meter > span:first-child { color: var(--text); font-weight: 650; }
+.token-meter small { flex-basis: 100%; color: var(--muted-2); font-size: 10px; }
