@@ -16,7 +16,7 @@ class WorkspaceTests(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.path = self.tmp.name+'/accounts.sqlite3'
         env = {'THIGAS_PUBLIC_URL':'https://test.example','THIGAS_SESSION_SECRET':'a'*48,
-               'THIGAS_ACCOUNTS_DB':self.path,'GITHUB_CLIENT_ID':'client','GITHUB_CLIENT_SECRET':'secret'}
+               'THIGAS_ACCOUNTS_DB':self.path,'DATABASE_URL':'','GITHUB_CLIENT_ID':'client','GITHUB_CLIENT_SECRET':'secret'}
         self.env = patch.dict(os.environ,env)
         self.env.start(); self.addCleanup(self.env.stop)
         self.app = Flask(__name__); self.app.config['TESTING']=True
@@ -126,3 +126,36 @@ class WorkspaceTests(unittest.TestCase):
         self.assertEqual(self.app.test_client().post('/chat').status_code,401)
         self.assertEqual(self.client.post('/chat',base_url='https://test.example').status_code,403)
         self.assertEqual(self.client.post('/chat',base_url='https://test.example',headers={'Origin':'https://test.example'}).status_code,404)
+
+    def test_neon_postgres_account_backend_uses_parameterized_queries(self):
+        """The real Neon connection is supplied by Render, not by this unit test."""
+        from unittest.mock import MagicMock
+        connection = MagicMock()
+        connection.execute.return_value.fetchone.return_value = ('pg-user', 'github', 'Thiago')
+        env = {'DATABASE_URL': 'postgresql://test.example/database?sslmode=require',
+               'THIGAS_ACCOUNTS_DB': ''}
+        with patch.dict(os.environ, env), patch('psycopg.connect', return_value=connection) as connect:
+            postgres_app = Flask('postgres_workspace_test')
+            postgres_app.config['TESTING'] = True
+            install(postgres_app, self.gateway)
+            pg_client = postgres_app.test_client()
+            profile = pg_client.get('/auth/me', base_url='https://test.example').json
+            self.assertIn('github', profile['providers'])
+            with pg_client.session_transaction(base_url='https://test.example') as sess:
+                sess['uid'] = 'pg-user'
+                sess['csrf'] = 'csrf'
+            profile = pg_client.get('/auth/me', base_url='https://test.example').json
+            self.assertEqual(profile['user']['id'], 'pg-user')
+            oauth = postgres_app.extensions['authlib.integrations.flask_client'].create_client('github')
+            user_response = Mock()
+            user_response.json.return_value = {'id': 123, 'name': 'Thiago'}
+            with patch.object(oauth, 'authorize_access_token', return_value={'access_token': 'SECRET'}), \
+                 patch.object(oauth, 'get', return_value=user_response):
+                callback = pg_client.get('/auth/callback/github', base_url='https://test.example')
+                self.assertEqual(callback.status_code, 302)
+            statements = [call.args[0] for call in connection.execute.call_args_list]
+            self.assertTrue(any('CREATE TABLE IF NOT EXISTS users' in sql for sql in statements))
+            self.assertTrue(any('id=%s' in sql for sql in statements))
+            self.assertTrue(any('ON CONFLICT(provider,subject)' in sql for sql in statements))
+            self.assertTrue(any('provider=%s AND subject=%s' in sql for sql in statements))
+            connect.assert_called_with('postgresql://test.example/database?sslmode=require', connect_timeout=10)
