@@ -8,7 +8,8 @@ O código não cria aplicativos OAuth nos provedores nem contrata armazenamento.
 
 - `THIGAS_PUBLIC_URL`: `https://thigas-coder-gateway.onrender.com` (sem barra final).
 - `THIGAS_SESSION_SECRET`: segredo aleatório de pelo menos 32 caracteres; gere com `python -c "import secrets; print(secrets.token_urlsafe(48))"`. Nunca publique no GitHub.
-- `THIGAS_ACCOUNTS_DB`: caminho SQLite em **disco persistente**, por exemplo `/var/data/thigas/accounts.sqlite3` se o disco estiver montado em `/var/data`. Não use `/tmp` para cadastros de produção.
+- `DATABASE_URL` (**recomendado para produção**): string de conexão do PostgreSQL do Neon, obtida em **Connect** no projeto. Copie a URL completa, incluindo `sslmode=require`, e configure-a **somente em Environment no Render**. Nunca cole a senha do banco no chat, GitHub ou frontend.
+- `THIGAS_ACCOUNTS_DB` (**alternativa local**): caminho SQLite, por exemplo `./data/accounts.sqlite3`. Se `DATABASE_URL` estiver configurada, o PostgreSQL tem prioridade; o SQLite não é consultado.
 - `THIGAS_DATA_DIR`: diretório para documentos; use o mesmo disco, em outra subpasta, se quiser sobreviver a reinícios. Arquivos expiram após 24 horas.
 - `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET`: aplicativo web Google, callback `https://thigas-coder-gateway.onrender.com/auth/callback/google`.
 - `GITHUB_CLIENT_ID` e `GITHUB_CLIENT_SECRET`: OAuth App GitHub, callback `https://thigas-coder-gateway.onrender.com/auth/callback/github`.
@@ -17,7 +18,9 @@ O código não cria aplicativos OAuth nos provedores nem contrata armazenamento.
 
 Somente provedores inteiramente configurados aparecem. São necessários HTTPS, segredo de sessão e caminho do banco. Configure consentimento, domínio, URLs de privacidade/exclusão e disponibilidade pública nos painéis dos provedores. Aplicativos em modo de testes podem aceitar apenas testadores. Tokens sociais não são guardados no banco nem enviados ao JavaScript.
 
-O plano gratuito atual não fornece persistência por este código. Provisionar disco/banco ou mudar hospedagem é uma etapa separada; esta atualização não contrata plano pago. SQLite nesta implementação destina-se a uma instância do servidor. Não escale horizontalmente com bancos locais separados.
+**Persistência do cadastro:** use Neon PostgreSQL via `DATABASE_URL`. A tabela `users` é criada automaticamente na primeira consulta ao banco; não é necessário executar SQL manualmente. O aplicativo não migra usuários antigos de um SQLite para o Neon: cadastros antigos exigem migração separada ou novo login. Não use SQLite no disco efêmero do Render para contas de produção.
+
+**Persistência dos documentos:** `THIGAS_DATA_DIR` ainda usa armazenamento local temporário, mesmo quando as contas estão no Neon. Em hospedagem gratuita do Render os anexos e saídas poderão desaparecer em reinicializações/deploys, antes da retenção de 24 horas. Neon neste passo guarda somente os cadastros. Para documentos duráveis, será necessário armazenamento de objetos com controle de acesso, como R2 ou S3.
 
 ## Uso
 
