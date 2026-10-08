@@ -26,9 +26,11 @@ MARITACA_URL = os.getenv(
 MARITACA_MODEL = os.getenv("MARITACA_MODEL", "sabiazinho-4").strip()
 MARITACA_API_KEY = os.getenv("MARITACA_API_KEY", "").strip()
 try:
-    MARITACA_MAX_TOKENS = int(os.getenv("MARITACA_MAX_TOKENS", "3072"))
+    MARITACA_MAX_TOKENS = int(os.getenv("MARITACA_MAX_TOKENS", "16384"))
 except ValueError:
-    MARITACA_MAX_TOKENS = 3072
+    MARITACA_MAX_TOKENS = 16384
+# Limit this application to the requested output budget even if the environment is higher.
+MARITACA_MAX_TOKENS = min(16384, max(1, MARITACA_MAX_TOKENS))
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 TELEGRAM_WEBHOOK_SECRET = os.getenv("TELEGRAM_WEBHOOK_SECRET", "").strip()
@@ -118,7 +120,23 @@ def build_messages(question: str, history: Any) -> list[dict[str, str]]:
     return messages
 
 
-def ask_maritaca(question: str, history: Any) -> str:
+def _measured_tokens(value: Any) -> int | None:
+    """Return only integer counters supplied by the provider; never estimate."""
+    return value if type(value) is int and value >= 0 else None
+
+
+def _maritaca_usage(data: Any) -> dict[str, int | None]:
+    usage = data.get("usage") if isinstance(data, dict) else None
+    if not isinstance(usage, dict):
+        usage = {}
+    return {
+        "prompt_tokens": _measured_tokens(usage.get("prompt_tokens")),
+        "completion_tokens": _measured_tokens(usage.get("completion_tokens")),
+        "total_tokens": _measured_tokens(usage.get("total_tokens")),
+    }
+
+
+def ask_maritaca_result(question: str, history: Any) -> dict[str, Any]:
     if not MARITACA_API_KEY:
         raise GatewayError(
             "MARITACA_API_KEY não configurada no servidor.",
@@ -141,7 +159,7 @@ def ask_maritaca(question: str, history: Any) -> str:
                 "Content-Type": "application/json",
             },
             json=payload,
-            timeout=75,
+            timeout=(10, 165),
         )
     except requests.Timeout:
         app.logger.warning("Timeout ao consultar a Maritaca")
@@ -195,8 +213,16 @@ def ask_maritaca(question: str, history: Any) -> str:
             502,
         )
 
-    return answer
+    return {
+        "answer": answer,
+        "usage": _maritaca_usage(data),
+        "finish_reason": choice.get("finish_reason") if isinstance(choice.get("finish_reason"), str) else None,
+    }
 
+
+def ask_maritaca(question: str, history: Any) -> str:
+    """Keep text-only contract for Telegram and document workflows."""
+    return ask_maritaca_result(question, history)["answer"]
 
 
 MAX_DOCUMENT_BYTES = 8 * 1024 * 1024
@@ -373,11 +399,17 @@ def chat():
         ), 413
 
     try:
-        answer = ask_maritaca(question, body.get("history", []))
+        result = ask_maritaca_result(question, body.get("history", []))
     except GatewayError as exc:
         return jsonify({"error": exc.message}), exc.status_code
 
-    return jsonify({"answer": answer, "model": MARITACA_MODEL})
+    return jsonify({
+        "answer": result["answer"],
+        "model": MARITACA_MODEL,
+        "usage": result["usage"],
+        "max_output_tokens": MARITACA_MAX_TOKENS,
+        "finish_reason": result["finish_reason"],
+    })
 
 
 telegram_executor = ThreadPoolExecutor(
