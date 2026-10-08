@@ -159,7 +159,7 @@ def ask_maritaca_result(question: str, history: Any) -> dict[str, Any]:
                 "Content-Type": "application/json",
             },
             json=payload,
-            timeout=(10, 165),
+            timeout=(10, 300),
         )
     except requests.Timeout:
         app.logger.warning("Timeout ao consultar a Maritaca")
