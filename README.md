@@ -74,6 +74,10 @@ O bot agora pode receber XLSX e preparar uma cópia editada por `/planilha`, com
 
 As ferramentas exigem `THIGAS_TELEGRAM_ALLOWED_USERS` e `TELEGRAM_WEBHOOK_SECRET`. O armazenamento temporário e o plano gratuito atuais não constituem uma implantação 24/7; o guia descreve os componentes que ainda faltam.
 
-## Contas e documentos no navegador
+## Documentos no navegador — sem cadastro
 
-A área `/workspace` oferece cadastro via Google, GitHub e Facebook (Meta), envio de arquivos do aparelho e entrega de PDF, DOCX e XLSX revisado. Requer configuração OAuth e `DATABASE_URL` do Neon PostgreSQL para cadastro persistente. Os arquivos de documentos ainda ficam no armazenamento temporário do servidor. Consulte [configuração e limites](docs/CONTAS_E_DOCUMENTOS.md).
+A área `/workspace` agora abre **diretamente, sem Google, GitHub, Facebook, login ou cadastro**. O visitante pode enviar arquivos PDF, DOCX, XLSX e PPTX (até 8 MB), gerar PDF/Word, revisar uma planilha XLSX enviada e confirmar o download.
+
+Os arquivos temporários são segregados por uma sessão anônima assinada no navegador (cookie HTTP-only, SameSite=Lax, Secure e token CSRF). É necessário manter `THIGAS_SESSION_SECRET` (mínimo 32 caracteres) configurado no Render para essa proteção. A sessão e os arquivos expiram em até 24 horas; como `THIGAS_DATA_DIR` permanece no disco efêmero do Render, podem se perder antes. O histórico do chat é guardado no navegador, sem sincronização.
+
+O código **não usa mais** `DATABASE_URL`, Neon, OAuth ou a tabela antiga de usuários. Os cadastros antigos no Neon **não foram apagados**; nenhuma exclusão de banco foi executada. As variáveis antigas do Render podem ser retiradas manualmente após validar o deploy. Consulte [documentação de uso e privacidade](docs/CONTAS_E_DOCUMENTOS.md).
