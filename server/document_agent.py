@@ -88,13 +88,52 @@ def apply_edits(data,edits):
         return output.getvalue(),'\n'.join(preview)
     finally:book.close()
 
+def document_lines(text):
+    if not isinstance(text,str) or not text.strip() or len(text)>40000:
+        raise ValueError('Texto do documento inválido ou grande demais.')
+    for line in text.splitlines():
+        line=line.strip()
+        if not line:
+            yield 'space',''
+        elif line.startswith('#'):
+            match=re.match(r'^(#{1,3})\s+(.+)$',line)
+            yield ('heading'+str(len(match[1])),match[2]) if match else ('body',line)
+        elif line.startswith(('- ','* ')):
+            yield 'bullet',line[2:]
+        else:
+            yield 'body',line
+
 def make_pdf(text):
-    if not isinstance(text,str) or not text.strip() or len(text)>40000:raise ValueError('Texto do PDF inválido ou grande demais.')
     output=BytesIO();styles=getSampleStyleSheet();story=[]
-    for paragraph in text.split('\n'):
-        if paragraph.strip():story.append(Paragraph(escape(paragraph),styles['BodyText']))
-        else:story.append(Spacer(1,8))
-    SimpleDocTemplate(output,title='Documento THIGAS AI').build(story)
+    for kind,content in document_lines(text):
+        if kind=='space':
+            story.append(Spacer(1,8));continue
+        style=styles[{'heading1':'Title','heading2':'Heading2','heading3':'Heading3','bullet':'BodyText','body':'BodyText'}[kind]]
+        story.append(Paragraph(escape(content),style,bulletText='•' if kind=='bullet' else None))
+        story.append(Spacer(1,5))
+    def footer(canvas,doc):
+        canvas.saveState();canvas.setFont('Helvetica',8)
+        canvas.drawString(36,22,'THIGAS AI')
+        canvas.drawRightString(doc.pagesize[0]-36,22,str(doc.page))
+        canvas.restoreState()
+    SimpleDocTemplate(output,title='Documento THIGAS AI',leftMargin=48,rightMargin=48,
+                      topMargin=48,bottomMargin=42).build(story,onFirstPage=footer,onLaterPages=footer)
+    return output.getvalue()
+
+def make_docx(text):
+    from docx import Document
+    from docx.shared import Pt
+    document=Document()
+    document.styles['Normal'].font.name='Calibri'
+    document.styles['Normal'].font.size=Pt(11)
+    for kind,content in document_lines(text):
+        if kind.startswith('heading'):
+            document.add_heading(content,level=int(kind[-1])-1)
+        elif kind=='bullet':
+            document.add_paragraph(content,style='List Bullet')
+        else:
+            document.add_paragraph(content)
+    output=BytesIO();document.save(output)
     return output.getvalue()
 
 class Store:
