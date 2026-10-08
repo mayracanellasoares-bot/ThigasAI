@@ -158,7 +158,7 @@ class GatewayTests(unittest.TestCase):
         self.assertEqual(data["finish_reason"], "length")
         self.assertEqual(data["answer"], "Saída real")
         self.assertEqual(request_post.call_args.kwargs["json"]["max_tokens"], 16384)
-        self.assertEqual(request_post.call_args.kwargs["timeout"], (10, 165))
+        self.assertEqual(request_post.call_args.kwargs["timeout"], (10, 300))
 
     def test_missing_or_invalid_usage_is_null_not_fabricated(self):
         for provided in (None, {}, {"prompt_tokens": "123", "completion_tokens": True, "total_tokens": -1}):
