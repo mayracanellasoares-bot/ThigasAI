@@ -89,7 +89,8 @@ test("requisição usa /chat e envia histórico e texto sem credencial no client
     received = { url, options };
     return { ok: true, json: async () => ({ answer: " Código ", model: "teste" }) };
   }, "Pergunta", [{ role: "user", content: "Antes" }], signal);
-  assert.equal(answer, "Código");
+  assert.equal(answer.answer, "Código");
+  assert.deepEqual(answer.usage, {prompt_tokens: null, completion_tokens: null, total_tokens: null});
   assert.equal(received.url, "/chat");
   assert.equal(received.options.method, "POST");
   assert.equal(received.options.signal, signal);
@@ -104,4 +105,26 @@ test("cota, resposta inválida/vazia e rede produzem erro, sem reenvio automáti
   await assert.rejects(chat.requestChat(async () => ({ ok: true, json: async () => ({ answer: " " }) }), "a", []), /vazia/);
   await assert.rejects(chat.requestChat(async () => ({ ok: true, json: async () => { throw new Error("invalid"); } }), "a", []), /válida/);
   await assert.rejects(chat.requestChat(async () => { throw new TypeError("Failed to fetch"); }, "a", []), /fetch/);
+});
+
+test("contadores exibem números somente quando medidos pela API", async () => {
+  const result = await chat.requestChat(async () => ({
+    ok: true,
+    json: async () => ({ answer: " Pronto ", usage: {prompt_tokens: 123, completion_tokens: 456, total_tokens: 579}, finish_reason: "stop" }),
+  }), "Teste", []);
+  assert.equal(result.answer, "Pronto");
+  assert.deepEqual(result.usage, { prompt_tokens: 123, completion_tokens: 456, total_tokens: 579 });
+  assert.equal(result.finish_reason, "stop");
+
+  const missing = await chat.requestChat(async () => ({
+    ok: true, json: async () => ({answer:"Oi", usage: {prompt_tokens: "100", completion_tokens: -5, total_tokens: 12.3}}),
+  }), "Oi", []);
+  assert.deepEqual(missing.usage, { prompt_tokens: null, completion_tokens: null, total_tokens: null });
+});
+
+test("indicadores de tokens existem no layout", () => {
+  const html = fs.readFileSync(path.join(__dirname, "../static/index.html"), "utf8");
+  for(const id of ["tokens-input","tokens-output","tokens-total","tokens-status"]) {
+    assert.match(html, new RegExp('id="' + id + '"'));
+  }
 });
