@@ -76,4 +76,4 @@ As ferramentas exigem `THIGAS_TELEGRAM_ALLOWED_USERS` e `TELEGRAM_WEBHOOK_SECRET
 
 ## Contas e documentos no navegador
 
-A área `/workspace` oferece cadastro via Google, GitHub e Facebook (Meta), envio de arquivos do aparelho e entrega de PDF, DOCX e XLSX revisado. Requer configuração OAuth e armazenamento persistente para cadastros de produção. Consulte [configuração e limites](docs/CONTAS_E_DOCUMENTOS.md).
+A área `/workspace` oferece cadastro via Google, GitHub e Facebook (Meta), envio de arquivos do aparelho e entrega de PDF, DOCX e XLSX revisado. Requer configuração OAuth e `DATABASE_URL` do Neon PostgreSQL para cadastro persistente. Os arquivos de documentos ainda ficam no armazenamento temporário do servidor. Consulte [configuração e limites](docs/CONTAS_E_DOCUMENTOS.md).
