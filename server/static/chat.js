@@ -520,7 +520,7 @@
     logs.append(pending);
     scrollBottom();
     beep("send");
-    const timeout = setTimeout(() => controller.abort(), 185000);
+    const timeout = setTimeout(() => controller.abort(), 325000);
     try {
       const result = await requestChat(window.fetch.bind(window), message, history, controller.signal);
       if (epoch !== conversationEpoch) return;
