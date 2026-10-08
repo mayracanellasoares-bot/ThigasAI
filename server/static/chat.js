@@ -109,7 +109,17 @@
     if (!data || typeof data !== "object") throw new Error("O servidor devolveu dados inválidos.");
     if (!response.ok) throw new Error(typeof data.error === "string" ? data.error : "Falha na consulta (HTTP " + response.status + ").");
     if (typeof data.answer !== "string" || !data.answer.trim()) throw new Error("A resposta veio vazia.");
-    return data.answer.trim();
+    const measured = value => Number.isSafeInteger(value) && value >= 0 ? value : null;
+    const usage = data.usage && typeof data.usage === "object" ? data.usage : {};
+    return {
+      answer: data.answer.trim(),
+      usage: {
+        prompt_tokens: measured(usage.prompt_tokens),
+        completion_tokens: measured(usage.completion_tokens),
+        total_tokens: measured(usage.total_tokens),
+      },
+      finish_reason: typeof data.finish_reason === "string" ? data.finish_reason : null,
+    };
   }
 
   // Exportações puras permitem testar o contrato sem DOM, API externa ou saldo.
@@ -122,6 +132,21 @@
   const byId = id => document.getElementById(id);
   const input = byId("chat-input");
   const logs = byId("chat-logs");
+  const usageSent = byId("tokens-input");
+  const usageReceived = byId("tokens-output");
+  const usageTotal = byId("tokens-total");
+  const usageStatus = byId("tokens-status");
+  const ptNumber = new Intl.NumberFormat("pt-BR");
+  function showUsage(usage) {
+    const show = value => Number.isSafeInteger(value) && value >= 0 ? ptNumber.format(value) : "—";
+    usageSent.textContent = show(usage?.prompt_tokens);
+    usageReceived.textContent = show(usage?.completion_tokens);
+    usageTotal.textContent = show(usage?.total_tokens);
+    usageStatus.textContent = [usage?.prompt_tokens, usage?.completion_tokens, usage?.total_tokens]
+      .every(value => Number.isSafeInteger(value) && value >= 0)
+      ? "Medição real informada pela API"
+      : "— = não informado pela API";
+  }
   const scroll = byId("chat-scroll");
   const modal = byId("help-modal");
   const historyModal = byId("history-modal");
@@ -495,12 +520,17 @@
     logs.append(pending);
     scrollBottom();
     beep("send");
-    const timeout = setTimeout(() => controller.abort(), 150000);
+    const timeout = setTimeout(() => controller.abort(), 325000);
     try {
-      const answer = await requestChat(window.fetch.bind(window), message, history, controller.signal);
+      const result = await requestChat(window.fetch.bind(window), message, history, controller.signal);
       if (epoch !== conversationEpoch) return;
       pending.remove();
+      const answer = result.answer;
       renderMessage("assistant", answer);
+      showUsage(result.usage);
+      if (result.finish_reason === "length") {
+        info("A resposta atingiu o limite de saída. Peça para continuar a partir do ponto onde parou.", true);
+      }
       history = sanitizeHistory([...history, { role: "user", content: message }, { role: "assistant", content: answer }]);
       persistConversation();
       // Não apaga uma nova pergunta digitada enquanto a resposta estava chegando.
@@ -511,6 +541,7 @@
     } catch (error) {
       if (epoch !== conversationEpoch) return;
       pending.remove();
+      showUsage(null);
       const explanation = error.name === "AbortError" ? "O tempo de espera terminou. O servidor pode estar despertando. A consulta enviada pode ter consumido saldo; não houve reenvio automático." : error instanceof TypeError ? "Não foi possível conectar ao servidor. Confira a internet e tente mais tarde." : error.message;
       info(explanation, true);
       beep("error");
