@@ -1,11 +1,12 @@
 import os
-import sqlite3
 import tempfile
 import unittest
 from io import BytesIO
-from unittest.mock import patch, Mock
+from unittest.mock import Mock, patch
+
 from flask import Flask
 from docx import Document
+
 import document_agent
 from web_workspace import install
 
@@ -14,148 +15,172 @@ class WorkspaceTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
-        self.path = self.tmp.name+'/accounts.sqlite3'
-        env = {'THIGAS_PUBLIC_URL':'https://test.example','THIGAS_SESSION_SECRET':'a'*48,
-               'THIGAS_ACCOUNTS_DB':self.path,'DATABASE_URL':'','GITHUB_CLIENT_ID':'client','GITHUB_CLIENT_SECRET':'secret'}
-        self.env = patch.dict(os.environ,env)
-        self.env.start(); self.addCleanup(self.env.stop)
-        self.app = Flask(__name__); self.app.config['TESTING']=True
+        # Even if old credentials remain in Render, no social login or Neon connection is used.
+        env = {
+            'THIGAS_SESSION_SECRET': 'a' * 48,
+            'DATABASE_URL': 'postgresql://example.invalid/old_users',
+            'GOOGLE_CLIENT_ID': 'old-client',
+            'GOOGLE_CLIENT_SECRET': 'old-secret',
+            'GITHUB_CLIENT_ID': 'old-client',
+            'GITHUB_CLIENT_SECRET': 'old-secret',
+        }
+        self.env = patch.dict(os.environ, env)
+        self.env.start()
+        self.addCleanup(self.env.stop)
+        self.app = Flask(__name__)
+        self.app.config['TESTING'] = True
         self.compose = Mock(return_value='# Documento\nConteúdo revisado.')
-        self.store = document_agent.Store(self.tmp.name+'/files')
-        class GatewayError(Exception): pass
-        self.gateway = dict(document_store=self.store, compose_reviewed_document=self.compose,
-                            extract_document_text=Mock(return_value=('Fonte real',False)),
-                            ask_maritaca=Mock(),GatewayError=GatewayError)
-        install(self.app,self.gateway)
+        self.store = document_agent.Store(self.tmp.name + '/files')
+
+        class GatewayError(Exception):
+            pass
+
+        self.gateway = dict(
+            document_store=self.store,
+            compose_reviewed_document=self.compose,
+            extract_document_text=Mock(return_value=('Fonte real', False)),
+            ask_maritaca=Mock(),
+            GatewayError=GatewayError,
+        )
+        install(self.app, self.gateway)
         self.client = self.app.test_client()
-        self.client.get('/auth/me',base_url='https://test.example')
-        self.login('one')
+        self.session_data = self.start_session(self.client)
 
-    def login(self,uid):
-        # /auth/me opens the same schema used by real callback.
-        with self.client.session_transaction(base_url='https://test.example') as session:
-            session['uid']=uid; session['csrf']='csrf'
-        self.client.get('/auth/me',base_url='https://test.example')
-        with sqlite3.connect(self.path) as con:
-            con.execute('INSERT OR IGNORE INTO users VALUES (?,?,?,?)',(uid,'github',uid,uid))
+    def start_session(self, client):
+        response = client.get('/workspace/api/session', base_url='https://test.example')
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json['anonymous'])
+        self.assertTrue(response.json['csrf'])
+        with client.session_transaction(base_url='https://test.example') as state:
+            self.assertEqual(len(state['visitor']), 48)
+            return {'csrf': state['csrf'], 'owner': 'web-anon:' + state['visitor']}
 
-    def post(self,path,**kwargs):
-        return self.client.post(path,base_url='https://test.example',headers={'X-CSRF-Token':'csrf'},**kwargs)
+    def post(self, path, **kwargs):
+        return self.client.post(
+            path,
+            base_url='https://test.example',
+            headers={'X-CSRF-Token': self.session_data['csrf'],
+                     'Origin': 'https://test.example'},
+            **kwargs,
+        )
 
-    def test_guest_and_csrf_are_rejected(self):
-        guest=self.app.test_client()
-        self.assertEqual(guest.post('/workspace/api/generate',json={}).status_code,401)
-        self.assertEqual(self.client.post('/workspace/api/clear',base_url='https://test.example').status_code,403)
-        self.assertEqual(self.client.get('/auth/me',base_url='https://test.example').headers['Cache-Control'],'no-store')
+    def test_no_login_and_no_social_routes(self):
+        self.assertEqual(self.client.get('/auth/login/google').status_code, 404)
+        self.assertEqual(self.client.get('/auth/login/github').status_code, 404)
+        self.assertEqual(self.client.get('/auth/login/meta').status_code, 404)
+        self.assertEqual(self.client.get('/auth/me').status_code, 404)
+        response = self.client.get('/workspace')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'Sem cadastro e sem login', response.data)
+        self.assertNotIn(b'Entrar com Google', response.data)
+
+    def test_anonymous_session_is_stable_and_secure(self):
+        second = self.start_session(self.client)
+        self.assertEqual(second, self.session_data)
+        fresh = self.app.test_client()
+        self.assertNotEqual(self.start_session(fresh)['owner'], self.session_data['owner'])
+        self.assertEqual(fresh.post('/workspace/api/generate',
+                                    base_url='https://test.example', json={}).status_code, 403)
+        self.assertEqual(self.client.post('/workspace/api/clear',
+                                          base_url='https://test.example').status_code, 403)
+        self.assertEqual(self.client.post('/workspace/api/clear',
+                                          base_url='https://test.example',
+                                          headers={'X-CSRF-Token': self.session_data['csrf'],
+                                                   'Origin': 'https://evil.example'}).status_code, 403)
+        self.assertEqual(self.client.get('/workspace/api/session').headers['Cache-Control'], 'no-store')
 
     def test_generate_preview_approve_and_download_isolated(self):
-        response=self.post('/workspace/api/generate',json={'instruction':'Crie uma aula','format':'docx'})
-        self.assertEqual(response.status_code,200)
-        pid=response.json['id'];url='/workspace/api/download/'+pid
-        self.assertEqual(self.client.get(url,base_url='https://test.example').status_code,404)
-        self.assertEqual(self.post('/workspace/api/decision/'+pid,json={'approve':True}).status_code,200)
-        downloaded=self.client.get(url,base_url='https://test.example')
-        self.assertEqual(downloaded.status_code,200)
-        self.assertIn('Conteúdo revisado.', [p.text for p in Document(BytesIO(downloaded.data)).paragraphs])
-        self.login('two')
-        self.assertEqual(self.client.get(url,base_url='https://test.example').status_code,404)
-        self.assertEqual(self.post('/workspace/api/decision/'+pid,json={'approve':True}).status_code,409)
+        response = self.post('/workspace/api/generate',
+                             json={'instruction': 'Crie uma aula', 'format': 'docx'})
+        self.assertEqual(response.status_code, 200)
+        pid = response.json['id']
+        url = '/workspace/api/download/' + pid
+        self.assertEqual(self.client.get(url, base_url='https://test.example').status_code, 404)
+        self.assertEqual(self.post('/workspace/api/decision/' + pid,
+                                   json={'approve': True}).status_code, 200)
+        downloaded = self.client.get(url, base_url='https://test.example')
+        self.assertEqual(downloaded.status_code, 200)
+        self.assertIn('Conteúdo revisado.',
+                      [p.text for p in Document(BytesIO(downloaded.data)).paragraphs])
+        other = self.app.test_client()
+        other_session = self.start_session(other)
+        self.assertNotEqual(other_session['owner'], self.session_data['owner'])
+        self.assertEqual(other.get(url, base_url='https://test.example').status_code, 404)
+        self.assertEqual(other.post('/workspace/api/decision/' + pid,
+                                    base_url='https://test.example',
+                                    json={'approve': True},
+                                    headers={'X-CSRF-Token': other_session['csrf']}).status_code, 409)
 
-    def test_source_is_sent_and_clear_removes_source(self):
-        response=self.post('/workspace/api/upload',data={'file':(BytesIO(b'fixture'),'source.pdf')})
-        self.assertEqual(response.status_code,200)
-        self.post('/workspace/api/generate',json={'instruction':'Resuma','format':'pdf','use_attachment':True})
-        self.compose.assert_called_once_with('Resuma','Fonte real')
-        self.post('/workspace/api/clear',json={})
-        self.assertIsNone(self.store.attached('web:one'))
+    def test_source_upload_and_clear(self):
+        response = self.post('/workspace/api/upload',
+                             data={'file': (BytesIO(b'fixture'), 'source.pdf')})
+        self.assertEqual(response.status_code, 200)
+        response = self.post('/workspace/api/generate',
+                             json={'instruction': 'Resuma', 'format': 'pdf', 'use_attachment': True})
+        self.assertEqual(response.status_code, 200)
+        self.compose.assert_called_once_with('Resuma', 'Fonte real')
+        self.assertEqual(self.post('/workspace/api/clear', json={}).status_code, 200)
+        self.assertIsNone(self.store.attached(self.session_data['owner']))
 
-    def test_cancel_and_invalid_payload(self):
-        pid=self.store.propose('web:one','test.pdf',b'pdf')
-        self.assertEqual(self.post('/workspace/api/decision/'+pid,json={'approve':'yes'}).status_code,400)
-        self.assertEqual(self.post('/workspace/api/decision/'+pid,json={'approve':False}).status_code,200)
-        self.assertIsNone(self.store.approved(pid,'web:one'))
-        self.assertEqual(self.post('/workspace/api/generate',json=[]).status_code,400)
-
-    def test_real_oauth_redirect_uses_state_and_pkce_and_rejects_bad_callback(self):
-        response=self.client.get('/auth/login/github',base_url='https://test.example')
-        self.assertEqual(response.status_code,302)
-        self.assertIn('state=',response.location)
-        self.assertIn('code_challenge=',response.location)
-        self.assertEqual(self.client.get('/auth/callback/github?code=bad&state=bad',base_url='https://test.example').status_code,400)
-
-    def test_oauth_callback_creates_stable_account_without_storing_token(self):
-        client=self.app.extensions['authlib.integrations.flask_client'].create_client('github')
-        profile=Mock();profile.json.return_value={'id':77,'name':'Thiago'}
-        with patch.object(client,'authorize_access_token',return_value={'access_token':'PRIVATE'}),patch.object(client,'get',return_value=profile):
-            response=self.client.get('/auth/callback/github',base_url='https://test.example')
-            self.assertEqual(response.status_code,302)
-            first=self.client.get('/auth/me',base_url='https://test.example').json
-            self.client.get('/auth/callback/github',base_url='https://test.example')
-            second=self.client.get('/auth/me',base_url='https://test.example').json
-            self.assertEqual(first['user']['id'],second['user']['id'])
-            with self.client.session_transaction(base_url='https://test.example') as session:
-                self.assertNotIn('PRIVATE',str(dict(session)))
-
-    def test_delete_account_removes_files_and_invalidates_session(self):
-        self.store.attach('web:one','x.pdf',b'x')
-        self.assertEqual(self.post('/workspace/api/delete-account',json={}).status_code,200)
-        self.assertIsNone(self.store.attached('web:one'))
-        self.assertIsNone(self.client.get('/auth/me',base_url='https://test.example').json['user'])
-
-    def test_quota_checked_before_model(self):
-        for i in range(20): self.store.propose('web:one','x.pdf',b'x')
-        self.assertEqual(self.post('/workspace/api/generate',json={'instruction':'Teste','format':'pdf'}).status_code,429)
+    def test_cancel_invalid_payload_and_quota(self):
+        owner = self.session_data['owner']
+        pid = self.store.propose(owner, 'test.pdf', b'pdf')
+        self.assertEqual(self.post('/workspace/api/decision/' + pid,
+                                   json={'approve': 'yes'}).status_code, 400)
+        self.assertEqual(self.post('/workspace/api/decision/' + pid,
+                                   json={'approve': False}).status_code, 200)
+        self.assertIsNone(self.store.approved(pid, owner))
+        self.assertEqual(self.post('/workspace/api/generate', json=[]).status_code, 400)
+        for _ in range(19):
+            self.store.propose(owner, 'test.pdf', b'pdf')
+        self.assertEqual(self.post('/workspace/api/generate',
+                                   json={'instruction': 'Teste', 'format': 'pdf'}).status_code, 429)
         self.compose.assert_not_called()
 
-    def test_xlsx_review_and_expired_source(self):
+    def test_xlsx_edit_and_expired_source(self):
         from openpyxl import Workbook, load_workbook
-        book=Workbook(); book.active.title='Aula'; book.active['A1']='Antes'
-        output=BytesIO(); book.save(output); book.close()
-        self.assertEqual(self.post('/workspace/api/upload',data={'file':(BytesIO(output.getvalue()),'aula.xlsx')}).status_code,200)
-        self.gateway['ask_maritaca'].return_value='{"edits":[{"sheet":"Aula","cell":"A1","value":"Depois"}]}'
-        result=self.post('/workspace/api/generate',json={'instruction':'Atualize A1','format':'xlsx','use_attachment':True})
-        self.assertEqual(result.status_code,200)
-        pid=result.json['id']; self.post('/workspace/api/decision/'+pid,json={'approve':True})
-        data=self.client.get('/workspace/api/download/'+pid,base_url='https://test.example').data
-        book=load_workbook(BytesIO(data)); self.assertEqual(book.active['A1'].value,'Depois');book.close()
-        self.store.clear('web:one')
-        result=self.post('/workspace/api/generate',json={'instruction':'Use a fonte','format':'docx','use_attachment':True})
-        self.assertEqual(result.status_code,400)
+        book = Workbook()
+        book.active.title = 'Aula'
+        book.active['A1'] = 'Antes'
+        output = BytesIO()
+        book.save(output)
+        book.close()
+        self.assertEqual(self.post('/workspace/api/upload',
+                                   data={'file': (BytesIO(output.getvalue()), 'aula.xlsx')}).status_code, 200)
+        self.gateway['ask_maritaca'].return_value = (
+            '{"edits":[{"sheet":"Aula","cell":"A1","value":"Depois"}]}'
+        )
+        result = self.post('/workspace/api/generate',
+                           json={'instruction': 'Atualize A1', 'format': 'xlsx', 'use_attachment': True})
+        self.assertEqual(result.status_code, 200)
+        pid = result.json['id']
+        self.post('/workspace/api/decision/' + pid, json={'approve': True})
+        data = self.client.get('/workspace/api/download/' + pid,
+                               base_url='https://test.example').data
+        edited = load_workbook(BytesIO(data))
+        self.assertEqual(edited.active['A1'].value, 'Depois')
+        edited.close()
+        self.store.clear(self.session_data['owner'])
+        result = self.post('/workspace/api/generate',
+                           json={'instruction': 'Use a fonte', 'format': 'docx', 'use_attachment': True})
+        self.assertEqual(result.status_code, 400)
 
-    def test_chat_requires_login_when_provider_configured(self):
-        self.assertEqual(self.app.test_client().post('/chat').status_code,401)
-        self.assertEqual(self.client.post('/chat',base_url='https://test.example').status_code,403)
-        self.assertEqual(self.client.post('/chat',base_url='https://test.example',headers={'Origin':'https://test.example'}).status_code,404)
+    def test_chat_does_not_require_auth(self):
+        @self.app.post('/chat')
+        def chat():
+            return {'answer': 'ok'}
+        response = self.app.test_client().post('/chat', json={'message': 'olá'})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json['answer'], 'ok')
 
-    def test_neon_postgres_account_backend_uses_parameterized_queries(self):
-        """The real Neon connection is supplied by Render, not by this unit test."""
-        from unittest.mock import MagicMock
-        connection = MagicMock()
-        connection.execute.return_value.fetchone.return_value = ('pg-user', 'github', 'Thiago')
-        env = {'DATABASE_URL': 'postgresql://test.example/database?sslmode=require',
-               'THIGAS_ACCOUNTS_DB': ''}
-        with patch.dict(os.environ, env), patch('psycopg.connect', return_value=connection) as connect:
-            postgres_app = Flask('postgres_workspace_test')
-            postgres_app.config['TESTING'] = True
-            install(postgres_app, self.gateway)
-            pg_client = postgres_app.test_client()
-            profile = pg_client.get('/auth/me', base_url='https://test.example').json
-            self.assertIn('github', profile['providers'])
-            with pg_client.session_transaction(base_url='https://test.example') as sess:
-                sess['uid'] = 'pg-user'
-                sess['csrf'] = 'csrf'
-            profile = pg_client.get('/auth/me', base_url='https://test.example').json
-            self.assertEqual(profile['user']['id'], 'pg-user')
-            oauth = postgres_app.extensions['authlib.integrations.flask_client'].create_client('github')
-            user_response = Mock()
-            user_response.json.return_value = {'id': 123, 'name': 'Thiago'}
-            with patch.object(oauth, 'authorize_access_token', return_value={'access_token': 'SECRET'}), \
-                 patch.object(oauth, 'get', return_value=user_response):
-                callback = pg_client.get('/auth/callback/github', base_url='https://test.example')
-                self.assertEqual(callback.status_code, 302)
-            statements = [call.args[0] for call in connection.execute.call_args_list]
-            self.assertTrue(any('CREATE TABLE IF NOT EXISTS users' in sql for sql in statements))
-            self.assertTrue(any('id=%s' in sql for sql in statements))
-            self.assertTrue(any('ON CONFLICT(provider,subject)' in sql for sql in statements))
-            self.assertTrue(any('provider=%s AND subject=%s' in sql for sql in statements))
-            connect.assert_called_with('postgresql://test.example/database?sslmode=require', connect_timeout=10)
+    def test_missing_session_secret_only_disables_anonymous_document_sessions(self):
+        with patch.dict(os.environ, {'THIGAS_SESSION_SECRET': ''}):
+            app = Flask('no_secret_app')
+            install(app, self.gateway)
+            response = app.test_client().get('/workspace/api/session')
+            self.assertEqual(response.status_code, 503)
+            self.assertIn('THIGAS_SESSION_SECRET', response.json['error'])
+
+
+if __name__ == '__main__':
+    unittest.main()
