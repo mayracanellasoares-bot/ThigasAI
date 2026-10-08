@@ -118,22 +118,7 @@
   }
   if (typeof document === "undefined") return;
 
-  // Load identity before rendering any saved conversation.
-  try {
-    const identityResponse = await fetch("/auth/me", {cache:"no-store", credentials:"same-origin", signal:AbortSignal.timeout(8000)});
-    if (!identityResponse.ok) throw new Error("identity unavailable");
-    const identity = await identityResponse.json();
-    if (identity.providers.length && !identity.user) { location.replace("/workspace"); return; }
-    if (identity.user) {
-      STORAGE_KEY += "." + identity.user.id;
-      CONVERSATIONS_KEY += "." + identity.user.id;
-      ACTIVE_CONVERSATION_KEY += "." + identity.user.id;
-    }
-  } catch (_) {
-    // Offline guest history remains local; signed-in namespaces are not opened.
-  }
-
-
+  // Acesso direto: histórico continua no navegador, sem identidade social.
   const byId = id => document.getElementById(id);
   const input = byId("chat-input");
   const logs = byId("chat-logs");
