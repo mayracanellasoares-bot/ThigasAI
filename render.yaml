@@ -12,6 +12,8 @@ services:
         sync: false
       - key: MARITACA_MODEL
         value: sabiazinho-4
+      - key: MARITACA_MAX_TOKENS
+        value: "16384"
       - key: MARITACA_URL
         value: https://chat.maritaca.ai/api/chat/completions
       - key: TELEGRAM_BOT_TOKEN
