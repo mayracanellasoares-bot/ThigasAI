@@ -22,11 +22,7 @@ services:
         value: https://thigas-coder-gateway.onrender.com/telegram/webhook
       - key: THIGAS_TELEGRAM_ALLOWED_USERS
         sync: false
-      - key: THIGAS_PUBLIC_URL
-        value: https://thigas-coder-gateway.onrender.com
       - key: THIGAS_SESSION_SECRET
-        sync: false
-      - key: DATABASE_URL
         sync: false
       - key: THIGAS_DATA_DIR
         value: /tmp/thigas-documents
