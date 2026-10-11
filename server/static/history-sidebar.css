@@ -60,3 +60,8 @@
   .history-drawer-collapsed .history-drawer{display:flex}
 }
 @media(prefers-reduced-motion:reduce){.history-drawer{transition:none}}
+
+/* Mensagens no padrão visual aprovado: usuário em verde suave e avatar da capivara. */
+.log-entry.assistant{position:relative;padding-left:45px}
+.log-entry.assistant>.assistant-avatar{position:absolute;left:3px;top:7px;width:34px;height:34px;border-radius:10px;object-fit:contain;background:#f15b53;padding:2px}
+.log-entry.user .message-text,.log-entry.user .message-content{background:#e9f6da!important;color:#29352b!important;border-radius:20px 20px 6px 20px}
