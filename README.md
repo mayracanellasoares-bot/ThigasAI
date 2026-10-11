@@ -141,3 +141,10 @@ A interface responsiva do THIGAS AI usa a capivara fornecida como marca visual e
 ## Integração do layout Mini Nano
 
 A folha `server/static/mini-nano-theme.css` incorpora e adapta as regras visuais do projeto [THIGAS Mini Nano](https://github.com/thiagollipe-web/thigasai_mini_nano), mediante autorização do titular comunicada pelo usuário. Este estilo carrega por último, com cabeçalho limpo, chat centralizado de 810 px, sugestões em duas colunas e compositor responsivo em tons off-white e verde-oliva. Os contratos JavaScript, Flask, documentos, menus +, ditado, histórico e PWA do THIGAS AI permanecem os do aplicativo principal; não há dependência do backend ou das credenciais do Mini Nano.
+
+
+## Histórico lateral de conversas (outubro de 2026)
+
+O chat exibe histórico na lateral esquerda no desktop e um painel recolhível no celular, com grupos Hoje / Ontem / Últimos 7 dias / Anteriores, busca por título, renomeação, exclusão e Nova conversa. As conversas ficam no `localStorage` deste navegador, limitadas a 30 conversas com 40 mensagens cada; **não sincronizam entre aparelhos**. O aplicativo omite o conteúdo delimitado por `[ARQUIVO: ...]` e `[FIM DO ARQUIVO]` antes de armazenar mensagens localmente; mensagens antigas são saneadas ao carregar. Não inclua segredos nas perguntas de texto normal.
+
+O ícone SVG foi atualizado com moldura coral e capivara, como o visual aprovado. Como o PWA também oferece ícones PNG, navegadores que priorizam esses PNGs podem manter o ícone anterior até que os bitmaps sejam substituídos e o app reinstalado.
