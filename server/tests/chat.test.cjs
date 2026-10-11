@@ -148,3 +148,34 @@ test("seletor de modelos e campos necessários existem no HTML", () => {
     assert.match(html, new RegExp('id="' + id + '"'));
   }
 });
+
+
+test("conteúdo de anexos não é persistido no histórico local", () => {
+  const attachmentText = "Veja o relatório.\n\n[ARQUIVO: privado.pdf]\nDADOS PESSOAIS SIGILOSOS\n[FIM DO ARQUIVO]";
+  const safe = chat.redactAttachmentFromHistory(attachmentText);
+  assert.match(safe, /Veja o relatório/);
+  assert.match(safe, /Anexo omitido do histórico local/);
+  assert.doesNotMatch(safe, /DADOS PESSOAIS SIGILOSOS/);
+  assert.equal(chat.redactAttachmentFromHistory("Conversa comum"), "Conversa comum");
+});
+
+test("datas de conversas aparecem em grupos previsíveis", () => {
+  const now = new Date(2026, 9, 11, 18, 0).getTime();
+  assert.equal(chat.classifyConversationDate(new Date(2026, 9, 11, 9).getTime(), now), "Hoje");
+  assert.equal(chat.classifyConversationDate(new Date(2026, 9, 10, 23).getTime(), now), "Ontem");
+  assert.equal(chat.classifyConversationDate(new Date(2026, 9, 6, 12).getTime(), now), "Últimos 7 dias");
+  assert.equal(chat.classifyConversationDate(new Date(2026, 9, 1, 12).getTime(), now), "Anteriores");
+});
+
+test("menu de histórico lateral existe e mantém funções de conversa", () => {
+  const html = fs.readFileSync(path.join(__dirname, "../static/index.html"), "utf8");
+  const js = fs.readFileSync(path.join(__dirname, "../static/chat.js"), "utf8");
+  const css = fs.readFileSync(path.join(__dirname, "../static/history-sidebar.css"), "utf8");
+  for (const id of ["history-drawer", "drawer-conversations", "history-search", "btn-drawer-new", "btn-close-drawer", "history-backdrop"]) {
+    assert.match(html, new RegExp('id="' + id + '"'));
+  }
+  for (const fn of ["renderSidebarHistory", "setDrawerOpen", "openConversation", "deleteConversation", "persistConversation"]) {
+    assert.ok(js.includes(fn), fn);
+  }
+  assert.ok(css.includes("@media(max-width:780px)"));
+});

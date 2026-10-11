@@ -1,13 +1,14 @@
 "use strict";
 
 const CACHE_PREFIX = "thigas-pwa-";
-const CACHE_NAME = CACHE_PREFIX + "v15";
+const CACHE_NAME = CACHE_PREFIX + "v16";
 const APP_SHELL = [
   "/",
   "/manifest.webmanifest",
-  "/static/chat.css?v=mininano1",
-  "/static/mini-nano-theme.css?v=source1",
-  "/static/chat.js?v=mininano1",
+  "/static/chat.css?v=drawer2",
+  "/static/mini-nano-theme.css?v=drawer2",
+  "/static/history-sidebar.css?v=drawer2",
+  "/static/chat.js?v=drawer2",
   "/static/pwa.js?v=llama2",
   "/static/icons/icon.svg",
   "/static/icons/icon-192.png",
