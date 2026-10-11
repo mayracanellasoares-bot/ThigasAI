@@ -78,7 +78,7 @@ def install(app, gateway):
         filename = Path((file.filename or '').replace('\\','/')).name[:120]
         data = file.read(document_agent.MAX_BYTES+1)
         if len(data) > document_agent.MAX_BYTES:
-            return jsonify(error='Limite de 8 MB.'), 413
+            return jsonify(error='Limite de 20 MB.'), 413
         try:
             if Path(filename).suffix.lower() == '.xlsx':
                 context = document_agent.snapshot(data)
