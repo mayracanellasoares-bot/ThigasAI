@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#0b0b0b" id="theme-color-meta">
+  <meta name="theme-color" content="#f8f6f0" id="theme-color-meta">
   <meta name="description" content="THIGAS AI: assistente de IA e programação com interface inspirada na WebUI do llama.cpp/llamafile.">
   <meta name="application-name" content="THIGAS AI">
   <meta name="mobile-web-app-capable" content="yes">
@@ -14,7 +14,7 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/static/icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
-  <link rel="stylesheet" href="/static/chat.css?v=brittech1">
+  <link rel="stylesheet" href="/static/chat.css?v=capivara2">
   <script src="/static/chat.js?v=doc20mb1" defer></script>
   <script src="/static/pwa.js?v=llama2" defer></script>
 </head>
@@ -25,7 +25,7 @@
         <img src="/static/icons/icon.svg" alt="" class="brand-icon">
         <div class="brand-copy">
           <strong>THIGAS AI</strong>
-          <span>coder</span>
+          <span>Brittech inc.</span>
         </div>
       </div>
 
@@ -35,7 +35,8 @@
       </button>
 
       <nav class="sidebar-nav" aria-label="Opções">
-        <a class="sidebar-btn" href="/workspace">Documentos</a>
+        <a class="sidebar-btn" href="/workspace"><span class="nav-icon" aria-hidden="true">▤</span> Documentos</a>
+        <a class="sidebar-btn" href="/links"><span class="nav-icon" aria-hidden="true">↗</span> Analisar sites e links</a>
         <button id="btn-history" class="sidebar-btn" type="button" aria-haspopup="dialog">
           <span class="nav-icon" aria-hidden="true">◷</span>
           <span>Histórico</span>
@@ -83,7 +84,7 @@
         </div>
         <div class="model-chip" title="Assistente ativo">
           <span class="model-dot"></span>
-          <span>THIGAS Coder</span>
+          <span>THIGAS AI</span>
           <span class="chevron" aria-hidden="true">⌄</span>
         </div>
         <div class="header-actions">
@@ -102,12 +103,14 @@
             <div class="welcome-mark">
               <img src="/static/icons/icon.svg" alt="">
             </div>
+            <span class="welcome-eyebrow">SEU ASSISTENTE INTELIGENTE</span>
             <h1>Olá! Eu sou o THIGAS AI</h1>
             <p>Uma aplicação desenvolvida pela <strong>Brittech inc.</strong> Estou aqui para ajudar com dúvidas, criar, explicar, revisar e corrigir códigos. Como posso ajudar você hoje?</p>
             <div class="starter-actions" aria-label="Sugestões">
               <button type="button" class="starter-chip" data-prompt="Analise este documento e faça um resumo objetivo.">Resumir documento</button>
               <button type="button" class="starter-chip" data-prompt="Revise este código, encontre bugs e proponha correções.">Revisar código</button>
               <button type="button" class="starter-chip" data-prompt="Explique este conteúdo de forma simples e passo a passo.">Explicar conteúdo</button>
+              <a class="starter-chip" href="/links">↗ Analisar um site</a>
             </div>
           </section>
           <div id="chat-logs" role="log" aria-live="polite" aria-relevant="additions" aria-label="Mensagens"></div>
