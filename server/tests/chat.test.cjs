@@ -128,3 +128,23 @@ test("indicadores de tokens existem no layout", () => {
     assert.match(html, new RegExp('id="' + id + '"'));
   }
 });
+
+test("modo nuvem só altera o provedor solicitado; credencial continua no servidor", async () => {
+  let received;
+  const reply = await chat.requestChat(async (url, options) => {
+    received = { url, options };
+    return { ok: true, json: async () => ({ answer: "20B online", model: "openai/gpt-oss-20b" }) };
+  }, "Teste", [], undefined, "cloud");
+  assert.equal(reply.answer, "20B online");
+  assert.equal(reply.model, "openai/gpt-oss-20b");
+  assert.equal(received.url, "/chat");
+  assert.deepEqual(JSON.parse(received.options.body), { message: "Teste", history: [], mode: "cloud" });
+  assert.equal(received.options.headers.Authorization, undefined);
+});
+
+test("seletor de modelos e campos necessários existem no HTML", () => {
+  const html = fs.readFileSync(path.join(__dirname, "../static/index.html"), "utf8");
+  for (const id of ["reasoning-mode", "mode-hint", "model-used"]) {
+    assert.match(html, new RegExp('id="' + id + '"'));
+  }
+});
