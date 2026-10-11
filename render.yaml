@@ -16,6 +16,18 @@ services:
         value: "16384"
       - key: MARITACA_URL
         value: https://chat.maritaca.ai/api/chat/completions
+      - key: MARITACA_THINKING_MODEL
+        value: sabia-4-thinking-br-sp
+      - key: THIGAS_ENABLE_THINKING
+        value: "false"
+      - key: THIGAS_CLOUD_API_KEY
+        sync: false
+      - key: THIGAS_CLOUD_ENABLED
+        value: "false"
+      - key: THIGAS_CLOUD_URL
+        value: https://api.groq.com/openai/v1/chat/completions
+      - key: THIGAS_CLOUD_MODEL
+        value: openai/gpt-oss-20b
       - key: TELEGRAM_BOT_TOKEN
         sync: false
       - key: TELEGRAM_WEBHOOK_SECRET

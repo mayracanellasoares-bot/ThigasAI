@@ -95,11 +95,13 @@
     return { name: safeFilename(data.filename || file.name), text: data.text.trim(), truncated: data.truncated === true };
   }
 
-  async function requestChat(fetcher, message, history, signal) {
+  async function requestChat(fetcher, message, history, signal, mode = "fast") {
+    const payload = { message, history: apiHistory(history, message) };
+    if (mode === "thinking" || mode === "cloud") payload.mode = mode;
     const response = await fetcher("/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message, history: apiHistory(history, message) }),
+      body: JSON.stringify(payload),
       signal,
     });
     let data;
@@ -113,6 +115,7 @@
     const usage = data.usage && typeof data.usage === "object" ? data.usage : {};
     return {
       answer: data.answer.trim(),
+      model: typeof data.model === "string" ? data.model : null,
       usage: {
         prompt_tokens: measured(usage.prompt_tokens),
         completion_tokens: measured(usage.completion_tokens),
@@ -136,6 +139,7 @@
   const usageReceived = byId("tokens-output");
   const usageTotal = byId("tokens-total");
   const usageStatus = byId("tokens-status");
+  const modeSelector = byId("reasoning-mode");
   const ptNumber = new Intl.NumberFormat("pt-BR");
   function showUsage(usage) {
     const show = value => Number.isSafeInteger(value) && value >= 0 ? ptNumber.format(value) : "—";
@@ -452,6 +456,7 @@
     byId("btn-send").disabled = busy;
     byId("btn-attach").disabled = busy;
     byId("btn-remove-file").disabled = requestActive;
+    modeSelector.disabled = busy;
     const sendArrow = byId("btn-send").querySelector(".send-arrow");
     if (sendArrow) sendArrow.textContent = requestActive ? "…" : "↑";
     byId("btn-send").setAttribute("aria-label", requestActive ? "Aguardando resposta" : "Enviar mensagem");
@@ -522,12 +527,13 @@
     beep("send");
     const timeout = setTimeout(() => controller.abort(), 325000);
     try {
-      const result = await requestChat(window.fetch.bind(window), message, history, controller.signal);
+      const result = await requestChat(window.fetch.bind(window), message, history, controller.signal, modeSelector.value);
       if (epoch !== conversationEpoch) return;
       pending.remove();
       const answer = result.answer;
       renderMessage("assistant", answer);
       showUsage(result.usage);
+      byId("model-used").textContent = result.model || "não informado";
       if (result.finish_reason === "length") {
         info("A resposta atingiu o limite de saída. Peça para continuar a partir do ponto onde parou.", true);
       }
@@ -542,6 +548,7 @@
       if (epoch !== conversationEpoch) return;
       pending.remove();
       showUsage(null);
+      byId("model-used").textContent = "—";
       const explanation = error.name === "AbortError" ? "O tempo de espera terminou. O servidor pode estar despertando. A consulta enviada pode ter consumido saldo; não houve reenvio automático." : error instanceof TypeError ? "Não foi possível conectar ao servidor. Confira a internet e tente mais tarde." : error.message;
       info(explanation, true);
       beep("error");
@@ -616,6 +623,29 @@
     void checkHealth();
   });
 
+  async function loadModelCapabilities() {
+    // The UI never enables paid advanced modes without server authorization.
+    try {
+      const response = await fetch("/api", { cache: "no-store" });
+      if (!response.ok) return;
+      const capabilities = await response.json();
+      const allowThinking = capabilities?.thinking_enabled === true;
+      const allowCloud = capabilities?.cloud_enabled === true;
+      const thinking = modeSelector.querySelector('option[value="thinking"]');
+      const cloud = modeSelector.querySelector('option[value="cloud"]');
+      thinking.disabled = !allowThinking;
+      cloud.disabled = !allowCloud;
+      thinking.textContent = allowThinking ? "Sabiá 4 Thinking BR-SP" : "Sabiá 4 Thinking · indisponível";
+      cloud.textContent = allowCloud ? "Nuvem 20B · " + (capabilities.models?.cloud || "modelo externo") : "Nuvem 20B · indisponível";
+      if (modeSelector.selectedOptions[0]?.disabled) modeSelector.value = "fast";
+      byId("mode-hint").textContent = allowCloud || allowThinking
+        ? "Modelos avançados podem consumir mais saldo da API."
+        : "Os modos avançados precisam ser ativados pelo administrador.";
+    } catch (_) {
+      // Fail closed: existing fast mode works, advanced modes stay disabled.
+    }
+  }
+
   const savedSettings = readSaved(SETTINGS_KEY);
   if (savedSettings && typeof savedSettings === "object") {
     if (THEMES.includes(savedSettings.theme)) settings.theme = savedSettings.theme;
@@ -659,4 +689,5 @@
   setInterval(updateClock, 30000);
   resizeInput();
   void checkHealth();
+  void loadModelCapabilities();
 })();

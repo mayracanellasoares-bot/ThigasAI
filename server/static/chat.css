@@ -28,11 +28,11 @@ body {
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
 }
-button, textarea { font: inherit; }
+button, textarea, select { font: inherit; }
 button { cursor: pointer; }
 button:disabled { opacity: .45; cursor: wait; }
-button, textarea { -webkit-tap-highlight-color: transparent; }
-button:focus-visible, textarea:focus-visible, #chat-scroll:focus-visible {
+button, textarea, select { -webkit-tap-highlight-color: transparent; }
+button:focus-visible, textarea:focus-visible, select:focus-visible, #chat-scroll:focus-visible {
   outline: 2px solid #e8e8e8;
   outline-offset: 2px;
 }
@@ -981,3 +981,11 @@ body.light-mode .conversation-row.active {
 .token-meter strong { color: var(--text); font-weight: 650; }
 .token-meter > span:first-child { color: var(--text); font-weight: 650; }
 .token-meter small { flex-basis: 100%; color: var(--muted-2); font-size: 10px; }
+
+/* Opt-in cloud inference and reasoning model selection. */
+.model-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 7px 12px; font-size: 12px; color: var(--muted); padding: 9px 0; }
+.model-controls label { font-weight: 600; }
+.model-controls select { border: 1px solid var(--border); background: var(--surface-2); color: var(--text); border-radius: 8px; padding: 8px 10px; max-width: 100%; min-width: 0; }
+.model-controls option { background: var(--surface-2); color: var(--text); }
+.model-controls small { flex-basis: 100%; font-size: 11px; line-height: 1.35; color: var(--muted); }
+#model-used { word-break: break-word; }

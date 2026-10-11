@@ -205,5 +205,75 @@ class GatewayTests(unittest.TestCase):
         ask.assert_not_called()
 
 
+    def test_model_selection_is_server_controlled(self):
+        self.assertEqual(gateway.choose_model("fast"), gateway.MARITACA_MODEL)
+        with patch.object(gateway, "THIGAS_ENABLE_THINKING", False):
+            response = self.client.post("/chat", json={"message": "Teste", "mode": "thinking"})
+            self.assertEqual(response.status_code, 403)
+            self.assertEqual(self.get("/api").get_json()["thinking_enabled"], False)
+        with patch.object(gateway, "THIGAS_ENABLE_THINKING", True):
+            self.assertEqual(gateway.choose_model("thinking"), gateway.MARITACA_THINKING_MODEL)
+            with patch.object(gateway, "MARITACA_API_KEY", "fake-secret"):
+                upstream = unittest.mock.Mock()
+                upstream.status_code = 200
+                upstream.json.return_value = {
+                    "choices": [{"message": {"content": "Resposta avançada"}, "finish_reason": "stop"}],
+                }
+                with patch.object(gateway.requests, "post", return_value=upstream) as post:
+                    response = self.client.post("/chat", json={"message": "Teste", "mode": "thinking"})
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.get_json()["model"], gateway.MARITACA_THINKING_MODEL)
+                self.assertEqual(post.call_args.kwargs["json"]["model"], gateway.MARITACA_THINKING_MODEL)
+                self.assertIn(gateway.MARITACA_THINKING_MODEL, post.call_args.kwargs["json"]["messages"][0]["content"])
+
+
+    def test_cloud_20b_requires_server_opt_in_and_a_real_key(self):
+        with patch.object(gateway, "THIGAS_CLOUD_ENABLED", False), patch.object(gateway, "THIGAS_CLOUD_API_KEY", "example-test-key"):
+            response = self.client.post("/chat", json={"message": "Olá", "mode": "cloud"})
+            self.assertEqual(response.status_code, 403)
+            self.assertFalse(self.get("/api").get_json()["cloud_enabled"])
+        with patch.object(gateway, "THIGAS_CLOUD_ENABLED", True), patch.object(gateway, "THIGAS_CLOUD_API_KEY", ""):
+            response = self.client.post("/chat", json={"message": "Olá", "mode": "cloud"})
+            self.assertEqual(response.status_code, 403)
+
+    def test_cloud_20b_uses_private_credential_and_correct_endpoint(self):
+        upstream = unittest.mock.Mock()
+        upstream.status_code = 200
+        upstream.json.return_value = {
+            "model": "openai/gpt-oss-20b",
+            "choices": [{"message": {"content": "Resposta do 20B"}, "finish_reason": "stop"}],
+            "usage": {"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30},
+        }
+        with (patch.object(gateway, "THIGAS_CLOUD_ENABLED", True),
+              patch.object(gateway, "THIGAS_CLOUD_API_KEY", "example-cloud-key"),
+              patch.object(gateway, "MARITACA_API_KEY", ""),
+              patch.object(gateway.requests, "post", return_value=upstream) as post):
+            response = self.client.post("/chat", json={"message": "Explique Python", "mode": "cloud"})
+            metadata = self.get("/api").get_json()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["model"], gateway.THIGAS_CLOUD_MODEL)
+        self.assertEqual(response.get_json()["usage"]["total_tokens"], 30)
+        self.assertTrue(metadata["cloud_enabled"])
+        self.assertNotIn("example-cloud-key", str(metadata))
+        self.assertEqual(post.call_args.args[0], gateway.THIGAS_CLOUD_URL)
+        self.assertEqual(post.call_args.kwargs["json"]["model"], gateway.THIGAS_CLOUD_MODEL)
+        self.assertEqual(post.call_args.kwargs["headers"]["Authorization"], "Bearer example-cloud-key")
+        self.assertIn(gateway.THIGAS_CLOUD_MODEL, post.call_args.kwargs["json"]["messages"][0]["content"])
+
+    def test_client_cannot_inject_arbitrary_model(self):
+        with patch.object(gateway, "ask_maritaca_result") as ask:
+            response = self.client.post("/chat", json={"message": "Teste", "mode": "private-model", "model": "arbitrary"})
+        self.assertEqual(response.status_code, 400)
+        ask.assert_not_called()
+
+    def test_malformed_provider_response_returns_gateway_error(self):
+        upstream = unittest.mock.Mock()
+        upstream.status_code = 200
+        for malformed in ([], {"choices": [{}]}, {"choices": [None]}, {"choices": [{"message": "invalid"}]}):
+            upstream.json.return_value = malformed
+            with self.subTest(payload=malformed), patch.object(gateway, "MARITACA_API_KEY", "fake"), patch.object(gateway.requests, "post", return_value=upstream):
+                response = self.client.post("/chat", json={"message": "Olá"})
+            self.assertEqual(response.status_code, 502)
+
 if __name__ == "__main__":
     unittest.main()
