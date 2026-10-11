@@ -205,5 +205,41 @@ class GatewayTests(unittest.TestCase):
         ask.assert_not_called()
 
 
+    def test_model_selection_is_server_controlled(self):
+        self.assertEqual(gateway.choose_model("fast"), gateway.MARITACA_MODEL)
+        with patch.object(gateway, "THIGAS_ENABLE_THINKING", False):
+            response = self.client.post("/chat", json={"message": "Teste", "mode": "thinking"})
+            self.assertEqual(response.status_code, 403)
+            self.assertEqual(self.get("/api").get_json()["thinking_enabled"], False)
+        with patch.object(gateway, "THIGAS_ENABLE_THINKING", True):
+            self.assertEqual(gateway.choose_model("thinking"), gateway.MARITACA_THINKING_MODEL)
+            with patch.object(gateway, "MARITACA_API_KEY", "fake-secret"):
+                upstream = unittest.mock.Mock()
+                upstream.status_code = 200
+                upstream.json.return_value = {
+                    "choices": [{"message": {"content": "Resposta avançada"}, "finish_reason": "stop"}],
+                }
+                with patch.object(gateway.requests, "post", return_value=upstream) as post:
+                    response = self.client.post("/chat", json={"message": "Teste", "mode": "thinking"})
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.get_json()["model"], gateway.MARITACA_THINKING_MODEL)
+                self.assertEqual(post.call_args.kwargs["json"]["model"], gateway.MARITACA_THINKING_MODEL)
+                self.assertIn(gateway.MARITACA_THINKING_MODEL, post.call_args.kwargs["json"]["messages"][0]["content"])
+
+    def test_client_cannot_inject_arbitrary_model(self):
+        with patch.object(gateway, "ask_maritaca_result") as ask:
+            response = self.client.post("/chat", json={"message": "Teste", "mode": "private-model", "model": "arbitrary"})
+        self.assertEqual(response.status_code, 400)
+        ask.assert_not_called()
+
+    def test_malformed_provider_response_returns_gateway_error(self):
+        upstream = unittest.mock.Mock()
+        upstream.status_code = 200
+        for malformed in ([], {"choices": [{}]}, {"choices": [None]}, {"choices": [{"message": "invalid"}]}):
+            upstream.json.return_value = malformed
+            with self.subTest(payload=malformed), patch.object(gateway, "MARITACA_API_KEY", "fake"), patch.object(gateway.requests, "post", return_value=upstream):
+                response = self.client.post("/chat", json={"message": "Olá"})
+            self.assertEqual(response.status_code, 502)
+
 if __name__ == "__main__":
     unittest.main()
