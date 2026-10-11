@@ -1023,3 +1023,23 @@ body:not(.light-mode) .send-btn:hover {background:#294633}
 .new-chat-btn {border-radius:13px;min-height:46px}
 .starter-chip {text-decoration:none;display:inline-flex;align-items:center;min-height:38px}
 @media(max-width:780px) {.welcome-eyebrow {margin-top:8px}.sidebar {gap:12px}}
+
+/* Compositor minimalista com caixa de mensagem e ferramentas recolhidas */
+.modern-composer{display:flex;flex-direction:column;align-items:stretch;gap:2px;padding:12px 14px 10px;border-radius:28px;min-height:104px;position:relative;box-shadow:0 12px 32px rgba(43,70,45,.09)}
+.modern-composer #chat-input{width:100%;min-height:44px;padding:10px 7px 6px;max-height:144px;resize:none}
+.composer-actions{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.composer-tools,.composer-send-actions{display:flex;align-items:center;gap:8px;position:relative}
+.composer-tools{min-width:0}
+.effort-wrap select{font-size:12px;background:transparent;border:0;border-radius:24px;padding:8px;color:var(--text);max-width:175px;cursor:pointer}
+.effort-wrap select:hover{background:var(--surface-2)}
+.microphone-btn{display:inline-flex;align-items:center;justify-content:center;font-size:22px}
+.microphone-btn.is-recording{color:#d2504b;background:#fae6e3;box-shadow:0 0 0 3px rgba(210,80,75,.16)}
+.microphone-btn:disabled{opacity:.45}
+.quick-menu{position:absolute;z-index:25;background:#fffefb;color:#29372c;border:1px solid #d9e0d6;box-shadow:0 16px 48px rgba(21,51,27,.15);padding:7px;border-radius:17px;display:flex;flex-direction:column;gap:2px;min-width:240px;max-width:min(370px,calc(100vw - 35px))}
+.quick-menu[hidden]{display:none!important}
+.quick-menu button{border:0;border-radius:10px;background:transparent;color:#304634;text-align:left;padding:11px 13px;font-size:13px;cursor:pointer;white-space:normal}
+.quick-menu button:hover,.quick-menu button:focus-visible{background:#eaf1e7}
+.attach-menu{bottom:calc(100% + 10px);left:0}
+#slash-menu{bottom:calc(100% - 18px);left:18px}
+.composer-wrap{position:relative}
+@media(max-width:780px){.modern-composer{border-radius:26px;min-height:102px;padding:10px 11px 9px}.modern-composer #chat-input{font-size:16px}.effort-wrap select{max-width:150px}.quick-menu{min-width:220px}.token-meter{font-size:10px}}
