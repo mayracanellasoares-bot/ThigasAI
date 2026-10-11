@@ -6,6 +6,7 @@ from unittest.mock import Mock, patch
 
 from flask import Flask
 from docx import Document
+from pptx import Presentation
 
 import document_agent
 from web_workspace import install
@@ -110,6 +111,20 @@ class WorkspaceTests(unittest.TestCase):
                                     base_url='https://test.example',
                                     json={'approve': True},
                                     headers={'X-CSRF-Token': other_session['csrf']}).status_code, 409)
+
+    def test_pptx_generate_and_download_after_approval(self):
+        result = self.post('/workspace/api/generate',
+                           json={'instruction': 'Crie uma apresentação', 'format': 'pptx'})
+        self.assertEqual(result.status_code, 200)
+        pid = result.json['id']
+        self.assertEqual(self.client.get('/workspace/api/download/' + pid,
+                                      base_url='https://test.example').status_code, 404)
+        self.assertEqual(self.post('/workspace/api/decision/' + pid, json={'approve': True}).status_code, 200)
+        downloaded = self.client.get('/workspace/api/download/' + pid,
+                                     base_url='https://test.example')
+        self.assertEqual(downloaded.status_code, 200)
+        slides = Presentation(BytesIO(downloaded.data)).slides
+        self.assertGreaterEqual(len(slides), 1)
 
     def test_source_upload_and_clear(self):
         response = self.post('/workspace/api/upload',
