@@ -61,9 +61,14 @@ test("manifest possui identidade, escopo e ícones realmente presentes", () => {
   assert.equal(manifest.prefer_related_applications, false);
   for (const icon of manifest.icons) {
     const data = fs.readFileSync(path.join(__dirname, "..", icon.src.replace(/^\/static/, "static")));
-    assert.equal(data.readUInt32BE(16), Number(icon.sizes.split("x")[0]));
-    assert.equal(data.readUInt32BE(20), Number(icon.sizes.split("x")[1]));
-    assert.equal(icon.type, "image/png");
+    if (icon.type === "image/svg+xml") {
+      assert.equal(icon.sizes, "any");
+      assert.match(data.toString("utf8"), /<svg/);
+    } else {
+      assert.equal(data.readUInt32BE(16), Number(icon.sizes.split("x")[0]));
+      assert.equal(data.readUInt32BE(20), Number(icon.sizes.split("x")[1]));
+      assert.equal(icon.type, "image/png");
+    }
   }
 });
 
