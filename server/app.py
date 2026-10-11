@@ -28,6 +28,11 @@ MARITACA_API_KEY = os.getenv("MARITACA_API_KEY", "").strip()
 MARITACA_THINKING_MODEL = os.getenv("MARITACA_THINKING_MODEL", "sabia-4-thinking-br-sp").strip() or "sabia-4-thinking-br-sp"
 # Expensive reasoning must be explicitly enabled by the owner on the server.
 THIGAS_ENABLE_THINKING = os.getenv("THIGAS_ENABLE_THINKING", "false").strip().lower() in {"1", "true", "yes", "on"}
+THIGAS_CLOUD_API_KEY = (os.getenv("THIGAS_CLOUD_API_KEY") or os.getenv("GROQ_API_KEY") or "").strip()
+THIGAS_CLOUD_URL = os.getenv("THIGAS_CLOUD_URL", "https://api.groq.com/openai/v1/chat/completions").strip()
+THIGAS_CLOUD_MODEL = os.getenv("THIGAS_CLOUD_MODEL", "openai/gpt-oss-20b").strip() or "openai/gpt-oss-20b"
+# No public cloud spending without an explicit opt-in from the server owner.
+THIGAS_CLOUD_ENABLED = os.getenv("THIGAS_CLOUD_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
 try:
     MARITACA_MAX_TOKENS = int(os.getenv("MARITACA_MAX_TOKENS", "16384"))
 except ValueError:
@@ -48,13 +53,13 @@ Você é o THIGAS AI, também chamado de THIGAS Coder quando atua em programaç�
 IDENTIDADE E AUTORIA:
 - O THIGAS AI é uma aplicação e um código-fonte desenvolvido por Thiago Fillipe Soares.
 - Sua identidade é THIGAS AI. Nunca se apresente como Maritaca AI, Sabiá, ChatGPT, OpenAI, Claude ou como produto de outro provedor.
-- A infraestrutura atual usa a API da Maritaca como provedor externo de inferência e o modelo "{MARITACA_MODEL}" como motor de linguagem.
+- A infraestrutura utiliza serviços externos de inferência, com o modelo "{MARITACA_MODEL}" como motor padrão de linguagem.
 - Usar um modelo ou API de terceiros não muda a autoria nem a identidade da aplicação THIGAS AI.
 - Quando perguntarem "quem criou você?", responda que o THIGAS AI e seu código-fonte foram desenvolvidos por Thiago Fillipe Soares.
 - Quando perguntarem "de quem é o seu sistema?" ou "de quem é o código?", responda que a aplicação/código-fonte é de Thiago Fillipe Soares.
-- Quando perguntarem qual modelo, API ou provedor você usa, diferencie claramente as camadas: você é o THIGAS AI e atualmente utiliza a Maritaca apenas como provedor de inferência, por meio do modelo "{MARITACA_MODEL}".
-- Não atribua à Maritaca a autoria do THIGAS AI. Não diga "meu sistema é da Maritaca".
-- Também não diga que Thiago criou ou possui o modelo-base da Maritaca; a autoria aqui se refere ao aplicativo, integração, interface, backend e código-fonte do THIGAS AI.
+- Quando perguntarem qual modelo, API ou provedor você usa, diferencie claramente a aplicação THIGAS AI do serviço externo de inferência e informe o modelo ativo: "{MARITACA_MODEL}".
+- Não atribua ao provedor externo de IA a autoria do THIGAS AI.
+- Também não diga que Thiago criou ou possui os pesos do modelo-base externo; a autoria refere-se ao aplicativo, integração, interface, backend e código-fonte do THIGAS AI.
 
 COMPORTAMENTO:
 Responda sempre em português do Brasil.
@@ -149,16 +154,19 @@ def choose_model(mode: Any) -> str:
         if not THIGAS_ENABLE_THINKING:
             raise GatewayError("Modo avançado desativado pelo administrador.", 403)
         return MARITACA_THINKING_MODEL
+    if mode == "cloud":
+        if not (THIGAS_CLOUD_ENABLED and THIGAS_CLOUD_API_KEY):
+            raise GatewayError("Modelo na nuvem indisponível. Configure o acesso no servidor.", 403)
+        return THIGAS_CLOUD_MODEL
     raise GatewayError("Modo de resposta inválido.", 400)
 
 
 def ask_maritaca_result(question: str, history: Any, *, mode: str = "fast") -> dict[str, Any]:
     selected_model = choose_model(mode)
-    if not MARITACA_API_KEY:
-        raise GatewayError(
-            "MARITACA_API_KEY não configurada no servidor.",
-            503,
-        )
+    api_key = THIGAS_CLOUD_API_KEY if mode == "cloud" else MARITACA_API_KEY
+    api_url = THIGAS_CLOUD_URL if mode == "cloud" else MARITACA_URL
+    if not api_key:
+        raise GatewayError("Chave de acesso do provedor não configurada no servidor.", 503)
 
     payload = {
         "model": selected_model,
@@ -170,9 +178,9 @@ def ask_maritaca_result(question: str, history: Any, *, mode: str = "fast") -> d
 
     try:
         upstream = requests.post(
-            MARITACA_URL,
+            api_url,
             headers={
-                "Authorization": f"Bearer {MARITACA_API_KEY}",
+                "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json",
             },
             json=payload,
@@ -388,7 +396,12 @@ def api_info():
             "endpoint": "/chat",
             "telegram_webhook": "/telegram/webhook",
             "thinking_enabled": THIGAS_ENABLE_THINKING,
-            "models": {"fast": MARITACA_MODEL, "thinking": MARITACA_THINKING_MODEL if THIGAS_ENABLE_THINKING else None},
+            "cloud_enabled": THIGAS_CLOUD_ENABLED and bool(THIGAS_CLOUD_API_KEY),
+            "models": {
+                "fast": MARITACA_MODEL,
+                "thinking": MARITACA_THINKING_MODEL if THIGAS_ENABLE_THINKING else None,
+                "cloud": THIGAS_CLOUD_MODEL if (THIGAS_CLOUD_ENABLED and THIGAS_CLOUD_API_KEY) else None,
+            },
         }
     )
 
