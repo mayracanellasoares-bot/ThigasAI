@@ -177,5 +177,5 @@ test("menu de histórico lateral existe e mantém funções de conversa", () => 
   for (const fn of ["renderSidebarHistory", "setDrawerOpen", "openConversation", "deleteConversation", "persistConversation"]) {
     assert.ok(js.includes(fn), fn);
   }
-  assert.match(css, /@media\\(max-width:780px\\)/);
+  assert.ok(css.includes("@media(max-width:780px)"));
 });
