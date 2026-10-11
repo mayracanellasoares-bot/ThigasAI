@@ -377,7 +377,7 @@ def add_cors(response):
 
 @app.get("/")
 def index():
-    response = app.send_static_file("index.html")
+    response = app.response_class((Path(app.static_folder) / "index.html").read_bytes(), mimetype="text/html")
     response.headers["Cache-Control"] = "no-cache"
     return response
 
@@ -392,7 +392,7 @@ def manifest():
 
 @app.get("/sw.js")
 def service_worker():
-    response = app.send_static_file("sw.js")
+    response = app.response_class((Path(app.static_folder) / "sw.js").read_bytes(), mimetype="text/javascript")
     response.headers["Content-Type"] = "text/javascript; charset=utf-8"
     response.headers["Cache-Control"] = "no-cache"
     response.headers["Service-Worker-Allowed"] = "/"
