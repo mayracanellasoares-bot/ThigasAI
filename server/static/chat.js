@@ -503,7 +503,7 @@
   async function send(event) {
     event.preventDefault();
     if (requestActive || readingFile) return;
-    const raw = input.value.trim();
+    const raw = input.value.trim().replace(/^@(?:documento|codigo|site)\s+/i, (match) => ({ "@documento": "Considere o documento anexado: ", "@codigo": "Revise o código a seguir: ", "@site": "Analise o site a seguir: " })[match.trim().toLowerCase()] || match);
     const command = attachment ? { handled: false, question: raw } : handleCommand(raw);
     if (command.handled) { input.value = ""; resizeInput(); return; }
     if (navigator.onLine === false) {
@@ -533,7 +533,7 @@
       const answer = result.answer;
       renderMessage("assistant", answer);
       showUsage(result.usage);
-      byId("model-used").textContent = modeSelector.value === "thinking" ? "Pensamento" : "Rápido";
+      byId("model-used").textContent = modeSelector.value === "thinking" ? "Alto" : "Padrão";
       if (result.finish_reason === "length") {
         info("A resposta atingiu o limite de saída. Peça para continuar a partir do ponto onde parou.", true);
       }
@@ -632,11 +632,9 @@
       const allowThinking = capabilities?.thinking_enabled === true;
       const thinking = modeSelector.querySelector('option[value="thinking"]');
       thinking.disabled = !allowThinking;
-      thinking.textContent = allowThinking ? "Pensamento" : "Pensamento · indisponível";
+      thinking.textContent = allowThinking ? "Esforço: alto" : "Esforço: alto (indisponível)";
       if (modeSelector.selectedOptions[0]?.disabled) modeSelector.value = "fast";
-      byId("mode-hint").textContent = allowThinking
-        ? "Escolha entre respostas rápidas e análise aprofundada."
-        : "O modo Pensamento está indisponível no momento.";
+      byId("mode-hint").textContent = allowThinking ? "Esforço alto disponível." : "Esforço alto indisponível.";
     } catch (_) {
       // Fail closed: existing fast mode works, advanced modes stay disabled.
     }
@@ -672,7 +670,96 @@
   byId("btn-help").addEventListener("click", () => modal.showModal());
   byId("btn-privacy").addEventListener("click", () => modal.showModal());
   byId("btn-close-help").addEventListener("click", () => modal.close());
-  byId("btn-attach").addEventListener("click", () => byId("file-input").click());
+  const attachMenu = byId("attach-menu");
+  const shortcutMenu = byId("slash-menu");
+  function closeMenus() {
+    attachMenu.hidden = true;
+    shortcutMenu.hidden = true;
+    byId("btn-attach").setAttribute("aria-expanded", "false");
+  }
+  byId("btn-attach").addEventListener("click", () => {
+    const opening = attachMenu.hidden;
+    closeMenus();
+    attachMenu.hidden = !opening;
+    byId("btn-attach").setAttribute("aria-expanded", String(opening));
+  });
+  byId("attach-document").addEventListener("click", () => { closeMenus(); byId("file-input").click(); });
+  byId("attach-image").addEventListener("click", () => { closeMenus(); byId("image-input").click(); });
+  byId("attach-workspace").addEventListener("click", () => { window.location.href = "/workspace"; });
+  byId("image-input").addEventListener("change", async event => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type) || file.size > 8 * 1024 * 1024) {
+      info("Use imagem PNG, JPEG ou WebP de até 8 MB.", true);
+      event.target.value = "";
+      return;
+    }
+    readingFile = true;
+    setBusy();
+    try {
+      const form = new FormData();
+      form.append("image", file);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 60000);
+      let response;
+      try { response = await fetch("/image/describe", { method: "POST", body: form, signal: controller.signal }); }
+      finally { clearTimeout(timeout); }
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Não consegui analisar a imagem.");
+      attachment = { name: file.name + ".txt", text: "[Descrição da imagem enviada]\n" + result.description };
+      byId("attachment-preview").hidden = false;
+      byId("attachment-label").textContent = "▧ " + file.name + " · imagem interpretada";
+    } catch(error) {
+      info(error.message || "Erro ao processar a imagem.", true);
+    } finally {
+      event.target.value = "";
+      readingFile = false;
+      setBusy();
+    }
+  });
+  input.addEventListener("input", () => {
+    const value = input.value.slice(0, input.selectionStart).trim();
+    shortcutMenu.hidden = !(/^(?:\/|@)[\wÀ-ÿ]*$/.test(value) && value.length <= 24);
+  });
+  shortcutMenu.querySelectorAll("button[data-insert]").forEach(button => button.addEventListener("click", () => {
+    const value = button.dataset.insert;
+    input.value = value;
+    shortcutMenu.hidden = true;
+    input.focus();
+    resizeInput();
+  }));
+  document.addEventListener("click", event => {
+    if (!event.target.closest(".composer-tools") && !event.target.closest("#slash-menu")) closeMenus();
+  });
+  const mic = byId("btn-microphone");
+  const BrowserSpeech = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let recognizer = null;
+  if (!BrowserSpeech) {
+    mic.disabled = true;
+    mic.title = "Ditado indisponível neste navegador";
+  } else {
+    mic.addEventListener("click", () => {
+      if (recognizer) { recognizer.stop(); return; }
+      const speech = new BrowserSpeech();
+      recognizer = speech;
+      speech.lang = "pt-BR";
+      speech.interimResults = false;
+      speech.continuous = false;
+      speech.onresult = event => {
+        const transcript = Array.from(event.results).map(r => r[0]?.transcript || "").join(" ").trim();
+        if (transcript) {
+          input.value = (input.value.trim() + " " + transcript).trim();
+          resizeInput();
+          input.focus();
+        }
+      };
+      speech.onerror = event => { info("Ditado: " + (event.error || "não disponível"), true); };
+      speech.onend = () => { recognizer = null; mic.setAttribute("aria-pressed", "false"); mic.classList.remove("is-recording"); };
+      try { speech.start(); mic.setAttribute("aria-pressed", "true"); mic.classList.add("is-recording"); }
+      catch (_) { recognizer = null; info("O navegador não permitiu iniciar o microfone.", true); }
+    });
+  }
+
   byId("file-input").addEventListener("change", selectFile);
   byId("btn-remove-file").addEventListener("click", removeAttachment);
   document.querySelectorAll(".starter-chip").forEach(button => button.addEventListener("click", () => {
