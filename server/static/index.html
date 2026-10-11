@@ -14,8 +14,8 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/static/icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
-  <link rel="stylesheet" href="/static/chat.css?v=composer3">
-  <script src="/static/chat.js?v=composer3" defer></script>
+  <link rel="stylesheet" href="/static/chat.css?v=mininano1">
+  <script src="/static/chat.js?v=mininano1" defer></script>
   <script src="/static/pwa.js?v=llama2" defer></script>
 </head>
 <body class="theme-green">
@@ -79,7 +79,7 @@
       <header class="chat-header">
         <div class="mobile-brand">
           <img src="/static/icons/icon.svg" alt="" class="mobile-brand-icon">
-          <strong>THIGAS AI</strong>
+          <span class="mobile-brand-copy"><strong>THIGAS AI</strong><small>Assistente de pesquisa e criação</small></span>
         </div>
         <div class="model-chip" title="Assistente ativo">
           <span class="model-dot"></span>
@@ -87,7 +87,8 @@
           <span class="chevron" aria-hidden="true">⌄</span>
         </div>
         <div class="header-actions">
-          <span class="header-badge">online</span>
+          <button type="button" id="btn-new-top" class="header-new-chat">＋ Nova conversa</button>
+          <button type="button" id="btn-history-top" class="header-history" aria-label="Histórico de conversas">◷</button>
         </div>
       </header>
 
