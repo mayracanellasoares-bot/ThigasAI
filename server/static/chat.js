@@ -48,6 +48,21 @@
     return message;
   }
 
+  function redactAttachmentFromHistory(content) {
+    if (typeof content !== "string") return "";
+    return content.replace(/\n\n\[ARQUIVO:[^\n]*\]\n[\s\S]*?\n\[FIM DO ARQUIVO\]/g,
+      "\n\n[Anexo omitido do histórico local.]");
+  }
+
+  function classifyConversationDate(timestamp, today = Date.now()) {
+    const todayDate = new Date(today);
+    const startToday = new Date(todayDate.getFullYear(), todayDate.getMonth(), todayDate.getDate()).getTime();
+    if (timestamp >= startToday) return "Hoje";
+    if (timestamp >= startToday - 86400000) return "Ontem";
+    if (timestamp >= startToday - 7 * 86400000) return "Últimos 7 dias";
+    return "Anteriores";
+  }
+
   function sanitizeHistory(value, maxCharacters = 120000, maxMessages = 40) {
     if (!Array.isArray(value)) return [];
     const result = value.filter(item => item && ["user", "assistant"].includes(item.role) &&
@@ -127,7 +142,7 @@
 
   // Exportações puras permitem testar o contrato sem DOM, API externa ou saldo.
   if (typeof module !== "undefined" && module.exports) {
-    module.exports = { MAX_MESSAGE, MAX_FILE_BYTES, MAX_TEXT_FILE_BYTES, safeFilename, validateFile, composeMessage, sanitizeHistory, apiHistory, splitCodeBlocks, codeFilename, extractDocument, requestChat };
+    module.exports = { MAX_MESSAGE, MAX_FILE_BYTES, MAX_TEXT_FILE_BYTES, safeFilename, validateFile, composeMessage, sanitizeHistory, apiHistory, splitCodeBlocks, codeFilename, extractDocument, requestChat, redactAttachmentFromHistory, classifyConversationDate };
   }
   if (typeof document === "undefined") return;
 
@@ -192,11 +207,13 @@
 
   function normalizeConversation(value) {
     if (!value || typeof value !== "object" || typeof value.id !== "string") return null;
-    const messages = sanitizeHistory(value.messages, 120000, 40);
+    const messages = sanitizeHistory(value.messages, 120000, 40)
+      .map(item => ({ role: item.role, content: redactAttachmentFromHistory(item.content) }));
     if (!messages.length) return null;
     return {
       id: value.id.slice(0, 100),
       title: typeof value.title === "string" && value.title.trim() ? value.title.trim().slice(0, 60) : conversationTitle(messages),
+      customTitle: value.customTitle === true,
       updatedAt: Number.isFinite(value.updatedAt) ? value.updatedAt : Date.now(),
       messages,
     };
@@ -207,13 +224,15 @@
     conversations = Array.isArray(saved) ? saved.map(normalizeConversation).filter(Boolean) : [];
     conversations.sort((a, b) => b.updatedAt - a.updatedAt);
     conversations = conversations.slice(0, MAX_SAVED_CONVERSATIONS);
+    if (conversations.length) storeSaved(CONVERSATIONS_KEY, conversations);
 
     if (!conversations.length) {
-      const legacy = sanitizeHistory(readSaved(STORAGE_KEY));
+      const legacy = sanitizeHistory(readSaved(STORAGE_KEY)).map(item => ({ role: item.role, content: redactAttachmentFromHistory(item.content) }));
       if (legacy.length) {
         const migrated = { id: conversationId(), title: conversationTitle(legacy), updatedAt: Date.now(), messages: legacy };
         conversations = [migrated];
         storeSaved(CONVERSATIONS_KEY, conversations);
+        try { localStorage.removeItem(STORAGE_KEY); } catch (_) {}
       }
     }
 
@@ -228,11 +247,13 @@
     if (!history.length) return;
     if (!activeConversationId) activeConversationId = conversationId();
 
+    const previous = conversations.find(item => item.id === activeConversationId);
     const next = {
       id: activeConversationId,
-      title: conversationTitle(history),
+      title: previous?.customTitle ? previous.title : conversationTitle(history),
+      customTitle: previous?.customTitle === true,
       updatedAt: Date.now(),
-      messages: history.slice(),
+      messages: history.map(item => ({ role: item.role, content: redactAttachmentFromHistory(item.content) })),
     };
     conversations = [next, ...conversations.filter(item => item.id !== activeConversationId)]
       .sort((a, b) => b.updatedAt - a.updatedAt)
@@ -242,7 +263,83 @@
     renderConversationList();
   }
 
+  const drawer = byId("history-drawer");
+  const drawerBackdrop = byId("history-backdrop");
+  const drawerSearch = byId("history-search");
+  const mobileHistory = window.matchMedia("(max-width: 780px)");
+
+  function setDrawerOpen(open) {
+    const mobile = mobileHistory.matches;
+    document.body.classList.toggle("history-drawer-open", mobile && open);
+    document.body.classList.toggle("history-drawer-collapsed", !mobile && !open);
+    drawerBackdrop.hidden = !(mobile && open);
+    byId("btn-history-top").setAttribute("aria-expanded", String(mobile ? open : open));
+    drawer.setAttribute("aria-hidden", String(mobile && !open));
+    if (mobile && open) drawerSearch.focus();
+  }
+
+  function isDrawerOpen() {
+    return mobileHistory.matches
+      ? document.body.classList.contains("history-drawer-open")
+      : !document.body.classList.contains("history-drawer-collapsed");
+  }
+
+  function dismissMobileDrawer() {
+    if (mobileHistory.matches) setDrawerOpen(false);
+  }
+
+  function renderSidebarHistory() {
+    const list = byId("drawer-conversations");
+    list.replaceChildren();
+    const query = drawerSearch.value.trim().toLocaleLowerCase("pt-BR");
+    const results = conversations.filter(item => item.title.toLocaleLowerCase("pt-BR").includes(query));
+    if (!results.length) {
+      list.append(make("p", "drawer-empty", query ? "Nenhuma conversa encontrada." : "Inicie uma conversa para vê-la aqui."));
+      return;
+    }
+    let lastGroup = "";
+    for (const conversation of results) {
+      const group = classifyConversationDate(conversation.updatedAt);
+      if (group !== lastGroup) {
+        list.append(make("div", "drawer-group", group));
+        lastGroup = group;
+      }
+      const row = make("div", "drawer-conversation" + (conversation.id === activeConversationId ? " selected" : ""));
+      const open = make("button", "drawer-open");
+      open.type = "button";
+      open.setAttribute("aria-label", "Abrir " + conversation.title);
+      const title = make("strong", "", conversation.title);
+      const firstUser = conversation.messages.find(m => m.role === "user");
+      const preview = make("small", "", (firstUser?.content || "").replace(/\s+/g, " ").slice(0, 64) || "Conversa salva");
+      const stamp = make("time", "", new Date(conversation.updatedAt).toLocaleTimeString("pt-BR", { hour:"2-digit", minute:"2-digit" }));
+      open.append(make("span", "drawer-chat-icon", "▢"), title, preview);
+      open.addEventListener("click", () => openConversation(conversation.id));
+      const rename = make("button", "drawer-item-action", "✎");
+      rename.type = "button";
+      rename.title = "Renomear";
+      rename.setAttribute("aria-label", "Renomear " + conversation.title);
+      rename.addEventListener("click", () => {
+        const proposed = window.prompt("Novo nome da conversa:", conversation.title);
+        if (proposed === null) return;
+        const next = proposed.trim().replace(/\s+/g, " ").slice(0, 60);
+        if (!next) return;
+        conversation.title = next;
+        conversation.customTitle = true;
+        storeSaved(CONVERSATIONS_KEY, conversations);
+        renderConversationList();
+      });
+      const remove = make("button", "drawer-item-action", "×");
+      remove.type = "button";
+      remove.title = "Excluir";
+      remove.setAttribute("aria-label", "Excluir " + conversation.title);
+      remove.addEventListener("click", () => deleteConversation(conversation.id));
+      row.append(open, stamp, rename, remove);
+      list.append(row);
+    }
+  }
+
   function renderConversationList() {
+    renderSidebarHistory();
     const list = byId("conversation-list");
     if (!list) return;
     list.replaceChildren();
@@ -290,6 +387,7 @@
     showCurrentConversation();
     renderConversationList();
     if (historyModal && historyModal.open) historyModal.close();
+    dismissMobileDrawer();
     input.focus();
   }
 
@@ -308,6 +406,7 @@
     resizeInput();
     setBusy();
     renderConversationList();
+    dismissMobileDrawer();
     input.focus();
   }
 
@@ -666,7 +765,15 @@
   byId("btn-scanlines").addEventListener("click", () => { settings.crt = !settings.crt; applySettings(); });
   byId("btn-clear").addEventListener("click", startNewConversation);
   byId("btn-new-top").addEventListener("click", startNewConversation);
-  byId("btn-history-top").addEventListener("click", () => { renderConversationList(); historyModal.showModal(); });
+  byId("btn-history-top").addEventListener("click", () => setDrawerOpen(!isDrawerOpen()));
+  byId("btn-close-drawer").addEventListener("click", () => setDrawerOpen(false));
+  drawerBackdrop.addEventListener("click", () => setDrawerOpen(false));
+  byId("btn-drawer-new").addEventListener("click", startNewConversation);
+  drawerSearch.addEventListener("input", renderSidebarHistory);
+  byId("btn-drawer-settings").addEventListener("click", () => { dismissMobileDrawer(); modal.showModal(); });
+  document.addEventListener("keydown", event => { if (event.key === "Escape" && isDrawerOpen() && mobileHistory.matches) setDrawerOpen(false); });
+  if (mobileHistory.addEventListener) mobileHistory.addEventListener("change", () => setDrawerOpen(!mobileHistory.matches));
+  setDrawerOpen(!mobileHistory.matches);
   byId("btn-history").addEventListener("click", () => { renderConversationList(); historyModal.showModal(); });
   byId("btn-close-history").addEventListener("click", () => historyModal.close());
   byId("btn-help").addEventListener("click", () => modal.showModal());
