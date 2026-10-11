@@ -1,0 +1,53 @@
+name: Temporary Capybara Icons Builder
+on:
+  push:
+    branches: [feat/history-sidebar-pwa-logo]
+    paths: [".github/workflows/_temp_make_capybara_icons.yml"]
+permissions:
+  contents: write
+jobs:
+  update-icons:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install "Pillow>=11,<13"
+      - name: Render app icons from approved existing capybara SVG art
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from PIL import Image, ImageDraw
+          from io import BytesIO
+          import re, base64
+          source = Path("server/static/icons/icon.svg").read_text(encoding="utf-8")
+          capybara = Image.open(BytesIO(base64.b64decode(re.search(r"data:image/webp;base64,([^\"]+)", source).group(1)))).convert("RGB")
+          for size in (192, 512):
+              scale = 4
+              side = size * scale
+              canvas = Image.new("RGB", (side, side), "#ef5a52")
+              draw = ImageDraw.Draw(canvas)
+              draw.rounded_rectangle((0, 0, side-1, side-1), radius=int(side*.215), fill="#f15b53")
+              margin = int(side*.085)
+              draw.ellipse((margin, margin, side-margin, side-margin), fill="#fffdf8")
+              icon = capybara.resize((side-2*margin, side-2*margin), Image.Resampling.LANCZOS)
+              mask = Image.new("L", icon.size, 0)
+              ImageDraw.Draw(mask).ellipse((0, 0, icon.width-1, icon.height-1), fill=255)
+              canvas.paste(icon, (margin, margin), mask)
+              out = canvas.resize((size, size), Image.Resampling.LANCZOS)
+              out.save("server/static/icons/icon-"+str(size)+".png", optimize=True)
+              print("Saved", size, "px")
+          PY
+      - name: Commit generated PWA icons to this feature branch
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server/static/icons/icon-192.png server/static/icons/icon-512.png
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "brand: render approved coral capybara PWA icons"
+          git push origin HEAD:feat/history-sidebar-pwa-logo
