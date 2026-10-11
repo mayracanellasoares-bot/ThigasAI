@@ -15,13 +15,13 @@ from openpyxl.cell.cell import MergedCell
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 
-MAX_BYTES=8*1024*1024
+MAX_BYTES=20*1024*1024
 
 def validate_archive(data):
-    if len(data)>MAX_BYTES:raise ValueError('A planilha excede 8 MB.')
+    if len(data)>MAX_BYTES:raise ValueError('A planilha excede 20 MB.')
     with zipfile.ZipFile(BytesIO(data)) as archive:
         entries=archive.infolist()
-        if len(entries)>2000 or sum(x.file_size for x in entries)>30*1024*1024:
+        if len(entries)>2000 or sum(x.file_size for x in entries)>60*1024*1024:
             raise ValueError('Planilha expandida grande demais.')
         if any('vbaProject' in x.filename for x in entries):raise ValueError('Macros não são permitidas.')
 
@@ -184,7 +184,7 @@ def make_pptx(text):
     output = BytesIO()
     prs.save(output)
     if output.tell() > MAX_BYTES:
-        raise ValueError('A apresentação gerada excedeu 8 MB.')
+        raise ValueError('A apresentação gerada excedeu 20 MB.')
     return output.getvalue()
 
 
