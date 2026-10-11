@@ -665,6 +665,8 @@
   byId("btn-sound").addEventListener("click", () => { settings.sound = !settings.sound; applySettings(); beep(); });
   byId("btn-scanlines").addEventListener("click", () => { settings.crt = !settings.crt; applySettings(); });
   byId("btn-clear").addEventListener("click", startNewConversation);
+  byId("btn-new-top").addEventListener("click", startNewConversation);
+  byId("btn-history-top").addEventListener("click", () => { renderConversationList(); historyModal.showModal(); });
   byId("btn-history").addEventListener("click", () => { renderConversationList(); historyModal.showModal(); });
   byId("btn-close-history").addEventListener("click", () => historyModal.close());
   byId("btn-help").addEventListener("click", () => modal.showModal());
