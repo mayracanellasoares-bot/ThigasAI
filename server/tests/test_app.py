@@ -28,6 +28,32 @@ class GatewayTests(unittest.TestCase):
         self.addCleanup(response.close)
         return response
 
+    def test_url_pasted_in_chat_is_inspected_automatically(self):
+        page = {"status": 200, "title": "Página pública", "text": "Exemplo de página para análise",
+                "note": "", "redirect": None}
+        answer = {"answer": "Resumo da página", "usage": {"prompt_tokens": 10,
+                  "completion_tokens": 5, "total_tokens": 15}, "finish_reason": "stop",
+                  "model": gateway.MARITACA_MODEL}
+        with patch.object(gateway.link_inspector, "fetch_public_page", return_value=page) as check, \
+             patch.object(gateway, "ask_maritaca_result", return_value=answer) as call:
+            response = self.client.post("/chat", json={"message": "https://example.org/novidades"})
+        self.assertEqual(response.status_code, 200)
+        check.assert_called_once_with("https://example.org/novidades")
+        prompt = call.call_args.args[0]
+        self.assertIn("Exemplo de página para análise", prompt)
+        self.assertIn("FONTE WEB", prompt)
+        self.assertEqual(response.get_json()["answer"], "Resumo da página")
+
+    def test_chat_with_private_url_does_not_fetch(self):
+        with patch.object(gateway.link_inspector, "fetch_public_page", side_effect=ValueError("Endereço privado bloqueado")), \
+             patch.object(gateway, "ask_maritaca_result", return_value={
+                 "answer": "Não posso abrir esse endereço", "usage": {},
+                 "finish_reason": "stop", "model": gateway.MARITACA_MODEL
+             }) as call:
+            response = self.client.post("/chat", json={"message": "http://localhost/admin"})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("não foi possível consultar", call.call_args.args[0])
+
     def test_root_serves_real_chat_layout(self):
         response = self.get("/")
         self.assertEqual(response.status_code, 200)
