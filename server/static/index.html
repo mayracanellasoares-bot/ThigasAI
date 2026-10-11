@@ -14,8 +14,8 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/static/icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
-  <link rel="stylesheet" href="/static/chat.css?v=cloud20b1">
-  <script src="/static/chat.js?v=cloud20b1" defer></script>
+  <link rel="stylesheet" href="/static/chat.css?v=brittech1">
+  <script src="/static/chat.js?v=brittech1" defer></script>
   <script src="/static/pwa.js?v=llama2" defer></script>
 </head>
 <body class="theme-green">
@@ -102,8 +102,8 @@
             <div class="welcome-mark">
               <img src="/static/icons/icon.svg" alt="">
             </div>
-            <h1>Como posso ajudar?</h1>
-            <p>Converse, programe e analise documentos no mesmo lugar.</p>
+            <h1>Olá! Eu sou o THIGAS AI</h1>
+            <p>Uma aplicação desenvolvida pela <strong>Brittech inc.</strong> Estou aqui para ajudar com dúvidas, criar, explicar, revisar e corrigir códigos. Como posso ajudar você hoje?</p>
             <div class="starter-actions" aria-label="Sugestões">
               <button type="button" class="starter-chip" data-prompt="Analise este documento e faça um resumo objetivo.">Resumir documento</button>
               <button type="button" class="starter-chip" data-prompt="Revise este código, encontre bugs e proponha correções.">Revisar código</button>
@@ -133,16 +133,15 @@
           <input type="file" id="file-input" hidden accept=".pdf,.docx,.xlsx,.pptx,.txt,.md,.py,.js,.mjs,.cjs,.ts,.tsx,.jsx,.json,.yaml,.yml,.toml,.csv,.xml,.html,.css,.scss,.sh,.ps1,.bat,.c,.h,.cpp,.hpp,.cs,.java,.go,.rs,.rb,.php,.sql,.kt,.swift,.dart,.lua,.r">
 
           <div class="model-controls">
-            <label for="reasoning-mode">Modelo de inteligência</label>
+            <label for="reasoning-mode">Modo de resposta</label>
             <select id="reasoning-mode" aria-describedby="mode-hint">
-              <option value="fast">Rápido · Sabiazinho 4</option>
-              <option value="cloud" disabled>Nuvem 20B · indisponível</option>
-              <option value="thinking" disabled>Sabiá 4 Thinking · indisponível</option>
+              <option value="fast">Rápido</option>
+              <option value="thinking" disabled>Pensamento · indisponível</option>
             </select>
-            <small id="mode-hint">Os modos avançados precisam ser ativados pelo administrador.</small>
+            <small id="mode-hint">O modo Pensamento está indisponível no momento.</small>
           </div>
           <div class="token-meter" role="group" aria-label="Tokens medidos na última resposta">
-            <span>Última resposta · Modelo <strong id="model-used">—</strong></span>
+            <span>Última resposta · Modo <strong id="model-used">—</strong></span>
             <span>Enviados <strong id="tokens-input">—</strong></span>
             <span>Recebidos <strong id="tokens-output">—</strong></span>
             <span>Total <strong id="tokens-total">—</strong></span>

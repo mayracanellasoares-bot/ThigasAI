@@ -51,15 +51,11 @@ SYSTEM_PROMPT = f"""
 Você é o THIGAS AI, também chamado de THIGAS Coder quando atua em programação.
 
 IDENTIDADE E AUTORIA:
-- O THIGAS AI é uma aplicação e um código-fonte desenvolvido por Thiago Fillipe Soares.
-- Sua identidade é THIGAS AI. Nunca se apresente como Maritaca AI, Sabiá, ChatGPT, OpenAI, Claude ou como produto de outro provedor.
-- A infraestrutura utiliza serviços externos de inferência, com o modelo "{MARITACA_MODEL}" como motor padrão de linguagem.
-- Usar um modelo ou API de terceiros não muda a autoria nem a identidade da aplicação THIGAS AI.
-- Quando perguntarem "quem criou você?", responda que o THIGAS AI e seu código-fonte foram desenvolvidos por Thiago Fillipe Soares.
-- Quando perguntarem "de quem é o seu sistema?" ou "de quem é o código?", responda que a aplicação/código-fonte é de Thiago Fillipe Soares.
-- Quando perguntarem qual modelo, API ou provedor você usa, diferencie claramente a aplicação THIGAS AI do serviço externo de inferência e informe o modelo ativo: "{MARITACA_MODEL}".
-- Não atribua ao provedor externo de IA a autoria do THIGAS AI.
-- Também não diga que Thiago criou ou possui os pesos do modelo-base externo; a autoria refere-se ao aplicativo, integração, interface, backend e código-fonte do THIGAS AI.
+- O THIGAS AI é uma aplicação desenvolvida pela Brittech inc.
+- Apresente-se como THIGAS AI, não como o nome técnico do modelo de inferência.
+- Saudação preferida: "Olá! Eu sou o THIGAS AI, uma aplicação desenvolvida pela Brittech inc. Estou aqui para ajudar com dúvidas, criar, explicar, revisar e corrigir códigos. Como posso ajudar você hoje?"
+- A identidade da aplicação não implica propriedade ou autoria dos modelos de terceiros usados como provedores.
+- Não divulgue nomes técnicos de modelos espontaneamente. Se perguntarem qual modelo ou provedor está processando as respostas, seja transparente sobre a configuração de inferência, sem expor chaves ou informações confidenciais.
 
 COMPORTAMENTO:
 Responda sempre em português do Brasil.
@@ -107,8 +103,8 @@ def text_content(value: Any) -> str:
 
 def build_messages(question: str, history: Any, model: str | None = None) -> list[dict[str, str]]:
     prompt = SYSTEM_PROMPT
-    if model and model != MARITACA_MODEL:
-        prompt = prompt.replace(f'"{MARITACA_MODEL}"', f'"{model}"')
+    active_model = model or MARITACA_MODEL
+    prompt += f"\n\nCONFIGURAÇÃO INTERNA: Modelo ativo nesta solicitação: {active_model}. Responda com esta informação verdadeira apenas se o usuário perguntar expressamente pelo modelo ou provedor."
     messages = [{"role": "system", "content": prompt}]
     previous = []
 
@@ -150,21 +146,17 @@ def _maritaca_usage(data: Any) -> dict[str, int | None]:
 def choose_model(mode: Any) -> str:
     if mode in (None, "fast"):
         return MARITACA_MODEL
-    if mode == "thinking":
-        if not THIGAS_ENABLE_THINKING:
-            raise GatewayError("Modo avançado desativado pelo administrador.", 403)
-        return MARITACA_THINKING_MODEL
-    if mode == "cloud":
+    if mode in ("thinking", "cloud"):
         if not (THIGAS_CLOUD_ENABLED and THIGAS_CLOUD_API_KEY):
-            raise GatewayError("Modelo na nuvem indisponível. Configure o acesso no servidor.", 403)
+            raise GatewayError("Modo Pensamento indisponível. Configure o acesso no servidor.", 403)
         return THIGAS_CLOUD_MODEL
     raise GatewayError("Modo de resposta inválido.", 400)
 
 
 def ask_maritaca_result(question: str, history: Any, *, mode: str = "fast") -> dict[str, Any]:
     selected_model = choose_model(mode)
-    api_key = THIGAS_CLOUD_API_KEY if mode == "cloud" else MARITACA_API_KEY
-    api_url = THIGAS_CLOUD_URL if mode == "cloud" else MARITACA_URL
+    api_key = THIGAS_CLOUD_API_KEY if mode in ("thinking", "cloud") else MARITACA_API_KEY
+    api_url = THIGAS_CLOUD_URL if mode in ("thinking", "cloud") else MARITACA_URL
     if not api_key:
         raise GatewayError("Chave de acesso do provedor não configurada no servidor.", 503)
 
@@ -187,27 +179,27 @@ def ask_maritaca_result(question: str, history: Any, *, mode: str = "fast") -> d
             timeout=(10, 300),
         )
     except requests.Timeout:
-        app.logger.warning("Timeout ao consultar a Maritaca")
-        raise GatewayError("A Maritaca demorou para responder.", 504)
+        app.logger.warning("Timeout ao consultar o provedor de IA")
+        raise GatewayError("O provedor de IA demorou para responder.", 504)
     except requests.RequestException as exc:
         app.logger.warning(
-            "Falha de conexão com a Maritaca: %s",
+            "Falha de conexão com o provedor de IA: %s",
             exc.__class__.__name__,
         )
-        raise GatewayError("Não foi possível conectar à Maritaca.", 502)
+        raise GatewayError("Não foi possível conectar ao provedor de IA.", 502)
 
     if upstream.status_code == 401:
-        raise GatewayError("A chave da Maritaca foi recusada.", 502)
+        raise GatewayError("A chave do provedor de IA foi recusada.", 502)
 
     if upstream.status_code == 429:
         raise GatewayError(
-            "A Maritaca informou limite ou cota excedida.",
+            "O provedor de IA informou limite ou cota excedida.",
             429,
         )
 
     if upstream.status_code >= 400:
         raise GatewayError(
-            f"A Maritaca recusou a consulta (HTTP {upstream.status_code}).",
+            f"O provedor de IA recusou a consulta (HTTP {upstream.status_code}).",
             502,
         )
 
@@ -215,30 +207,30 @@ def ask_maritaca_result(question: str, history: Any, *, mode: str = "fast") -> d
         data = upstream.json()
     except ValueError:
         raise GatewayError(
-            "A Maritaca retornou uma resposta inválida.",
+            "O provedor de IA retornou uma resposta inválida.",
             502,
         )
 
     choices = data.get("choices") if isinstance(data, dict) else None
     if not isinstance(choices, list) or not choices:
         raise GatewayError(
-            "A Maritaca não retornou uma resposta.",
+            "O provedor de IA não retornou uma resposta.",
             502,
         )
 
     choice = choices[0]
     if not isinstance(choice, dict):
-        raise GatewayError("A Maritaca retornou dados de resposta inválidos.", 502)
+        raise GatewayError("O provedor de IA retornou dados de resposta inválidos.", 502)
     message = choice.get("message") or {}
     if not isinstance(message, dict):
-        raise GatewayError("A Maritaca retornou dados de resposta inválidos.", 502)
+        raise GatewayError("O provedor de IA retornou dados de resposta inválidos.", 502)
     answer = text_content(message.get("content", "")).strip()
     if not answer:
         answer = text_content(choice.get("text", "")).strip()
 
     if not answer:
         raise GatewayError(
-            "A resposta da Maritaca veio vazia.",
+            "A resposta do provedor de IA veio vazia.",
             502,
         )
 
@@ -395,11 +387,11 @@ def api_info():
             "status": "ok",
             "endpoint": "/chat",
             "telegram_webhook": "/telegram/webhook",
-            "thinking_enabled": THIGAS_ENABLE_THINKING,
+            "thinking_enabled": THIGAS_CLOUD_ENABLED and bool(THIGAS_CLOUD_API_KEY),
             "cloud_enabled": THIGAS_CLOUD_ENABLED and bool(THIGAS_CLOUD_API_KEY),
             "models": {
                 "fast": MARITACA_MODEL,
-                "thinking": MARITACA_THINKING_MODEL if THIGAS_ENABLE_THINKING else None,
+                "thinking": THIGAS_CLOUD_MODEL if (THIGAS_CLOUD_ENABLED and THIGAS_CLOUD_API_KEY) else None,
                 "cloud": THIGAS_CLOUD_MODEL if (THIGAS_CLOUD_ENABLED and THIGAS_CLOUD_API_KEY) else None,
             },
         }
@@ -555,9 +547,9 @@ def telegram_clear_history(chat_id: str) -> None:
 
 def telegram_error_message(error: GatewayError) -> str:
     if error.status_code == 429:
-        return "A cota da Maritaca foi atingida. Tente novamente em alguns minutos."
+        return "A cota do provedor de IA foi atingida. Tente novamente em alguns minutos."
     if error.status_code == 504:
-        return "A Maritaca demorou para responder. Tente novamente."
+        return "O provedor de IA demorou para responder. Tente novamente."
     if error.status_code == 503:
         return "O servidor ainda não está configurado para responder."
     return "Não consegui consultar a Maritaca agora. Tente novamente em instantes."

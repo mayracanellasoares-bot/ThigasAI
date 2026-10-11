@@ -205,27 +205,30 @@ class GatewayTests(unittest.TestCase):
         ask.assert_not_called()
 
 
-    def test_model_selection_is_server_controlled(self):
+    def test_mode_selection_uses_cloud_for_thinking(self):
         self.assertEqual(gateway.choose_model("fast"), gateway.MARITACA_MODEL)
-        with patch.object(gateway, "THIGAS_ENABLE_THINKING", False):
+        with patch.object(gateway, "THIGAS_CLOUD_ENABLED", False):
             response = self.client.post("/chat", json={"message": "Teste", "mode": "thinking"})
             self.assertEqual(response.status_code, 403)
             self.assertEqual(self.get("/api").get_json()["thinking_enabled"], False)
-        with patch.object(gateway, "THIGAS_ENABLE_THINKING", True):
-            self.assertEqual(gateway.choose_model("thinking"), gateway.MARITACA_THINKING_MODEL)
-            with patch.object(gateway, "MARITACA_API_KEY", "fake-secret"):
-                upstream = unittest.mock.Mock()
-                upstream.status_code = 200
-                upstream.json.return_value = {
-                    "choices": [{"message": {"content": "Resposta avançada"}, "finish_reason": "stop"}],
-                }
-                with patch.object(gateway.requests, "post", return_value=upstream) as post:
-                    response = self.client.post("/chat", json={"message": "Teste", "mode": "thinking"})
-                self.assertEqual(response.status_code, 200)
-                self.assertEqual(response.get_json()["model"], gateway.MARITACA_THINKING_MODEL)
-                self.assertEqual(post.call_args.kwargs["json"]["model"], gateway.MARITACA_THINKING_MODEL)
-                self.assertIn(gateway.MARITACA_THINKING_MODEL, post.call_args.kwargs["json"]["messages"][0]["content"])
+        with patch.object(gateway, "THIGAS_CLOUD_ENABLED", True), patch.object(gateway, "THIGAS_CLOUD_API_KEY", "fake-secret"):
+            self.assertEqual(gateway.choose_model("thinking"), gateway.THIGAS_CLOUD_MODEL)
+            upstream = unittest.mock.Mock()
+            upstream.status_code = 200
+            upstream.json.return_value = {
+                "choices": [{"message": {"content": "Resposta avançada"}, "finish_reason": "stop"}],
+            }
+            with patch.object(gateway.requests, "post", return_value=upstream) as post:
+                response = self.client.post("/chat", json={"message": "Teste", "mode": "thinking"})
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.get_json()["model"], gateway.THIGAS_CLOUD_MODEL)
+            self.assertEqual(post.call_args.kwargs["json"]["model"], gateway.THIGAS_CLOUD_MODEL)
+            self.assertEqual(post.call_args.args[0], gateway.THIGAS_CLOUD_URL)
+            self.assertIn(gateway.THIGAS_CLOUD_MODEL, post.call_args.kwargs["json"]["messages"][0]["content"])
 
+    def test_brittech_identity_in_system_prompt(self):
+        self.assertIn("Brittech inc.", gateway.SYSTEM_PROMPT)
+        self.assertIn("Como posso ajudar você hoje?", gateway.SYSTEM_PROMPT)
 
     def test_cloud_20b_requires_server_opt_in_and_a_real_key(self):
         with patch.object(gateway, "THIGAS_CLOUD_ENABLED", False), patch.object(gateway, "THIGAS_CLOUD_API_KEY", "example-test-key"):

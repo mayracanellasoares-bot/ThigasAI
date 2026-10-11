@@ -533,7 +533,7 @@
       const answer = result.answer;
       renderMessage("assistant", answer);
       showUsage(result.usage);
-      byId("model-used").textContent = result.model || "não informado";
+      byId("model-used").textContent = modeSelector.value === "thinking" ? "Pensamento" : "Rápido";
       if (result.finish_reason === "length") {
         info("A resposta atingiu o limite de saída. Peça para continuar a partir do ponto onde parou.", true);
       }
@@ -630,17 +630,13 @@
       if (!response.ok) return;
       const capabilities = await response.json();
       const allowThinking = capabilities?.thinking_enabled === true;
-      const allowCloud = capabilities?.cloud_enabled === true;
       const thinking = modeSelector.querySelector('option[value="thinking"]');
-      const cloud = modeSelector.querySelector('option[value="cloud"]');
       thinking.disabled = !allowThinking;
-      cloud.disabled = !allowCloud;
-      thinking.textContent = allowThinking ? "Sabiá 4 Thinking BR-SP" : "Sabiá 4 Thinking · indisponível";
-      cloud.textContent = allowCloud ? "Nuvem 20B · " + (capabilities.models?.cloud || "modelo externo") : "Nuvem 20B · indisponível";
+      thinking.textContent = allowThinking ? "Pensamento" : "Pensamento · indisponível";
       if (modeSelector.selectedOptions[0]?.disabled) modeSelector.value = "fast";
-      byId("mode-hint").textContent = allowCloud || allowThinking
-        ? "Modelos avançados podem consumir mais saldo da API."
-        : "Os modos avançados precisam ser ativados pelo administrador.";
+      byId("mode-hint").textContent = allowThinking
+        ? "Escolha entre respostas rápidas e análise aprofundada."
+        : "O modo Pensamento está indisponível no momento.";
     } catch (_) {
       // Fail closed: existing fast mode works, advanced modes stay disabled.
     }
