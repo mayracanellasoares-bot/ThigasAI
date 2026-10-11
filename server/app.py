@@ -485,7 +485,7 @@ def chat_options():
     return ("", 204)
 
 
-_PUBLIC_URL_PATTERN = re.compile(r"https?://[^\\s<>\\\\"']+", re.IGNORECASE)
+_PUBLIC_URL_PATTERN = re.compile(r"""https?://[^\s<>"']+""", re.IGNORECASE)
 
 
 def attach_public_web_context(question: str) -> str:
