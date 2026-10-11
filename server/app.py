@@ -464,6 +464,11 @@ def check_public_link():
         return jsonify(error=str(exc)), 422
 
 
+@app.get("/links")
+def links_page():
+    return app.send_static_file("links.html")
+
+
 @app.get("/health")
 def health():
     return jsonify(
