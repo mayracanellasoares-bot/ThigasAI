@@ -54,6 +54,22 @@ class GatewayTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("não foi possível consultar", call.call_args.args[0])
 
+    def test_image_upload_requires_configured_visual_model(self):
+        with patch.dict(gateway.os.environ, {"THIGAS_VISION_MODEL": "", "THIGAS_VISION_API_KEY": ""}), \
+             patch.object(gateway, "THIGAS_CLOUD_API_KEY", ""):
+            response = self.client.post("/image/describe")
+        self.assertEqual(response.status_code, 503)
+
+    def test_image_upload_rejects_invalid_data_without_provider_call(self):
+        with patch.dict(gateway.os.environ, {"THIGAS_VISION_MODEL": "vision-test",
+                                              "THIGAS_VISION_API_KEY": "private-test-token"}):
+            with patch.object(gateway.requests, "post") as external:
+                response = self.client.post("/image/describe",
+                    data={"image": (BytesIO(b"not an image"), "test.png", "image/png")},
+                    content_type="multipart/form-data")
+        self.assertEqual(response.status_code, 415)
+        external.assert_not_called()
+
     def test_root_serves_real_chat_layout(self):
         response = self.get("/")
         self.assertEqual(response.status_code, 200)
