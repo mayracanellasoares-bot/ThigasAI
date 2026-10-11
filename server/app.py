@@ -103,8 +103,8 @@ def text_content(value: Any) -> str:
 
 def build_messages(question: str, history: Any, model: str | None = None) -> list[dict[str, str]]:
     prompt = SYSTEM_PROMPT
-    if model and model != MARITACA_MODEL:
-        prompt = prompt.replace(f'"{MARITACA_MODEL}"', f'"{model}"')
+    active_model = model or MARITACA_MODEL
+    prompt += f"\n\nCONFIGURAÇÃO INTERNA: Modelo ativo nesta solicitação: {active_model}. Responda com esta informação verdadeira apenas se o usuário perguntar expressamente pelo modelo ou provedor."
     messages = [{"role": "system", "content": prompt}]
     previous = []
 
