@@ -36,7 +36,6 @@
 
       <nav class="sidebar-nav" aria-label="Opções">
         <a class="sidebar-btn" href="/workspace"><span class="nav-icon" aria-hidden="true">▤</span> Documentos</a>
-        <a class="sidebar-btn" href="/links"><span class="nav-icon" aria-hidden="true">↗</span> Analisar sites e links</a>
         <button id="btn-history" class="sidebar-btn" type="button" aria-haspopup="dialog">
           <span class="nav-icon" aria-hidden="true">◷</span>
           <span>Histórico</span>
@@ -110,7 +109,6 @@
               <button type="button" class="starter-chip" data-prompt="Analise este documento e faça um resumo objetivo.">Resumir documento</button>
               <button type="button" class="starter-chip" data-prompt="Revise este código, encontre bugs e proponha correções.">Revisar código</button>
               <button type="button" class="starter-chip" data-prompt="Explique este conteúdo de forma simples e passo a passo.">Explicar conteúdo</button>
-              <a class="starter-chip" href="/links">↗ Analisar um site</a>
             </div>
           </section>
           <div id="chat-logs" role="log" aria-live="polite" aria-relevant="additions" aria-label="Mensagens"></div>
@@ -127,7 +125,7 @@
               <span aria-hidden="true">＋</span>
             </button>
             <label class="sr-only" for="chat-input">Sua mensagem</label>
-            <textarea id="chat-input" rows="1" maxlength="60000" placeholder="Mensagem, código ou pergunta sobre o documento…" autocomplete="off" spellcheck="false"></textarea>
+            <textarea id="chat-input" rows="1" maxlength="60000" placeholder="Pergunte, cole um link ou anexe um documento…" autocomplete="off" spellcheck="false"></textarea>
             <button id="btn-send" type="submit" class="send-btn" aria-label="Enviar mensagem" title="Enviar">
               <span class="send-arrow" aria-hidden="true">↑</span>
               <span class="send-label">Enviar</span>
