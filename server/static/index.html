@@ -14,8 +14,8 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/static/icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
-  <link rel="stylesheet" href="/static/chat.css?v=capivara2">
-  <script src="/static/chat.js?v=doc20mb1" defer></script>
+  <link rel="stylesheet" href="/static/chat.css?v=composer3">
+  <script src="/static/chat.js?v=composer3" defer></script>
   <script src="/static/pwa.js?v=llama2" defer></script>
 </head>
 <body class="theme-green">
@@ -120,27 +120,45 @@
             <button id="btn-remove-file" class="attachment-remove" type="button" aria-label="Remover anexo">×</button>
           </div>
 
-          <form id="chat-form" class="composer">
-            <button type="button" id="btn-attach" class="icon-btn attach-btn" aria-label="Anexar documento, texto ou código" title="Anexar documento, texto ou código">
-              <span aria-hidden="true">＋</span>
-            </button>
+          <div id="slash-menu" class="quick-menu" hidden role="listbox" aria-label="Atalhos e referências">
+            <button type="button" data-insert="/ajuda">/ajuda — comandos disponíveis</button>
+            <button type="button" data-insert="/limpar">/limpar — novo chat</button>
+            <button type="button" data-insert="@documento ">@documento — abrir seus arquivos</button>
+            <button type="button" data-insert="@site ">@site — colar e analisar um link</button>
+            <button type="button" data-insert="@codigo ">@codigo — revisar programação</button>
+          </div>
+          <form id="chat-form" class="composer modern-composer">
             <label class="sr-only" for="chat-input">Sua mensagem</label>
-            <textarea id="chat-input" rows="1" maxlength="60000" placeholder="Pergunte, cole um link ou anexe um documento…" autocomplete="off" spellcheck="false"></textarea>
-            <button id="btn-send" type="submit" class="send-btn" aria-label="Enviar mensagem" title="Enviar">
-              <span class="send-arrow" aria-hidden="true">↑</span>
-              <span class="send-label">Enviar</span>
-            </button>
+            <textarea id="chat-input" rows="1" maxlength="60000" placeholder="Pergunte qualquer coisa…" autocomplete="off" spellcheck="false"></textarea>
+            <div class="composer-actions">
+              <div class="composer-tools">
+                <button type="button" id="btn-attach" class="icon-btn attach-btn" aria-label="Abrir opções de anexos" aria-expanded="false" aria-controls="attach-menu" title="Adicionar">
+                  <span aria-hidden="true">＋</span>
+                </button>
+                <div id="attach-menu" class="quick-menu attach-menu" hidden>
+                  <button type="button" id="attach-document">▤ &nbsp; Anexar arquivo</button>
+                  <button type="button" id="attach-image">▧ &nbsp; Anexar imagem</button>
+                  <button type="button" id="attach-workspace">◫ &nbsp; Criar PDF, Word, Excel ou PowerPoint</button>
+                </div>
+                <div class="effort-wrap">
+                  <label class="sr-only" for="reasoning-mode">Nível de esforço</label>
+                  <select id="reasoning-mode" aria-label="Nível de esforço">
+                    <option value="fast">Esforço: padrão</option>
+                    <option value="thinking" disabled>Esforço: alto (indisponível)</option>
+                  </select>
+                </div>
+              </div>
+              <div class="composer-send-actions">
+                <button type="button" id="btn-microphone" class="icon-btn microphone-btn" aria-label="Ditar mensagem" aria-pressed="false" title="Ditar mensagem">🎙</button>
+                <button id="btn-send" type="submit" class="send-btn" aria-label="Enviar mensagem" title="Enviar">
+                  <span class="send-arrow" aria-hidden="true">↑</span><span class="send-label">Enviar</span>
+                </button>
+              </div>
+            </div>
           </form>
           <input type="file" id="file-input" hidden accept=".pdf,.docx,.xlsx,.pptx,.txt,.md,.py,.js,.mjs,.cjs,.ts,.tsx,.jsx,.json,.yaml,.yml,.toml,.csv,.xml,.html,.css,.scss,.sh,.ps1,.bat,.c,.h,.cpp,.hpp,.cs,.java,.go,.rs,.rb,.php,.sql,.kt,.swift,.dart,.lua,.r">
-
-          <div class="model-controls">
-            <label for="reasoning-mode">Modo de resposta</label>
-            <select id="reasoning-mode" aria-describedby="mode-hint">
-              <option value="fast">Rápido</option>
-              <option value="thinking" disabled>Pensamento · indisponível</option>
-            </select>
-            <small id="mode-hint">O modo Pensamento está indisponível no momento.</small>
-          </div>
+          <input type="file" id="image-input" hidden accept="image/png,image/jpeg,image/webp">
+          <small id="mode-hint" class="sr-only">O nível alto utiliza o modelo avançado somente quando habilitado no servidor.</small>
           <div class="token-meter" role="group" aria-label="Tokens medidos na última resposta">
             <span>Última resposta · Modo <strong id="model-used">—</strong></span>
             <span>Enviados <strong id="tokens-input">—</strong></span>
