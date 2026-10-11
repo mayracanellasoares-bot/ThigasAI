@@ -136,3 +136,8 @@ Fontes: [Modelos Maritaca](https://docs.maritaca.ai/pt/modelos), [Resposta e con
 A interface responsiva do THIGAS AI usa a capivara fornecida como marca visual e tons areia/verde-oliva, com acesso ao chat, documentos e ao novo verificador de links em `/links`.
 
 **Verificação de sites**: a rota `POST /link/check` recebe `{ "url": "https://exemplo.com", "analyze": false }` e retorna HTTP, título, texto limitado e redirecionamento (não seguido automaticamente). Para análise do conteúdo com IA, envie `analyze: true`; o texto da página é tratado como fonte não confiável e resumido pelo modo escolhido (Rápido como padrão). Apenas HTTP/80 e HTTPS/443 para IPs públicos são permitidos. Conexões usam IP validado, verificação de certificado para HTTPS, tempo limite, máximo de 256 KiB de resposta, nenhuma execução de scripts e 8 solicitações por minuto por origem. Não há garantia de que o site seja seguro, genuíno ou livre de fraude. Sites JavaScript podem não expor conteúdo legível.
+
+
+## Integração do layout Mini Nano
+
+A folha `server/static/mini-nano-theme.css` incorpora e adapta as regras visuais do projeto [THIGAS Mini Nano](https://github.com/thiagollipe-web/thigasai_mini_nano), mediante autorização do titular comunicada pelo usuário. Este estilo carrega por último, com cabeçalho limpo, chat centralizado de 810 px, sugestões em duas colunas e compositor responsivo em tons off-white e verde-oliva. Os contratos JavaScript, Flask, documentos, menus +, ditado, histórico e PWA do THIGAS AI permanecem os do aplicativo principal; não há dependência do backend ou das credenciais do Mini Nano.
