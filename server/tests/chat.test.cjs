@@ -151,7 +151,7 @@ test("seletor de modelos e campos necessários existem no HTML", () => {
 
 
 test("conteúdo de anexos não é persistido no histórico local", () => {
-  const attachmentText = "Veja o relatório.\\n\\n[ARQUIVO: privado.pdf]\\nDADOS PESSOAIS SIGILOSOS\\n[FIM DO ARQUIVO]";
+  const attachmentText = "Veja o relatório.\n\n[ARQUIVO: privado.pdf]\nDADOS PESSOAIS SIGILOSOS\n[FIM DO ARQUIVO]";
   const safe = chat.redactAttachmentFromHistory(attachmentText);
   assert.match(safe, /Veja o relatório/);
   assert.match(safe, /Anexo omitido do histórico local/);
