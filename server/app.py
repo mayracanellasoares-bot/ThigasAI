@@ -533,8 +533,8 @@ def describe_uploaded_image():
         return jsonify(error="Envie uma imagem de até 8 MB."), 413
     content_type = upload.mimetype
     valid = (
-        (content_type == "image/png" and data.startswith(b"\\x89PNG\\r\\n\\x1a\\n")) or
-        (content_type == "image/jpeg" and data.startswith(b"\\xff\\xd8\\xff")) or
+        (content_type == "image/png" and data.startswith(b"\x89PNG\r\n\x1a\n")) or
+        (content_type == "image/jpeg" and data.startswith(b"\xff\xd8\xff")) or
         (content_type == "image/webp" and data.startswith(b"RIFF") and data[8:12] == b"WEBP")
     )
     if not valid:
