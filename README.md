@@ -105,6 +105,19 @@ Segurança: o chat continua público e sem cadastro. Se ativar o modelo de nuvem
 
 Referências: https://console.groq.com/docs/models e https://console.groq.com/docs/api-reference e https://docs.maritaca.ai/pt/modelos.
 
+## Assistente de documentos e prompt de sistema
+
+O THIGAS AI possui instruções de sistema ampliadas: ajuda com programação, revisão textual, análise de documentos, explicações e respostas em português brasileiro, com limites claros e sem simular operações externas.
+
+Em **Documentos** (`/workspace`), o usuário pode enviar PDF, DOCX, XLSX ou PPTX de até 8 MB, pedir uma revisão ou um documento novo e receber uma **cópia real**, após conferir a prévia e aprovar o download.
+
+- **PDF (.pdf)**: novo documento gerado pelo servidor com ReportLab.
+- **Word (.docx)**: novo documento editável, gerado com python-docx.
+- **Excel (.xlsx)**: revisão de planilha **anexada** com alterações limitadas a células autorizadas. Preserva fórmulas, formato e o arquivo original. Não cria uma planilha nova sem arquivo base.
+- **PowerPoint (.pptx)**: cria apresentação nova e editável com python-pptx a partir de texto revisado. Não mantém o design original do PPTX enviado.
+
+A extração de texto não equivale a interpretação visual de páginas digitalizadas. Não há OCR automático, execução de código produzido pelo modelo ou verificação de fatos em fontes externas. A prévia e a aprovação são exigidas antes da entrega. O armazenamento é temporário e separado por sessão, sem cadastro.
+
 ## Tokens e contador real de consumo
 
 - Motor: Maritaca `sabiazinho-4`, cujo limite documentado é até 32K tokens de saída; THIGAS solicita **até 16.384 tokens** de saída em cada requisição. Variável `MARITACA_MAX_TOKENS=16384` (o servidor impede valores acima de 16.384 e usa esse padrão se estiver ausente ou for inválido).
