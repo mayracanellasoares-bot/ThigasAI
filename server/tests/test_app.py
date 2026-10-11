@@ -81,19 +81,21 @@ class GatewayTests(unittest.TestCase):
     def test_document_upload_limit_is_20_mib(self):
         self.assertEqual(gateway.MAX_DOCUMENT_BYTES, 20 * 1024 * 1024)
         self.assertEqual(gateway.app.config["MAX_CONTENT_LENGTH"], 22 * 1024 * 1024)
-        with patch.object(gateway, "extract_document_text", return_value=("Texto", False)):
+        # Mock only the upload byte threshold so the test stays lightweight.
+        with patch.object(gateway, "MAX_DOCUMENT_BYTES", 10), \
+             patch.object(gateway, "extract_document_text", return_value=("Texto", False)):
             accepted = self.client.post(
                 "/document/extract",
-                data={"file": (BytesIO(b"x" * (8 * 1024 * 1024 + 1)), "relatorio.pdf")},
+                data={"file": (BytesIO(b"x" * 10), "relatorio.pdf")},
                 content_type="multipart/form-data",
             )
-        self.assertEqual(accepted.status_code, 200)
-        over_limit = self.client.post(
-            "/document/extract",
-            data={"file": (BytesIO(b"x" * (20 * 1024 * 1024 + 1)), "relatorio.pdf")},
-            content_type="multipart/form-data",
-        )
-        self.assertEqual(over_limit.status_code, 413)
+            self.assertEqual(accepted.status_code, 200)
+            over_limit = self.client.post(
+                "/document/extract",
+                data={"file": (BytesIO(b"x" * 11), "relatorio.pdf")},
+                content_type="multipart/form-data",
+            )
+            self.assertEqual(over_limit.status_code, 413)
 
     def test_document_endpoint_rejects_missing_and_unsupported_files(self):
         self.assertEqual(self.client.post("/document/extract").status_code, 400)
