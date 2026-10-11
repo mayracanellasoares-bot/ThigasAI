@@ -989,3 +989,37 @@ body.light-mode .conversation-row.active {
 .model-controls option { background: var(--surface-2); color: var(--text); }
 .model-controls small { flex-basis: 100%; font-size: 11px; line-height: 1.35; color: var(--muted); }
 #model-used { word-break: break-word; }
+
+/* Identidade contemporânea THIGAS — capivara, areia e verde-oliva */
+:root { --bg:#f8f6f0; --sidebar:#f0eee6; --surface:#fffefb; --surface-2:#ebece2; --surface-3:#e0e5d5; --border:#d9ddd1; --border-soft:#e5e6dd; --text:#29372c; --muted:#677163; --muted-2:#859081; --accent:#365b45; --accent-contrast:#fff; --success:#568666; --danger:#ac584e; --shadow:0 16px 50px rgba(57,73,57,.10); color-scheme:light; }
+body:not(.light-mode) {background:var(--bg);color:var(--text)}
+body:not(.light-mode) .sidebar {background:#f0eee6;border-right-color:#dfe1d8}
+body:not(.light-mode) .chat-header {background:rgba(248,246,240,.91);border-color:#dfe1d8}
+body:not(.light-mode) .new-chat-btn {background:#365b45;color:#fff}
+body:not(.light-mode) .new-chat-btn:hover {background:#284b35}
+body:not(.light-mode) .sidebar-btn {color:#4c5e4d}
+body:not(.light-mode) .sidebar-btn:hover {color:#223b2a;background:#e0e5d8}
+body:not(.light-mode) .starter-chip {background:#fffefb;color:#3e5d45;border-color:#d7ddce}
+body:not(.light-mode) .starter-chip:hover {background:#edf3e6}
+body:not(.light-mode) .model-controls select,body:not(.light-mode) .composer {background:#fff;border-color:#d7dfd0;color:#30422f}
+body:not(.light-mode) #chat-input {color:#273829}
+body:not(.light-mode) #chat-input::placeholder {color:#899387}
+body:not(.light-mode) .token-meter strong,body:not(.light-mode) .token-meter>span:first-child {color:#29372c}
+body:not(.light-mode) .model-chip {background:#fffefb;color:#344f3a;border-color:#dce0d4}
+body:not(.light-mode) .welcome h1 {color:#294332}
+body:not(.light-mode) .welcome p {color:#627265}
+body:not(.light-mode) .brand-copy strong {color:#314736}
+body:not(.light-mode) .brand-copy span {color:#788477}
+body:not(.light-mode) .send-btn {background:#365b45;color:white}
+body:not(.light-mode) .send-btn:hover {background:#294633}
+.brand-icon,.mobile-brand-icon {background:#fff9f0!important;border:1px solid #e0ddcf;border-radius:13px!important;padding:1px!important;object-fit:cover}
+.brand-icon {width:42px;height:42px}
+.mobile-brand-icon {width:34px;height:34px}
+.welcome-mark img {object-fit:contain;border-radius:22px}
+.welcome-eyebrow {color:#7b8b74;text-transform:uppercase;font-size:11px;font-weight:750;letter-spacing:.16em;display:block;margin:14px 0 8px}
+.sidebar {gap:20px}
+.sidebar-nav {gap:7px}
+.sidebar-btn {border-radius:12px;min-height:45px}
+.new-chat-btn {border-radius:13px;min-height:46px}
+.starter-chip {text-decoration:none;display:inline-flex;align-items:center;min-height:38px}
+@media(max-width:780px) {.welcome-eyebrow {margin-top:8px}.sidebar {gap:12px}}

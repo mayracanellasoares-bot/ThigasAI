@@ -129,3 +129,10 @@ A extração de texto não equivale a interpretação visual de páginas digital
 - Cada resposta pode consumir mais tokens e saldo da Maritaca. Considere configurar limite de gastos e controle de uso por origem no backend, pois o chat permanece público e sem cadastro.
 
 Fontes: [Modelos Maritaca](https://docs.maritaca.ai/pt/modelos), [Resposta e contadores de tokens](https://docs.maritaca.ai/api/pt/completion-response).
+
+
+## Identidade capivara e análise de links
+
+A interface responsiva do THIGAS AI usa a capivara fornecida como marca visual e tons areia/verde-oliva, com acesso ao chat, documentos e ao novo verificador de links em `/links`.
+
+**Verificação de sites**: a rota `POST /link/check` recebe `{ "url": "https://exemplo.com", "analyze": false }` e retorna HTTP, título, texto limitado e redirecionamento (não seguido automaticamente). Para análise do conteúdo com IA, envie `analyze: true`; o texto da página é tratado como fonte não confiável e resumido pelo modo escolhido (Rápido como padrão). Apenas HTTP/80 e HTTPS/443 para IPs públicos são permitidos. Conexões usam IP validado, verificação de certificado para HTTPS, tempo limite, máximo de 256 KiB de resposta, nenhuma execução de scripts e 8 solicitações por minuto por origem. Não há garantia de que o site seja seguro, genuíno ou livre de fraude. Sites JavaScript podem não expor conteúdo legível.
