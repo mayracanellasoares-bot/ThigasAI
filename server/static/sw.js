@@ -1,81 +1,218 @@
-"use strict";
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0b0b" id="theme-color-meta">
+  <meta name="description" content="THIGAS AI: assistente de IA e programação com interface inspirada na WebUI do llama.cpp/llamafile.">
+  <meta name="application-name" content="THIGAS AI">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="THIGAS AI">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>THIGAS AI</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/static/icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+  <link rel="stylesheet" href="/static/chat.css?v=brittech1">
+  <script src="/static/chat.js?v=doc20mb1" defer></script>
+  <script src="/static/pwa.js?v=llama2" defer></script>
+</head>
+<body class="theme-green">
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="Navegação principal">
+      <div class="brand">
+        <img src="/static/icons/icon.svg" alt="" class="brand-icon">
+        <div class="brand-copy">
+          <strong>THIGAS AI</strong>
+          <span>coder</span>
+        </div>
+      </div>
 
-const CACHE_PREFIX = "thigas-pwa-";
-const CACHE_NAME = CACHE_PREFIX + "v10";
-const APP_SHELL = [
-  "/",
-  "/manifest.webmanifest",
-  "/static/chat.css?v=brittech1",
-  "/static/chat.js?v=brittech1",
-  "/static/pwa.js?v=llama2",
-  "/static/icons/icon.svg",
-  "/static/icons/icon-192.png",
-  "/static/icons/icon-512.png",
-];
+      <button id="btn-clear" class="new-chat-btn" type="button">
+        <span aria-hidden="true">＋</span>
+        <span>Novo chat</span>
+      </button>
 
-function cacheable(request, origin) {
-  if (request.method !== "GET") return false;
-  const url = new URL(request.url);
-  if (url.origin !== origin) return false;
-  return APP_SHELL.includes(url.pathname + url.search);
-}
+      <nav class="sidebar-nav" aria-label="Opções">
+        <a class="sidebar-btn" href="/workspace">Documentos</a>
+        <button id="btn-history" class="sidebar-btn" type="button" aria-haspopup="dialog">
+          <span class="nav-icon" aria-hidden="true">◷</span>
+          <span>Histórico</span>
+        </button>
+        <button id="btn-install" class="sidebar-btn" type="button">
+          <span class="nav-icon" aria-hidden="true">↓</span>
+          <span>Instalar aplicativo</span>
+        </button>
+        <button id="btn-color-mode" class="sidebar-btn" type="button" aria-label="Alternar tema claro ou escuro" title="Alternar tema">
+          <span id="color-mode-icon" class="nav-icon" aria-hidden="true">☾</span>
+          <span id="color-mode-label">Tema: Escuro</span>
+        </button>
+        <button id="btn-help" class="sidebar-btn" type="button" aria-haspopup="dialog">
+          <span class="nav-icon" aria-hidden="true">?</span>
+          <span>Ajuda</span>
+        </button>
+        <button id="btn-privacy" class="sidebar-btn" type="button">
+          <span class="nav-icon" aria-hidden="true">◉</span>
+          <span>Privacidade</span>
+        </button>
+      </nav>
 
-if (typeof module !== "undefined" && module.exports) {
-  module.exports = { CACHE_NAME, CACHE_PREFIX, APP_SHELL, cacheable };
-}
+      <div class="legacy-controls" aria-hidden="true">
+        <button id="btn-theme" type="button">TEMA: VERDE</button>
+        <button id="btn-scanlines" type="button" aria-pressed="true">CRT: ON</button>
+        <button id="btn-sound" type="button" aria-pressed="false">SOM: OFF</button>
+      </div>
 
-if (typeof self !== "undefined" && self.addEventListener) {
-  self.addEventListener("install", event => {
-    event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL)));
-  });
+      <div class="sidebar-bottom">
+        <div class="server-state">
+          <span id="power-lamp" class="lamp" aria-hidden="true"></span>
+          <div>
+            <span id="connection-status" role="status">Verificando servidor…</span>
+            <small>THIGAS v2.0</small>
+          </div>
+        </div>
+      </div>
+    </aside>
 
-  self.addEventListener("activate", event => {
-    event.waitUntil((async () => {
-      for (const name of await caches.keys()) {
-        if (name.startsWith(CACHE_PREFIX) && name !== CACHE_NAME) await caches.delete(name);
-      }
-      await self.clients.claim();
-    })());
-  });
+    <section class="workspace">
+      <header class="chat-header">
+        <div class="mobile-brand">
+          <img src="/static/icons/icon.svg" alt="" class="mobile-brand-icon">
+          <strong>THIGAS AI</strong>
+        </div>
+        <div class="model-chip" title="Assistente ativo">
+          <span class="model-dot"></span>
+          <span>THIGAS Coder</span>
+          <span class="chevron" aria-hidden="true">⌄</span>
+        </div>
+        <div class="header-actions">
+          <span class="header-badge">online</span>
+        </div>
+      </header>
 
-  self.addEventListener("message", event => {
-    if (event.data && event.data.type === "SKIP_WAITING") void self.skipWaiting();
-  });
+      <main id="terminal" class="chat-panel" aria-label="Conversa com THIGAS AI">
+        <div id="pwa-update" class="update-notice" role="status" hidden>
+          <span>Nova versão disponível.</span>
+          <button id="btn-update" class="compact-btn" type="button">Atualizar</button>
+        </div>
 
-  async function navigation(request, event) {
-    const cache = await caches.open(CACHE_NAME);
-    const network = fetch(request).then(async response => {
-      if (!response.ok) throw new Error("Navegação indisponível");
-      await cache.put("/", response.clone());
-      return response;
-    });
-    event.waitUntil(network.catch(() => undefined));
-    let timeout;
-    try {
-      return await Promise.race([network, new Promise((_, reject) => {
-        timeout = setTimeout(() => reject(new Error("Navegação lenta")), 5000);
-      })]);
-    } catch (_) {
-      const saved = await cache.match("/");
-      if (saved) return saved;
-      return new Response("<!doctype html><html lang='pt-BR'><meta name='viewport' content='width=device-width'><title>THIGAS offline</title><p>Conecte-se à internet para abrir o THIGAS pela primeira vez.</p></html>", { status: 503, headers: { "Content-Type": "text/html; charset=utf-8" } });
-    } finally { clearTimeout(timeout); }
-  }
+        <div id="chat-scroll" tabindex="0" aria-label="Conversa">
+          <section class="welcome" aria-label="Boas-vindas">
+            <div class="welcome-mark">
+              <img src="/static/icons/icon.svg" alt="">
+            </div>
+            <h1>Olá! Eu sou o THIGAS AI</h1>
+            <p>Uma aplicação desenvolvida pela <strong>Brittech inc.</strong> Estou aqui para ajudar com dúvidas, criar, explicar, revisar e corrigir códigos. Como posso ajudar você hoje?</p>
+            <div class="starter-actions" aria-label="Sugestões">
+              <button type="button" class="starter-chip" data-prompt="Analise este documento e faça um resumo objetivo.">Resumir documento</button>
+              <button type="button" class="starter-chip" data-prompt="Revise este código, encontre bugs e proponha correções.">Revisar código</button>
+              <button type="button" class="starter-chip" data-prompt="Explique este conteúdo de forma simples e passo a passo.">Explicar conteúdo</button>
+            </div>
+          </section>
+          <div id="chat-logs" role="log" aria-live="polite" aria-relevant="additions" aria-label="Mensagens"></div>
+        </div>
 
-  self.addEventListener("fetch", event => {
-    if (!cacheable(event.request, self.location.origin)) return;
-    const url = new URL(event.request.url);
-    if (event.request.mode === "navigate" && url.pathname === "/") {
-      event.respondWith(navigation(event.request, event));
-      return;
-    }
-    event.respondWith((async () => {
-      const cache = await caches.open(CACHE_NAME);
-      const saved = await cache.match(event.request);
-      if (saved) return saved;
-      const response = await fetch(event.request);
-      if (response.ok) await cache.put(event.request, response.clone());
-      return response;
-    })());
-  });
-}
+        <section class="composer-wrap" aria-label="Enviar mensagem">
+          <div id="attachment-preview" class="attachment-preview" hidden>
+            <span id="attachment-label"></span>
+            <button id="btn-remove-file" class="attachment-remove" type="button" aria-label="Remover anexo">×</button>
+          </div>
+
+          <form id="chat-form" class="composer">
+            <button type="button" id="btn-attach" class="icon-btn attach-btn" aria-label="Anexar documento, texto ou código" title="Anexar documento, texto ou código">
+              <span aria-hidden="true">＋</span>
+            </button>
+            <label class="sr-only" for="chat-input">Sua mensagem</label>
+            <textarea id="chat-input" rows="1" maxlength="60000" placeholder="Mensagem, código ou pergunta sobre o documento…" autocomplete="off" spellcheck="false"></textarea>
+            <button id="btn-send" type="submit" class="send-btn" aria-label="Enviar mensagem" title="Enviar">
+              <span class="send-arrow" aria-hidden="true">↑</span>
+              <span class="send-label">Enviar</span>
+            </button>
+          </form>
+          <input type="file" id="file-input" hidden accept=".pdf,.docx,.xlsx,.pptx,.txt,.md,.py,.js,.mjs,.cjs,.ts,.tsx,.jsx,.json,.yaml,.yml,.toml,.csv,.xml,.html,.css,.scss,.sh,.ps1,.bat,.c,.h,.cpp,.hpp,.cs,.java,.go,.rs,.rb,.php,.sql,.kt,.swift,.dart,.lua,.r">
+
+          <div class="model-controls">
+            <label for="reasoning-mode">Modo de resposta</label>
+            <select id="reasoning-mode" aria-describedby="mode-hint">
+              <option value="fast">Rápido</option>
+              <option value="thinking" disabled>Pensamento · indisponível</option>
+            </select>
+            <small id="mode-hint">O modo Pensamento está indisponível no momento.</small>
+          </div>
+          <div class="token-meter" role="group" aria-label="Tokens medidos na última resposta">
+            <span>Última resposta · Modo <strong id="model-used">—</strong></span>
+            <span>Enviados <strong id="tokens-input">—</strong></span>
+            <span>Recebidos <strong id="tokens-output">—</strong></span>
+            <span>Total <strong id="tokens-total">—</strong></span>
+            <small id="tokens-status">Aguardando dados reais da API</small>
+          </div>
+          <div class="composer-footer">
+            <span>Enter para enviar · Shift+Enter para nova linha</span>
+            <span id="request-status" role="status">Pronto</span>
+          </div>
+        </section>
+      </main>
+
+      <footer class="site-footer">
+        <span>THIGAS AI pode cometer erros. Verifique informações importantes.</span>
+        <span id="clock-display" aria-label="Hora local"></span>
+      </footer>
+    </section>
+  </div>
+
+  <dialog id="help-modal" aria-labelledby="help-title">
+    <div class="dialog-header">
+      <div>
+        <span class="dialog-kicker">THIGAS AI</span>
+        <h2 id="help-title">Ajuda e privacidade</h2>
+      </div>
+      <button id="btn-close-help" class="dialog-close" type="button" aria-label="Fechar ajuda">×</button>
+    </div>
+    <p>Escreva normalmente para conversar com o THIGAS. As respostas vêm da IA configurada no servidor.</p>
+    <dl>
+      <dt>/help ou /ajuda</dt><dd>Abre esta ajuda.</dd>
+      <dt>/novo</dt><dd>Inicia uma nova conversa sem apagar as anteriores.</dd>
+      <dt>/clear</dt><dd>Apaga apenas a conversa atual do histórico local.</dd>
+      <dt>/theme green|amber|cyan|pink</dt><dd>Comando legado de tema.</dd>
+      <dt>/sound</dt><dd>Liga ou desliga os sons.</dd>
+      <dt>/cat</dt><dd>Mostra um gato ASCII.</dd>
+      <dt>/thigas pergunta</dt><dd>Envia uma pergunta à IA.</dd>
+    </dl>
+    <p>Você pode anexar PDF, DOCX, XLSX, PPTX, texto e código. Documentos podem ter até 20 MB; o texto extraído é limitado para caber na consulta. PDFs digitalizados somente como imagem ainda exigem OCR. ZIP e executáveis não são aceitos.</p>
+    <p>Blocos de código podem ser copiados ou baixados. A interface não executa os códigos automaticamente.</p>
+    <h3>Privacidade</h3>
+    <p>Seu texto, anexos enviados e parte do histórico são encaminhados ao provedor de IA configurado no servidor para gerar a resposta. Não envie senhas, chaves de API ou dados sensíveis.</p>
+    <p>O contador mostra somente os tokens efetivamente reportados na última resposta pela API: entrada, saída e total. O símbolo — significa que a API não forneceu a medição. O limite máximo de saída é 16.384 tokens, não uma garantia de tamanho; solicitações longas podem demorar e consumir mais saldo.</p>
+    <p>O histórico de conversas fica salvo apenas neste navegador, com até 30 conversas recentes. O PWA pode reabrir esse histórico sem internet depois do primeiro carregamento, mas novas respostas exigem conexão.</p>
+  </dialog>
+
+  <dialog id="history-modal" class="history-modal" aria-labelledby="history-title">
+    <div class="dialog-header">
+      <div>
+        <span class="dialog-kicker">THIGAS AI</span>
+        <h2 id="history-title">Histórico de conversas</h2>
+      </div>
+      <button id="btn-close-history" class="dialog-close" type="button" aria-label="Fechar histórico">×</button>
+    </div>
+    <p>As conversas ficam salvas somente neste navegador. Você pode reabrir ou excluir cada conversa.</p>
+    <div id="conversation-list" class="conversation-list" aria-live="polite"></div>
+  </dialog>
+
+  <dialog id="install-modal" aria-labelledby="install-title">
+    <div class="dialog-header">
+      <div>
+        <span class="dialog-kicker">PWA</span>
+        <h2 id="install-title">Instalar THIGAS AI</h2>
+      </div>
+      <button id="btn-close-install" class="dialog-close" type="button" aria-label="Fechar instruções de instalação">×</button>
+    </div>
+    <p>O THIGAS pode ser instalado diretamente pelo navegador, sem APK.</p>
+    <p><strong>Android:</strong> abra no Chrome e use o menu ⋮ → <strong>Instalar aplicativo</strong> ou <strong>Adicionar à tela inicial</strong>.</p>
+    <p><strong>Computador:</strong> use o botão de instalação disponível na barra de endereço do Chrome ou Edge.</p>
+    <p><strong>iPhone/iPad:</strong> abra no Safari e escolha Compartilhar → Adicionar à Tela de Início.</p>
+  </dialog>
+
+  <noscript>Ative o JavaScript para conversar com o THIGAS.</noscript>
+</body>
+</html>
