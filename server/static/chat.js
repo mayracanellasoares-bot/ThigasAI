@@ -465,6 +465,12 @@
     const meta = make("div", "log-meta");
     meta.append(make("span", "", "[" + now() + "] "), make("strong", "", role === "user" ? "VOCÊ" : "THIGAS"), document.createTextNode(" >"));
     entry.append(meta);
+    if (role === "assistant") {
+      const avatar = make("img", "assistant-avatar");
+      avatar.src = "/static/icons/icon.svg";
+      avatar.alt = "THIGAS AI";
+      entry.prepend(avatar);
+    }
     const parts = role === "assistant" ? splitCodeBlocks(text) : [{ type: "text", text }];
     let codeIndex = 0;
     for (const part of parts) {
