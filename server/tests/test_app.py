@@ -34,7 +34,7 @@ class GatewayTests(unittest.TestCase):
         answer = {"answer": "Resumo da página", "usage": {"prompt_tokens": 10,
                   "completion_tokens": 5, "total_tokens": 15}, "finish_reason": "stop",
                   "model": gateway.MARITACA_MODEL}
-        with patch.object(gateway.link_inspector, "fetch_public_page", return_value=page) as check, \\
+        with patch.object(gateway.link_inspector, "fetch_public_page", return_value=page) as check, \
              patch.object(gateway, "ask_maritaca_result", return_value=answer) as call:
             response = self.client.post("/chat", json={"message": "https://example.org/novidades"})
         self.assertEqual(response.status_code, 200)
