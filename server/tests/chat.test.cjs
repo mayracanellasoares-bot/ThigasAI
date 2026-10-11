@@ -31,7 +31,7 @@ test("aceita texto, código e documentos suportados; bloqueia formatos e tamanho
   for (const name of ["a.pdf", "a.docx", "a.xlsx", "a.pptx"]) assert.equal(chat.validateFile({ name, size: 1024, type: "" }), "document");
   for (const name of ["a.png", "a.zip", "a.gguf"]) assert.throws(() => chat.validateFile({ name, size: 100, type: "" }), /Formato/);
   assert.throws(() => chat.validateFile({ name: "a.txt", size: chat.MAX_TEXT_FILE_BYTES + 1 }), /512/);
-  assert.throws(() => chat.validateFile({ name: "a.pdf", size: chat.MAX_FILE_BYTES + 1 }), /8 MB/);
+  assert.throws(() => chat.validateFile({ name: "a.pdf", size: chat.MAX_FILE_BYTES + 1 }), /20 MB/);
 });
 
 test("nomes de anexos não injetam novas linhas no marcador", () => {

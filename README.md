@@ -76,7 +76,7 @@ As ferramentas exigem `THIGAS_TELEGRAM_ALLOWED_USERS` e `TELEGRAM_WEBHOOK_SECRET
 
 ## Documentos no navegador — sem cadastro
 
-A área `/workspace` agora abre **diretamente, sem Google, GitHub, Facebook, login ou cadastro**. O visitante pode enviar arquivos PDF, DOCX, XLSX e PPTX (até 8 MB), gerar PDF/Word, revisar uma planilha XLSX enviada e confirmar o download.
+A área `/workspace` agora abre **diretamente, sem Google, GitHub, Facebook, login ou cadastro**. O visitante pode enviar arquivos PDF, DOCX, XLSX e PPTX (até 20 MB), gerar PDF/Word, revisar uma planilha XLSX enviada e confirmar o download.
 
 Os arquivos temporários são segregados por uma sessão anônima assinada no navegador (cookie HTTP-only, SameSite=Lax, Secure e token CSRF). É necessário manter `THIGAS_SESSION_SECRET` (mínimo 32 caracteres) configurado no Render para essa proteção. A sessão e os arquivos expiram em até 24 horas; como `THIGAS_DATA_DIR` permanece no disco efêmero do Render, podem se perder antes. O histórico do chat é guardado no navegador, sem sincronização.
 
@@ -104,6 +104,19 @@ Para um modelo 8B, a mesma integração suporta um endpoint compatível com Chat
 Segurança: o chat continua público e sem cadastro. Se ativar o modelo de nuvem, qualquer visitante poderá consumir créditos pelo endpoint /chat. Configure cotas e alertas no provedor e adicione rate limiting/autorização robustos antes de divulgar o serviço. Ativar o modo não torna as requisições gratuitas. Testes unitários não validam acesso real nem cobrança da API.
 
 Referências: https://console.groq.com/docs/models e https://console.groq.com/docs/api-reference e https://docs.maritaca.ai/pt/modelos.
+
+## Assistente de documentos e prompt de sistema
+
+O THIGAS AI possui instruções de sistema ampliadas: ajuda com programação, revisão textual, análise de documentos, explicações e respostas em português brasileiro, com limites claros e sem simular operações externas.
+
+Em **Documentos** (`/workspace`), o usuário pode enviar PDF, DOCX, XLSX ou PPTX de até 20 MB, pedir uma revisão ou um documento novo e receber uma **cópia real**, após conferir a prévia e aprovar o download.
+
+- **PDF (.pdf)**: novo documento gerado pelo servidor com ReportLab.
+- **Word (.docx)**: novo documento editável, gerado com python-docx.
+- **Excel (.xlsx)**: revisão de planilha **anexada** com alterações limitadas a células autorizadas. Preserva fórmulas, formato e o arquivo original. Não cria uma planilha nova sem arquivo base.
+- **PowerPoint (.pptx)**: cria apresentação nova e editável com python-pptx a partir de texto revisado. Não mantém o design original do PPTX enviado.
+
+A extração de texto não equivale a interpretação visual de páginas digitalizadas. Não há OCR automático, execução de código produzido pelo modelo ou verificação de fatos em fontes externas. A prévia e a aprovação são exigidas antes da entrega. O armazenamento é temporário e separado por sessão, sem cadastro.
 
 ## Tokens e contador real de consumo
 

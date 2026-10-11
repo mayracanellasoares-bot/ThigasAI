@@ -5,6 +5,7 @@ from io import BytesIO
 from unittest.mock import patch
 from openpyxl import Workbook,load_workbook
 from pypdf import PdfReader
+from pptx import Presentation
 from test_app import gateway
 import document_agent as documents
 
@@ -37,6 +38,19 @@ class Documents(unittest.TestCase):
         pid=self.store.propose('1:1','x.xlsx',sample());self.store.decide(pid,'1:1',False);self.assertIsNone(self.store.approved(pid,'1:1'))
     def test_pdf_contains_real_text(self):
         text=''.join(p.extract_text() for p in PdfReader(BytesIO(documents.make_pdf('Planejamento\nAula de Python <teste>'))).pages);self.assertIn('Aula de Python',text)
+    def test_pptx_is_an_actual_editable_presentation(self):
+        presentation = Presentation(BytesIO(documents.make_pptx(
+            '# Introdução\nEste é o conteúdo.\n- Primeiro ponto\n## Conclusão\nResultado final.'
+        )))
+        self.assertGreaterEqual(len(presentation.slides), 2)
+        text = ' '.join(shape.text for slide in presentation.slides for shape in slide.shapes if shape.has_text_frame)
+        self.assertIn('Introdução', text)
+        self.assertIn('Resultado final.', text)
+
+    def test_pptx_rejects_oversized_text(self):
+        with self.assertRaises(ValueError):
+            documents.make_pptx('a' * 40001)
+
     def test_telegram_review_does_not_deliver_workbook(self):
         self.store.attach('1:1','agenda.xlsx',sample())
         with patch.object(gateway,'document_store',self.store),patch.object(gateway,'ask_maritaca',return_value=json.dumps({'edits':[{'sheet':'Semana 1','cell':'B2','value':'Python'}]})),patch.object(gateway,'telegram_send_message'),patch.object(gateway,'telegram_api') as api,patch.object(gateway,'telegram_send_document') as send:

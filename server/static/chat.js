@@ -3,7 +3,7 @@
   "use strict";
 
   const MAX_MESSAGE = 60000;
-  const MAX_FILE_BYTES = 8 * 1024 * 1024;
+  const MAX_FILE_BYTES = 20 * 1024 * 1024;
   const MAX_TEXT_FILE_BYTES = 512 * 1024;
   let STORAGE_KEY = "thigas.crt.history.v1";
   let CONVERSATIONS_KEY = "thigas.conversations.v2";
@@ -24,7 +24,7 @@
     const extension = String(file.name || "").split(".").pop().toLowerCase();
     const mime = String(file.type || "").toLowerCase();
     if (DOCUMENT_EXTENSIONS.has(extension)) {
-      if (file.size > MAX_FILE_BYTES) throw new Error("O documento excede 8 MB.");
+      if (file.size > MAX_FILE_BYTES) throw new Error("O documento excede 20 MB.");
       return "document";
     }
     if (file.size > MAX_TEXT_FILE_BYTES) throw new Error("Arquivos de texto ou código podem ter até 512 KiB.");

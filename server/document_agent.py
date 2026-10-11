@@ -15,13 +15,13 @@ from openpyxl.cell.cell import MergedCell
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 
-MAX_BYTES=8*1024*1024
+MAX_BYTES=20*1024*1024
 
 def validate_archive(data):
-    if len(data)>MAX_BYTES:raise ValueError('A planilha excede 8 MB.')
+    if len(data)>MAX_BYTES:raise ValueError('A planilha excede 20 MB.')
     with zipfile.ZipFile(BytesIO(data)) as archive:
         entries=archive.infolist()
-        if len(entries)>2000 or sum(x.file_size for x in entries)>30*1024*1024:
+        if len(entries)>2000 or sum(x.file_size for x in entries)>60*1024*1024:
             raise ValueError('Planilha expandida grande demais.')
         if any('vbaProject' in x.filename for x in entries):raise ValueError('Macros não são permitidas.')
 
@@ -135,6 +135,58 @@ def make_docx(text):
             document.add_paragraph(content)
     output=BytesIO();document.save(output)
     return output.getvalue()
+
+
+def make_pptx(text):
+    """Generate an editable presentation from reviewed structured text."""
+    from pptx import Presentation
+    from pptx.util import Inches, Pt
+
+    prs = Presentation()
+    prs.slide_width = Inches(13.333)
+    prs.slide_height = Inches(7.5)
+    current_title = None
+    items = []
+
+    def flush():
+        nonlocal current_title, items
+        if current_title is None and not items:
+            return
+        if len(prs.slides) >= 40:
+            raise ValueError('A apresentação excede 40 slides; reduza o documento.')
+        slide = prs.slides.add_slide(prs.slide_layouts[1])
+        slide.shapes.title.text = (current_title or 'THIGAS AI')[:120]
+        frame = slide.placeholders[1].text_frame
+        frame.clear()
+        frame.word_wrap = True
+        for index, (kind, value) in enumerate(items):
+            para = frame.paragraphs[0] if index == 0 else frame.add_paragraph()
+            para.text = value[:450]
+            para.level = 1 if kind == 'bullet' else 0
+            para.font.size = Pt(22 if len(items) <= 5 else 18)
+        current_title = None
+        items = []
+
+    for kind, value in document_lines(text):
+        if kind == 'space':
+            continue
+        if kind.startswith('heading'):
+            flush()
+            current_title = value
+        elif value:
+            if len(items) >= 6:
+                flush()
+                current_title = 'Continuação'
+            items.append((kind, value))
+    flush()
+    if not prs.slides:
+        raise ValueError('Conteúdo vazio para apresentação.')
+    output = BytesIO()
+    prs.save(output)
+    if output.tell() > MAX_BYTES:
+        raise ValueError('A apresentação gerada excedeu 20 MB.')
+    return output.getvalue()
+
 
 class Store:
     def __init__(self,directory):self.directory=Path(directory)

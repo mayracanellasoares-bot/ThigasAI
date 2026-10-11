@@ -78,7 +78,7 @@ def install(app, gateway):
         filename = Path((file.filename or '').replace('\\','/')).name[:120]
         data = file.read(document_agent.MAX_BYTES+1)
         if len(data) > document_agent.MAX_BYTES:
-            return jsonify(error='Limite de 8 MB.'), 413
+            return jsonify(error='Limite de 20 MB.'), 413
         try:
             if Path(filename).suffix.lower() == '.xlsx':
                 context = document_agent.snapshot(data)
@@ -97,7 +97,7 @@ def install(app, gateway):
             return jsonify(error='Pedido inválido.'),400
         instruction = payload.get('instruction')
         kind = payload.get('format')
-        if not isinstance(instruction,str) or not instruction.strip() or len(instruction)>8000 or kind not in ('pdf','docx','xlsx'):
+        if not isinstance(instruction,str) or not instruction.strip() or len(instruction)>8000 or kind not in ('pdf','docx','xlsx','pptx'):
             return jsonify(error='Informe um pedido de até 8.000 caracteres e um formato válido.'),400
         store = gateway['document_store']
         who = owner()
@@ -127,7 +127,9 @@ def install(app, gateway):
                         if truncated: source += '\n[EXTRAÇÃO PARCIAL]'
                 # Include bounded source in both drafting and editorial review.
                 answer = gateway['compose_reviewed_document'](instruction, source)
-                content = document_agent.make_pdf(answer) if kind=='pdf' else document_agent.make_docx(answer)
+                content = (document_agent.make_pdf(answer) if kind=='pdf' else
+                           document_agent.make_pptx(answer) if kind=='pptx' else
+                           document_agent.make_docx(answer))
                 name, preview = 'thigas-documento.'+kind, answer
             pid = store.propose(who,name,content)
             return jsonify(id=pid, preview=preview, name=name)
