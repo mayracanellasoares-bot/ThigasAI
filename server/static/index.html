@@ -14,8 +14,8 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/static/icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
-  <link rel="stylesheet" href="/static/chat.css?v=tokens1">
-  <script src="/static/chat.js?v=tokens1" defer></script>
+  <link rel="stylesheet" href="/static/chat.css?v=cloud20b1">
+  <script src="/static/chat.js?v=cloud20b1" defer></script>
   <script src="/static/pwa.js?v=llama2" defer></script>
 </head>
 <body class="theme-green">
@@ -132,8 +132,17 @@
           </form>
           <input type="file" id="file-input" hidden accept=".pdf,.docx,.xlsx,.pptx,.txt,.md,.py,.js,.mjs,.cjs,.ts,.tsx,.jsx,.json,.yaml,.yml,.toml,.csv,.xml,.html,.css,.scss,.sh,.ps1,.bat,.c,.h,.cpp,.hpp,.cs,.java,.go,.rs,.rb,.php,.sql,.kt,.swift,.dart,.lua,.r">
 
+          <div class="model-controls">
+            <label for="reasoning-mode">Modelo de inteligência</label>
+            <select id="reasoning-mode" aria-describedby="mode-hint">
+              <option value="fast">Rápido · Sabiazinho 4</option>
+              <option value="cloud" disabled>Nuvem 20B · indisponível</option>
+              <option value="thinking" disabled>Sabiá 4 Thinking · indisponível</option>
+            </select>
+            <small id="mode-hint">Os modos avançados precisam ser ativados pelo administrador.</small>
+          </div>
           <div class="token-meter" role="group" aria-label="Tokens medidos na última resposta">
-            <span>Última resposta</span>
+            <span>Última resposta · Modelo <strong id="model-used">—</strong></span>
             <span>Enviados <strong id="tokens-input">—</strong></span>
             <span>Recebidos <strong id="tokens-output">—</strong></span>
             <span>Total <strong id="tokens-total">—</strong></span>
