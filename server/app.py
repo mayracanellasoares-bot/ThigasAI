@@ -25,6 +25,9 @@ MARITACA_URL = os.getenv(
 ).strip()
 MARITACA_MODEL = os.getenv("MARITACA_MODEL", "sabiazinho-4").strip()
 MARITACA_API_KEY = os.getenv("MARITACA_API_KEY", "").strip()
+MARITACA_THINKING_MODEL = os.getenv("MARITACA_THINKING_MODEL", "sabia-4-thinking-br-sp").strip() or "sabia-4-thinking-br-sp"
+# Expensive reasoning must be explicitly enabled by the owner on the server.
+THIGAS_ENABLE_THINKING = os.getenv("THIGAS_ENABLE_THINKING", "false").strip().lower() in {"1", "true", "yes", "on"}
 try:
     MARITACA_MAX_TOKENS = int(os.getenv("MARITACA_MAX_TOKENS", "16384"))
 except ValueError:
@@ -97,8 +100,11 @@ def text_content(value: Any) -> str:
     return ""
 
 
-def build_messages(question: str, history: Any) -> list[dict[str, str]]:
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+def build_messages(question: str, history: Any, model: str | None = None) -> list[dict[str, str]]:
+    prompt = SYSTEM_PROMPT
+    if model and model != MARITACA_MODEL:
+        prompt = prompt.replace(f'"{MARITACA_MODEL}"', f'"{model}"')
+    messages = [{"role": "system", "content": prompt}]
     previous = []
 
     for item in history if isinstance(history, list) else []:
@@ -136,7 +142,18 @@ def _maritaca_usage(data: Any) -> dict[str, int | None]:
     }
 
 
-def ask_maritaca_result(question: str, history: Any) -> dict[str, Any]:
+def choose_model(mode: Any) -> str:
+    if mode in (None, "fast"):
+        return MARITACA_MODEL
+    if mode == "thinking":
+        if not THIGAS_ENABLE_THINKING:
+            raise GatewayError("Modo avançado desativado pelo administrador.", 403)
+        return MARITACA_THINKING_MODEL
+    raise GatewayError("Modo de resposta inválido.", 400)
+
+
+def ask_maritaca_result(question: str, history: Any, *, mode: str = "fast") -> dict[str, Any]:
+    selected_model = choose_model(mode)
     if not MARITACA_API_KEY:
         raise GatewayError(
             "MARITACA_API_KEY não configurada no servidor.",
@@ -144,8 +161,8 @@ def ask_maritaca_result(question: str, history: Any) -> dict[str, Any]:
         )
 
     payload = {
-        "model": MARITACA_MODEL,
-        "messages": build_messages(question, history),
+        "model": selected_model,
+        "messages": build_messages(question, history, selected_model),
         "temperature": 0.2,
         "max_tokens": MARITACA_MAX_TOKENS,
         "stream": False,
@@ -194,15 +211,19 @@ def ask_maritaca_result(question: str, history: Any) -> dict[str, Any]:
             502,
         )
 
-    choices = data.get("choices") or []
-    if not choices:
+    choices = data.get("choices") if isinstance(data, dict) else None
+    if not isinstance(choices, list) or not choices:
         raise GatewayError(
             "A Maritaca não retornou uma resposta.",
             502,
         )
 
-    choice = choices[0] or {}
+    choice = choices[0]
+    if not isinstance(choice, dict):
+        raise GatewayError("A Maritaca retornou dados de resposta inválidos.", 502)
     message = choice.get("message") or {}
+    if not isinstance(message, dict):
+        raise GatewayError("A Maritaca retornou dados de resposta inválidos.", 502)
     answer = text_content(message.get("content", "")).strip()
     if not answer:
         answer = text_content(choice.get("text", "")).strip()
@@ -215,6 +236,7 @@ def ask_maritaca_result(question: str, history: Any) -> dict[str, Any]:
 
     return {
         "answer": answer,
+        "model": selected_model,
         "usage": _maritaca_usage(data),
         "finish_reason": choice.get("finish_reason") if isinstance(choice.get("finish_reason"), str) else None,
     }
@@ -365,6 +387,8 @@ def api_info():
             "status": "ok",
             "endpoint": "/chat",
             "telegram_webhook": "/telegram/webhook",
+            "thinking_enabled": THIGAS_ENABLE_THINKING,
+            "models": {"fast": MARITACA_MODEL, "thinking": MARITACA_THINKING_MODEL if THIGAS_ENABLE_THINKING else None},
         }
     )
 
@@ -398,14 +422,20 @@ def chat():
             {"error": "A mensagem ou arquivo excede o limite de 60000 caracteres."}
         ), 413
 
+    mode = body.get("mode", "fast")
     try:
-        result = ask_maritaca_result(question, body.get("history", []))
+        # Keep the original two-argument contract for current clients and Telegram.
+        if mode == "fast":
+            result = ask_maritaca_result(question, body.get("history", []))
+        else:
+            choose_model(mode)
+            result = ask_maritaca_result(question, body.get("history", []), mode=mode)
     except GatewayError as exc:
         return jsonify({"error": exc.message}), exc.status_code
 
     return jsonify({
         "answer": result["answer"],
-        "model": MARITACA_MODEL,
+        "model": result.get("model", MARITACA_MODEL),
         "usage": result["usage"],
         "max_output_tokens": MARITACA_MAX_TOKENS,
         "finish_reason": result["finish_reason"],
