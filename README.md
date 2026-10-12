@@ -86,7 +86,7 @@ O código **não usa mais** `DATABASE_URL`, Neon, OAuth ou a tabela antiga de us
 
 O THIGAS AI é um gateway de chat, não o próprio modelo de linguagem. Mudar de um modelo 3B para 8B ou 20B significa conectar um modelo diferente, não aumentar os pesos de um modelo existente. O Render executa o backend Flask e o PWA; a inferência do modelo de 20B ocorre no provedor externo da nuvem.
 
-O chat mantém o modo Rápido (Maritaca Sabiazinho 4) como padrão e agora pode oferecer modos Nuvem (GPT-OSS 20B na Groq) e Sabiá 4 Thinking BR-SP (Maritaca). Os modos pagos ficam desabilitados por padrão, inclusive na interface pública.
+O chat mantém o modo Rápido (Maritaca Sabiá 4) como padrão e agora pode oferecer modos Nuvem (GPT-OSS 20B na Groq) e Sabiá 4 Thinking BR-SP (Maritaca). Os modos pagos ficam desabilitados por padrão, inclusive na interface pública.
 
 Para ativar o GPT-OSS 20B, configure em Render > Environment:
 
@@ -120,7 +120,7 @@ A extração de texto não equivale a interpretação visual de páginas digital
 
 ## Tokens e contador real de consumo
 
-- Motor: Maritaca `sabiazinho-4`, cujo limite documentado é até 32K tokens de saída; THIGAS solicita **até 16.384 tokens** de saída em cada requisição. Variável `MARITACA_MAX_TOKENS=16384` (o servidor impede valores acima de 16.384 e usa esse padrão se estiver ausente ou for inválido).
+- Motor: Maritaca `sabia-4`, cujo limite documentado é até 32K tokens de saída; THIGAS solicita **até 16.384 tokens** de saída em cada requisição. Variável `MARITACA_MAX_TOKENS=16384` (o servidor impede valores acima de 16.384 e usa esse padrão se estiver ausente ou for inválido).
 - A resposta de `POST /chat` inclui `usage.prompt_tokens` (enviados), `usage.completion_tokens` (recebidos), `usage.total_tokens` (total consumido), `max_output_tokens` e `finish_reason`. Todos os contadores vêm diretamente da resposta do provedor externo selecionado. Sem `usage`, os campos retornam `null` e o navegador mostra **— / não informado**; **não há estimativa por caractere ou soma fictícia**.
 - O painel de tokens mostra **apenas a última requisição de chat**, não uma soma entre múltiplas chamadas. Documentos no `/workspace` e comandos Telegram preservam o formato anterior e não exibem painel próprio de tokens.
 - O histórico de entrada continua limitado pelo aplicativo a 12 mensagens anteriores, com orçamento máximo de 60 mil caracteres (além do prompt de sistema). Este valor **não é** uma medição de tokens.

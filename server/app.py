@@ -26,7 +26,7 @@ MARITACA_URL = os.getenv(
     "MARITACA_URL",
     "https://chat.maritaca.ai/api/chat/completions",
 ).strip()
-MARITACA_MODEL = os.getenv("MARITACA_MODEL", "sabiazinho-4").strip()
+MARITACA_MODEL = os.getenv("MARITACA_MODEL", "sabia-4").strip()
 MARITACA_API_KEY = os.getenv("MARITACA_API_KEY", "").strip()
 MARITACA_THINKING_MODEL = os.getenv("MARITACA_THINKING_MODEL", "sabia-4-thinking-br-sp").strip() or "sabia-4-thinking-br-sp"
 # Expensive reasoning must be explicitly enabled by the owner on the server.

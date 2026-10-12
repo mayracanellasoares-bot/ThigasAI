@@ -11,7 +11,7 @@ services:
       - key: MARITACA_API_KEY
         sync: false
       - key: MARITACA_MODEL
-        value: sabiazinho-4
+        value: sabia-4
       - key: MARITACA_MAX_TOKENS
         value: "16384"
       - key: MARITACA_URL
