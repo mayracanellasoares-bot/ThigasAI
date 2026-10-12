@@ -166,6 +166,17 @@ class GatewayTests(unittest.TestCase):
         self.assertEqual(response.headers["Access-Control-Allow-Origin"], "*")
         self.assertEqual(self.client.options("/chat").status_code, 204)
 
+    def test_authenticated_post_refuses_cross_origin_before_using_provider(self):
+        with patch.object(gateway, "ask_maritaca_result") as provider:
+            response = self.client.post("/chat", json={"message": "Olá"},
+                headers={"Origin": "https://outro-site.test"})
+            self.assertEqual(response.status_code, 403)
+            response = self.client.post("/chat", json={"message": "Olá"},
+                headers={"Sec-Fetch-Site": "cross-site"})
+            self.assertEqual(response.status_code, 403)
+            provider.assert_not_called()
+        self.assertFalse(gateway.app.config["SESSION_REFRESH_EACH_REQUEST"])
+
     def test_chat_contract_for_browser_and_apk(self):
         history = [{"role": "user", "content": "Olá"}, {"role": "assistant", "content": "Olá!"}]
         with patch.object(gateway, "ask_maritaca_result", return_value={
