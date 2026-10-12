@@ -72,7 +72,7 @@ class WorkspaceTests(unittest.TestCase):
         self.assertEqual(self.client.get('/auth/me').status_code, 404)
         response = self.client.get('/workspace')
         self.assertEqual(response.status_code, 200)
-        self.assertIn(b'Sem cadastro e sem login', response.data)
+        self.assertIn(b'Sem cadastro individual', response.data)
         self.assertNotIn(b'Entrar com Google', response.data)
 
     def test_anonymous_session_is_stable_and_secure(self):

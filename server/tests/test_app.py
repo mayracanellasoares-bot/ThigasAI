@@ -14,7 +14,11 @@ spec = importlib.util.spec_from_file_location("thigas_test_app", SERVER / "app.p
 gateway = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = gateway
 # Não registra webhooks nem lê credenciais reais durante a suíte.
-with patch.dict(os.environ, {"TELEGRAM_BOT_TOKEN": "", "MARITACA_API_KEY": ""}):
+with patch.dict(os.environ, {
+    "TELEGRAM_BOT_TOKEN": "", "MARITACA_API_KEY": "",
+    "THIGAS_ACCESS_PASSWORD": "teste-senha-unica-123456789",
+    "THIGAS_SESSION_SECRET": "sessao-segura-para-testes-mais-de-32-caracteres",
+}):
     spec.loader.exec_module(gateway)
 
 
@@ -22,6 +26,8 @@ class GatewayTests(unittest.TestCase):
     def setUp(self):
         gateway.app.config["TESTING"] = True
         self.client = gateway.app.test_client()
+        login = self.client.post("/auth/login", data={"password": "teste-senha-unica-123456789"})
+        self.assertEqual(login.status_code, 303)
 
     def get(self, path):
         response = self.client.get(path)
@@ -74,7 +80,7 @@ class GatewayTests(unittest.TestCase):
         response = self.get("/")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.mimetype, "text/html")
-        self.assertEqual(response.headers["Cache-Control"], "no-cache")
+        self.assertEqual(response.headers["Cache-Control"], "no-store")
         html = response.get_data(as_text=True)
         for marker in ('lang="pt-BR"', 'id="chat-form"', 'id="file-input"'):
             self.assertIn(marker, html)
@@ -159,6 +165,17 @@ class GatewayTests(unittest.TestCase):
         self.assertEqual(response.get_json()["status"], "ok")
         self.assertEqual(response.headers["Access-Control-Allow-Origin"], "*")
         self.assertEqual(self.client.options("/chat").status_code, 204)
+
+    def test_authenticated_post_refuses_cross_origin_before_using_provider(self):
+        with patch.object(gateway, "ask_maritaca_result") as provider:
+            response = self.client.post("/chat", json={"message": "Olá"},
+                headers={"Origin": "https://outro-site.test"})
+            self.assertEqual(response.status_code, 403)
+            response = self.client.post("/chat", json={"message": "Olá"},
+                headers={"Sec-Fetch-Site": "cross-site"})
+            self.assertEqual(response.status_code, 403)
+            provider.assert_not_called()
+        self.assertFalse(gateway.app.config["SESSION_REFRESH_EACH_REQUEST"])
 
     def test_chat_contract_for_browser_and_apk(self):
         history = [{"role": "user", "content": "Olá"}, {"role": "assistant", "content": "Olá!"}]
@@ -342,3 +359,68 @@ class GatewayTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class AccessControlTests(unittest.TestCase):
+    def setUp(self):
+        gateway.app.config["TESTING"] = True
+        self.client = gateway.app.test_client()
+
+    def test_public_install_screen_and_private_chat(self):
+        self.assertEqual(self.client.get("/entrar").status_code, 200)
+        self.assertIn('id="btn-install-login"', self.client.get("/entrar").get_data(as_text=True))
+        self.assertEqual(self.client.get("/manifest.webmanifest").status_code, 200)
+        self.assertEqual(self.client.get("/static/login.js").status_code, 200)
+        self.assertEqual(self.client.get("/static/chat.js").status_code, 401)
+        self.assertEqual(self.client.get("/", headers={"Accept": "text/html"}).status_code, 303)
+        self.assertEqual(self.client.get("/workspace", headers={"Accept": "text/html"}).status_code, 303)
+        self.assertEqual(self.client.post("/chat", json={"message": "teste"}).status_code, 401)
+        self.assertEqual(self.client.post("/document/extract").status_code, 401)
+        self.assertEqual(self.client.post("/image/describe").status_code, 401)
+        self.assertEqual(self.client.get("/workspace/api/session").status_code, 401)
+        self.assertEqual(self.client.get("/api").status_code, 401)
+
+    def test_correct_password_unlocks_site_and_logout_relocks(self):
+        bad = self.client.post("/auth/login", data={"password": "senha-incorreta"})
+        self.assertEqual(bad.status_code, 303)
+        self.assertIn("erro=senha", bad.headers["Location"])
+        ok = self.client.post("/auth/login", data={"password": "teste-senha-unica-123456789"})
+        self.assertEqual(ok.status_code, 303)
+        home = self.client.get("/")
+        self.assertEqual(home.status_code, 200)
+        self.assertEqual(home.headers["Cache-Control"], "no-store")
+        self.assertEqual(self.client.get("/workspace").status_code, 200)
+        self.assertEqual(self.client.post("/auth/logout").status_code, 303)
+        self.assertEqual(self.client.post("/chat", json={"message": "teste"}).status_code, 401)
+
+    def test_missing_server_password_fails_closed(self):
+        from flask import Flask
+        from access_control import install as install_access_control
+        with patch.dict(os.environ, {"THIGAS_ACCESS_PASSWORD": "",
+                                      "THIGAS_SESSION_SECRET": "x" * 48}):
+            isolated = Flask("isolated_access")
+            isolated.secret_key = "x" * 48
+            install_access_control(isolated)
+
+            @isolated.post("/chat")
+            def private_chat():
+                return {"answer": "não deve abrir"}
+
+            response = isolated.test_client().post("/chat", json={"message": "teste"})
+            self.assertEqual(response.status_code, 503)
+        page = self.client.get("/entrar").get_data(as_text=True)
+        self.assertNotIn("teste-senha-unica-123456789", page)
+        self.assertNotIn("sessao-segura-para-testes", page)
+
+    def test_login_origin_and_throttling(self):
+        forbidden = self.client.post("/auth/login", data={"password": "teste-senha-unica-123456789"},
+                                     headers={"Origin": "https://other.example"})
+        self.assertEqual(forbidden.status_code, 403)
+        for attempt in range(10):
+            result = self.client.post("/auth/login", data={"password": "incorreta"},
+                                      environ_overrides={"REMOTE_ADDR": "192.0.2.55"})
+            self.assertEqual(result.status_code, 303)
+        blocked = self.client.post("/auth/login", data={"password": "teste-senha-unica-123456789"},
+                                   environ_overrides={"REMOTE_ADDR": "192.0.2.55"})
+        self.assertIn("erro=limite", blocked.headers["Location"])
+

@@ -1006,6 +1006,9 @@ def configure_telegram_webhook() -> None:
         app.logger.info("Webhook do Telegram configurado: %s", TELEGRAM_WEBHOOK_URL)
 
 
+from access_control import install as install_access_control
+install_access_control(app)
+
 from web_workspace import install as install_workspace
 install_workspace(app, globals())
 

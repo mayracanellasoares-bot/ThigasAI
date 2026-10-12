@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f8f7f3">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Acessar THIGAS AI</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/static/icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+  <script src="/static/login.js?v=access1" defer></script>
+  <style>
+    :root { color-scheme: light; font-family: system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100svh; display: grid; place-items: center; background: #f8f7f3; color: #23372c; padding: 1.2rem; }
+    main { width: min(100%, 420px); background: #fff; border: 1px solid #d9e1da; border-radius: 22px; box-shadow: 0 20px 70px #1c3a2416; padding: clamp(1.4rem,5vw,2.5rem); }
+    .brand { display: flex; align-items: center; gap: .8rem; margin-bottom: 1.8rem; }
+    .brand img { width: 60px; height: 60px; border-radius: 15px; }
+    .brand strong { font-size: 1.25rem; display: block; }
+    .brand small { color: #5b6a60; }
+    h1 { font-size: 1.5rem; margin: 0 0 .5rem; }
+    p { color: #526459; line-height: 1.55; }
+    label { display: block; font-weight: 600; margin: 1.3rem 0 .5rem; }
+    input { width: 100%; min-height: 50px; padding: .8rem .9rem; border: 1px solid #9fb4a5; border-radius: 12px; font-size: 1rem; background: #fff; color: #20352a; }
+    button { cursor: pointer; border-radius: 12px; font: inherit; padding: .85rem 1rem; min-height: 48px; width: 100%; }
+    button:focus-visible,input:focus-visible { outline: 3px solid #2c7159; outline-offset: 2px; }
+    .primary { background: #315f49; color: #fff; border: 1px solid #315f49; font-weight: 650; margin-top: 1rem; }
+    .secondary { background: #fff; color: #315f49; border: 1px solid #b8c8bd; margin-top: .8rem; }
+    #notice { color: #983d36; background: #fff1ed; border-radius: 8px; padding: .75rem; margin-bottom: 1rem; }
+    [hidden] { display: none !important; }
+    footer { font-size: .8rem; margin-top: 1.1rem; color: #69756c; text-align: center; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="brand"><img src="/static/icons/icon.svg" alt="Logotipo THIGAS AI"><span><strong>THIGAS AI</strong><small>Brittech inc.</small></span></div>
+    <h1>Acesso ao aplicativo</h1>
+    <p>Use a senha única fornecida pelo administrador. Não é necessário criar uma conta.</p>
+    <p id="notice" role="alert" hidden></p>
+    <form action="/auth/login" method="post">
+      <label for="password">Senha de acesso</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" minlength="1" maxlength="256" required autofocus>
+      <button class="primary" type="submit">Entrar no THIGAS AI</button>
+    </form>
+    <button type="button" id="btn-install-login" class="secondary">Instalar aplicativo</button>
+    <p id="install-hint" role="status" hidden></p>
+    <footer>O acesso exige conexão com a internet e sessão válida.</footer>
+  </main>
+</body>
+</html>

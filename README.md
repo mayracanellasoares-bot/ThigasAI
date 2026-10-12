@@ -24,7 +24,7 @@ Abra o site no Chrome, Edge, Samsung Internet ou Safari e use o botão **INSTALA
 - **Windows/Chrome ou Edge:** botão de instalação na barra de endereço.
 - **iPhone/iPad:** Safari → Compartilhar → Adicionar à Tela de Início.
 
-Depois da primeira visita online com o service worker instalado, a interface e o histórico local podem abrir sem internet. **Novas respostas exigem internet.** Perguntas não são reenviadas automaticamente quando a conexão volta.
+Por segurança, a interface protegida não é mais armazenada offline. O PWA pode abrir a tela de acesso sem conexão, mas o login, o chat e os documentos precisam de internet. O histórico local anterior não é apagado automaticamente. **Novas respostas exigem internet.** Perguntas não são reenviadas automaticamente quando a conexão volta.
 
 Uma nova versão oferece **ATUALIZAR** sem recarregar a conversa automaticamente. Se houver texto não enviado, anexo ou consulta em andamento, o usuário confirma o descarte antes de recarregar. O histórico já salvo permanece.
 
@@ -42,7 +42,7 @@ O servidor Flask em `server/app.py` oferece:
 - `POST /chat`: `{ "message": "...", "history": [] }` → `{ "answer": "...", "model": "..." }`.
 - `POST /telegram/webhook`: webhook do Telegram, preservado.
 
-As chaves continuam exclusivamente nas variáveis de ambiente do Render, nunca no JavaScript ou repositório. A rota `/chat` é pública: antes de divulgar amplamente, configure limite de gastos na Maritaca e avalie autenticação/controle de uso no servidor. O service worker guarda somente recursos públicos da interface; não intercepta nem coloca mensagens, respostas ou anexos da API no cache.
+As chaves continuam exclusivamente nas variáveis de ambiente do Render, nunca no JavaScript ou repositório. A rota `/chat` exige sessão autenticada quando a senha única está configurada. O serviço não inicia com acesso público caso falte a senha. Ainda é recomendado aplicar cotas e limites de gastos no provedor. O service worker guarda somente recursos públicos da interface; não intercepta nem coloca mensagens, respostas ou anexos da API no cache.
 
 ## Testes locais
 
@@ -74,9 +74,9 @@ O bot agora pode receber XLSX e preparar uma cópia editada por `/planilha`, com
 
 As ferramentas exigem `THIGAS_TELEGRAM_ALLOWED_USERS` e `TELEGRAM_WEBHOOK_SECRET`. O armazenamento temporário e o plano gratuito atuais não constituem uma implantação 24/7; o guia descreve os componentes que ainda faltam.
 
-## Documentos no navegador — sem cadastro
+## Documentos no navegador — sem cadastro individual
 
-A área `/workspace` agora abre **diretamente, sem Google, GitHub, Facebook, login ou cadastro**. O visitante pode enviar arquivos PDF, DOCX, XLSX e PPTX (até 20 MB), gerar PDF/Word, revisar uma planilha XLSX enviada e confirmar o download.
+A área `/workspace` abre após informar **a mesma senha única de acesso**, sem cadastro individual ou OAuth do Google, GitHub e Meta. O visitante pode enviar arquivos PDF, DOCX, XLSX e PPTX (até 20 MB), gerar PDF/Word, revisar uma planilha XLSX enviada e confirmar o download.
 
 Os arquivos temporários são segregados por uma sessão anônima assinada no navegador (cookie HTTP-only, SameSite=Lax, Secure e token CSRF). É necessário manter `THIGAS_SESSION_SECRET` (mínimo 32 caracteres) configurado no Render para essa proteção. A sessão e os arquivos expiram em até 24 horas; como `THIGAS_DATA_DIR` permanece no disco efêmero do Render, podem se perder antes. O histórico do chat é guardado no navegador, sem sincronização.
 
@@ -101,7 +101,7 @@ Compatibilidade: POST /chat aceita o modo opcional fast, cloud ou thinking. Sem 
 
 Para um modelo 8B, a mesma integração suporta um endpoint compatível com Chat Completions, mas altere THIGAS_CLOUD_MODEL e THIGAS_CLOUD_URL para IDs e URLs verificados no provedor escolhido. Não use o antigo llama-3.1-8b-instant da Groq: ele foi descontinuado em agosto de 2026. O modelo 20B atualmente documentado é openai/gpt-oss-20b.
 
-Segurança: o chat continua público e sem cadastro. Se ativar o modelo de nuvem, qualquer visitante poderá consumir créditos pelo endpoint /chat. Configure cotas e alertas no provedor e adicione rate limiting/autorização robustos antes de divulgar o serviço. Ativar o modo não torna as requisições gratuitas. Testes unitários não validam acesso real nem cobrança da API.
+Segurança: o chat exige a senha única compartilhada e não usa cadastro individual. Quem conhece essa senha poderá consumir créditos pelo endpoint /chat. Configure cotas e alertas no provedor e adicione rate limiting/autorização robustos antes de divulgar o serviço. Ativar o modo não torna as requisições gratuitas. Testes unitários não validam acesso real nem cobrança da API.
 
 Referências: https://console.groq.com/docs/models e https://console.groq.com/docs/api-reference e https://docs.maritaca.ai/pt/modelos.
 
@@ -158,3 +158,19 @@ O ícone SVG foi atualizado com moldura coral e capivara, como o visual aprovado
 - Se `THIGAS_ENABLE_THINKING=true` e houver chave Maritaca, `thinking` usa `MARITACA_THINKING_MODEL`. Caso contrário, preserva o provedor de nuvem habilitado, como nas versões anteriores. `cloud` continua exclusivo da nuvem.
 - `gunicorn.conf.py` aplica uma instância com duas threads, timeout de 660 segundos e encerramento gracioso de 60 segundos, inclusive ao comando Render sem esses argumentos. Argumentos explícitos do Gunicorn têm precedência.
 - JSON inválido é recusado com HTTP 400; modos inválidos são recusados antes de acessar links.
+
+
+## Senha única do site e do PWA
+
+O mesmo login por senha é aplicado ao site no navegador e ao PWA instalado no Android, iOS ou desktop, **sem cadastro individual**. O botão **Instalar aplicativo** também aparece na tela pública `/entrar`. Depois de instalar, o usuário informa a senha antes de usar o chat ou os documentos. O acesso é validado pelo servidor, não por JavaScript.
+
+Configure **antes de incorporar esta mudança à main** no Render → serviço `thigas-coder-gateway` → Environment:
+
+- `THIGAS_ACCESS_PASSWORD`: uma senha forte e exclusiva, de 12 a 256 caracteres (marque como segredo no painel; **não publique no GitHub ou na conversa**).
+- `THIGAS_SESSION_SECRET`: segredo de assinatura já utilizado pelos documentos, com pelo menos 32 caracteres. **Preserve o valor atual** para não invalidar as sessões existentes sem necessidade.
+
+Depois configure essas variáveis no serviço já existente e publique a nova versão. A aplicação falha de forma fechada caso falte a senha ou o segredo de sessão, sem abrir chat nem documentos ao público. Rotas de saúde, manifesto, ícones, tela de acesso e webhook Telegram (com sua própria chave) continuam acessíveis. Há limitação básica em memória de tentativas de senha: dez falhas por IP em cinco minutos; não substitui um rate limiter compartilhado para múltiplos workers ou instâncias.
+
+A sessão é mantida em cookie assinado, HttpOnly, Secure e SameSite=Lax e expira em até 24h; trocas de senha revogam os cookies autenticados. O botão **Sair** encerra a sessão no servidor. O histórico anterior permanece no armazenamento local do aparelho: uma senha compartilhada **não separa conversas por pessoa** e não impede leitura local por quem tem acesso ao navegador/dispositivo. Use aparelho e perfil de navegador confiáveis.
+
+O service worker `v18-auth` elimina caches antigos do próprio PWA e nunca armazena páginas privadas, respostas ou documentos. A tela de login pode abrir offline, porém não é possível autenticar sem conexão. `/chat`, `/workspace`, `/links`, `/api`, `/document/extract` e demais endpoints privados exigem a sessão, inclusive por requisições diretas fora da interface. `MARITACA_API_KEY` e `THIGAS_ACCESS_PASSWORD` são credenciais **diferentes** e permanecem somente no servidor.

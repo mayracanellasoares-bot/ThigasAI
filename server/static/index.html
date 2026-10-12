@@ -73,6 +73,9 @@
           <span class="nav-icon" aria-hidden="true">?</span>
           <span>Ajuda</span>
         </button>
+        <form action="/auth/logout" method="post" class="sidebar-logout-form">
+          <button class="sidebar-btn" type="submit"><span class="nav-icon" aria-hidden="true">↪</span> Sair</button>
+        </form>
         <button id="btn-privacy" class="sidebar-btn" type="button">
           <span class="nav-icon" aria-hidden="true">◉</span>
           <span>Privacidade</span>
@@ -225,7 +228,7 @@
     <h3>Privacidade</h3>
     <p>Seu texto, anexos enviados e parte do histórico são encaminhados ao provedor de IA configurado no servidor para gerar a resposta. Não envie senhas, chaves de API ou dados sensíveis.</p>
     <p>O contador mostra somente os tokens efetivamente reportados na última resposta pela API: entrada, saída e total. O símbolo — significa que a API não forneceu a medição. O limite máximo de saída é 16.384 tokens, não uma garantia de tamanho; solicitações longas podem demorar e consumir mais saldo.</p>
-    <p>O histórico de conversas fica salvo apenas neste navegador, com até 30 conversas recentes. O PWA pode reabrir esse histórico sem internet depois do primeiro carregamento, mas novas respostas exigem conexão.</p>
+    <p>O histórico de conversas fica salvo apenas neste navegador, com até 30 conversas recentes. Para proteger o acesso, o PWA solicita senha e conexão após a instalação. O histórico local não é apagado ao sair.</p>
   </dialog>
 
   <dialog id="history-modal" class="history-modal" aria-labelledby="history-title">
