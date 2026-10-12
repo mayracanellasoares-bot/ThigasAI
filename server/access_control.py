@@ -19,6 +19,12 @@ def install(app):
     password = os.getenv("THIGAS_ACCESS_PASSWORD", "")
     secret = os.getenv("THIGAS_SESSION_SECRET", "")
     ready = 12 <= len(password) <= 256 and len(secret) >= 32
+    # Diagnóstico seguro: mostra somente se os requisitos foram atendidos.
+    # Nunca registrar credenciais, hashes ou comprimentos exatos.
+    app.logger.warning(
+        "THIGAS AUTH: configured=%s; access_password_valid=%s; session_secret_valid=%s",
+        ready, 12 <= len(password) <= 256, len(secret) >= 32,
+    )
     # A troca da senha invalida cookies autenticados anteriormente.
     session_marker = hashlib.sha256(
         ("thigas-access-v1:" + password + ":" + secret).encode("utf-8")
