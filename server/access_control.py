@@ -74,6 +74,8 @@ def install(app):
                 return redirect("/entrar?erro=config", code=303)
             return jsonify(error="A senha de acesso ainda não foi configurada no servidor."), 503
         if authenticated():
+            if request.method not in ("GET", "HEAD", "OPTIONS") and not same_origin():
+                return jsonify(error="Origem não autorizada."), 403
             return None
         if request.method in ("GET", "HEAD") and request.accept_mimetypes.accept_html:
             return redirect("/entrar", code=303)
