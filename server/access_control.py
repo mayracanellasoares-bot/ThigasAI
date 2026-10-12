@@ -14,6 +14,8 @@ from flask import jsonify, redirect, request, session
 
 
 def install(app):
+    # Sessões autenticadas têm duração fixa: chamadas ao chat não renovam indefinidamente o cookie.
+    app.config["SESSION_REFRESH_EACH_REQUEST"] = False
     password = os.getenv("THIGAS_ACCESS_PASSWORD", "")
     secret = os.getenv("THIGAS_SESSION_SECRET", "")
     ready = 12 <= len(password) <= 256 and len(secret) >= 32
@@ -34,6 +36,8 @@ def install(app):
         return ready and isinstance(value, str) and hmac.compare_digest(value, session_marker)
 
     def same_origin():
+        if request.headers.get("Sec-Fetch-Site") == "cross-site":
+            return False
         origin = request.headers.get("Origin")
         if not origin:
             return True
@@ -109,6 +113,8 @@ def install(app):
             return redirect("/entrar?erro=senha", code=303)
         with lock:
             attempts.pop(identity, None)
+        # Limpa o estado anônimo anterior e evita reaproveitar dados da sessão pré-login.
+        session.clear()
         session["thigas_access_v1"] = session_marker
         session.permanent = True
         return redirect("/", code=303)
