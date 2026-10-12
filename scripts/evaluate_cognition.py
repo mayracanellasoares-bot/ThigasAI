@@ -23,7 +23,7 @@ import urllib.request
 
 ROOT = Path(__file__).resolve().parents[1]
 SPLITS = ('train', 'val', 'test')
-NUMBERS = re.compile(r'(?<![\\w])[-+]?\\d+(?:[,.]\\d+)?(?![\\w])')
+NUMBERS = re.compile(r'(?<![\w])[-+]?\d+(?:[,.]\d+)?(?![\w])')
 
 
 def load_cases(split: str):
@@ -171,7 +171,7 @@ def main():
         return
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(''.join(json.dumps(row, ensure_ascii=False) + '\\n' for row in rows), encoding='utf-8')
+        args.output.write_text(''.join(json.dumps(row, ensure_ascii=False) + '\n' for row in rows), encoding='utf-8')
     print(json.dumps(score_responses(args.split, rows), ensure_ascii=False, indent=2))
 
 
