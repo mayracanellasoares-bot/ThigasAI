@@ -38,5 +38,11 @@ services:
         sync: false
       - key: THIGAS_SESSION_SECRET
         sync: false
+      - key: THIGAS_ACCESS_ENABLED
+        value: "false"
+      - key: THIGAS_ACCESS_USERNAME
+        value: thigas
+      - key: THIGAS_ACCESS_PASSWORD
+        sync: false
       - key: THIGAS_DATA_DIR
         value: /tmp/thigas-documents
