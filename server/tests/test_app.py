@@ -383,8 +383,20 @@ class AccessControlTests(unittest.TestCase):
         self.assertEqual(self.client.post("/chat", json={"message": "teste"}).status_code, 401)
 
     def test_missing_server_password_fails_closed(self):
-        # A política de configuração é validada pelo código-fonte, e as credenciais
-        # não devem aparecer nem na tela inicial nem nos ativos públicos.
+        from flask import Flask
+        from access_control import install as install_access_control
+        with patch.dict(os.environ, {"THIGAS_ACCESS_PASSWORD": "",
+                                      "THIGAS_SESSION_SECRET": "x" * 48}):
+            isolated = Flask("isolated_access")
+            isolated.secret_key = "x" * 48
+            install_access_control(isolated)
+
+            @isolated.post("/chat")
+            def private_chat():
+                return {"answer": "não deve abrir"}
+
+            response = isolated.test_client().post("/chat", json={"message": "teste"})
+            self.assertEqual(response.status_code, 503)
         page = self.client.get("/entrar").get_data(as_text=True)
         self.assertNotIn("teste-senha-unica-123456789", page)
         self.assertNotIn("sessao-segura-para-testes", page)
