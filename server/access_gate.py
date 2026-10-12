@@ -76,7 +76,7 @@ def install_access_gate(app):
             return None
         path = request.path
         # Os ativos estáticos são públicos; informações, inferências e documentos não.
-        if path.startswith("/static/") or path in {
+        if (path.startswith("/static/") and not path.endswith(".html")) or path in {
             "/login", "/health", "/sw.js", "/manifest.webmanifest", "/telegram/webhook"
         }:
             return None
