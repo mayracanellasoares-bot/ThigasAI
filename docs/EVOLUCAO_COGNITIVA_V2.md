@@ -16,6 +16,18 @@ python scripts/bench_context_retention.py
 
 Ele mede *recuperação de fato antigo dentro do contexto enviado*, **não** a precisão da resposta da LLM. Usa 8 conversas artificiais iguais nos dois algoritmos, medindo retenção do fato e tempo local de seleção. O CI executa a medição e imprime os valores reais no GitHub Actions. Resultados não autorizam afirmar +X% de raciocínio geral.
 
+### Primeira medição no GitHub Actions
+
+Execução pública [workflow #38293316118](https://github.com/mayracanellasoares-bot/ThigasAI/actions/runs/38293316118), runner Ubuntu/Python 3.12 em 12/10/2026:
+
+| Algoritmo | Fatos antigos presentes | Mediana da seleção para 8 casos |
+|---|---:|---:|
+| Recorte anterior (12 últimas mensagens) | 0/8 | 0,013004 ms |
+| Seleção v2 por relevância | 8/8 | 1,5389625 ms |
+
+Essas medidas são de código em **casos sintéticos**, não de raciocínio do modelo nem de latência de inferência. O algoritmo mais abrangente apresenta overhead pequeno em valores absolutos neste ambiente específico.
+
+
 A verificação de qualidade da geração identifica indicadores:
 - `output_limit`: finalização do provedor por limite de saída (`finish_reason=length`).
 - `possible_repetition`: três repetições contíguas de texto longo fora de blocos de código.
