@@ -388,15 +388,21 @@ def extract_document():
 
 @app.after_request
 def add_cors(response):
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    if os.getenv("THIGAS_ACCESS_ENABLED", "false").strip().lower() not in ("1", "true", "yes", "on"):
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
     return response
 
 
 @app.get("/")
 def index():
-    response = app.response_class((Path(app.static_folder) / "index.html").read_bytes(), mimetype="text/html")
+    html = (Path(app.static_folder) / "index.html").read_bytes()
+    if os.getenv("THIGAS_ACCESS_ENABLED", "false").lower() in ("1", "true", "yes", "on"):
+        logout_action = (b'<form action="/logout" method="post" class="logout-area">'
+                         b'<button type="submit" class="sidebar-btn"><span class="nav-icon" aria-hidden="true">\xe2\x8f\xbb</span>Encerrar sess\xc3\xa3o</button></form>')
+        html = html.replace(b"<!--THIGAS-AUTH-ACTION-->", logout_action)
+    response = app.response_class(html, mimetype="text/html")
     response.headers["Cache-Control"] = "no-cache"
     return response
 
@@ -1008,6 +1014,9 @@ def configure_telegram_webhook() -> None:
 
 from web_workspace import install as install_workspace
 install_workspace(app, globals())
+
+from access_gate import install_access_gate
+install_access_gate(app)
 
 
 if TELEGRAM_BOT_TOKEN:
