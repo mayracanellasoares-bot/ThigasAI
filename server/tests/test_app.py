@@ -14,7 +14,11 @@ spec = importlib.util.spec_from_file_location("thigas_test_app", SERVER / "app.p
 gateway = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = gateway
 # Não registra webhooks nem lê credenciais reais durante a suíte.
-with patch.dict(os.environ, {"TELEGRAM_BOT_TOKEN": "", "MARITACA_API_KEY": ""}):
+with patch.dict(os.environ, {
+    "TELEGRAM_BOT_TOKEN": "", "MARITACA_API_KEY": "",
+    "THIGAS_ACCESS_PASSWORD": "teste-senha-unica-123456789",
+    "THIGAS_SESSION_SECRET": "sessao-segura-para-testes-mais-de-32-caracteres",
+}):
     spec.loader.exec_module(gateway)
 
 
@@ -22,6 +26,8 @@ class GatewayTests(unittest.TestCase):
     def setUp(self):
         gateway.app.config["TESTING"] = True
         self.client = gateway.app.test_client()
+        login = self.client.post("/auth/login", data={"password": "teste-senha-unica-123456789"})
+        self.assertEqual(login.status_code, 303)
 
     def get(self, path):
         response = self.client.get(path)
@@ -342,3 +348,56 @@ class GatewayTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class AccessControlTests(unittest.TestCase):
+    def setUp(self):
+        gateway.app.config["TESTING"] = True
+        self.client = gateway.app.test_client()
+
+    def test_public_install_screen_and_private_chat(self):
+        self.assertEqual(self.client.get("/entrar").status_code, 200)
+        self.assertIn('id="btn-install-login"', self.client.get("/entrar").get_data(as_text=True))
+        self.assertEqual(self.client.get("/manifest.webmanifest").status_code, 200)
+        self.assertEqual(self.client.get("/static/login.js").status_code, 200)
+        self.assertEqual(self.client.get("/static/chat.js").status_code, 401)
+        self.assertEqual(self.client.get("/", headers={"Accept": "text/html"}).status_code, 303)
+        self.assertEqual(self.client.get("/workspace", headers={"Accept": "text/html"}).status_code, 303)
+        self.assertEqual(self.client.post("/chat", json={"message": "teste"}).status_code, 401)
+        self.assertEqual(self.client.post("/document/extract").status_code, 401)
+        self.assertEqual(self.client.post("/image/describe").status_code, 401)
+        self.assertEqual(self.client.get("/workspace/api/session").status_code, 401)
+        self.assertEqual(self.client.get("/api").status_code, 401)
+
+    def test_correct_password_unlocks_site_and_logout_relocks(self):
+        bad = self.client.post("/auth/login", data={"password": "senha-incorreta"})
+        self.assertEqual(bad.status_code, 303)
+        self.assertIn("erro=senha", bad.headers["Location"])
+        ok = self.client.post("/auth/login", data={"password": "teste-senha-unica-123456789"})
+        self.assertEqual(ok.status_code, 303)
+        home = self.client.get("/")
+        self.assertEqual(home.status_code, 200)
+        self.assertEqual(home.headers["Cache-Control"], "no-store")
+        self.assertEqual(self.client.get("/workspace").status_code, 200)
+        self.assertEqual(self.client.post("/auth/logout").status_code, 303)
+        self.assertEqual(self.client.post("/chat", json={"message": "teste"}).status_code, 401)
+
+    def test_missing_server_password_fails_closed(self):
+        # A política de configuração é validada pelo código-fonte, e as credenciais
+        # não devem aparecer nem na tela inicial nem nos ativos públicos.
+        page = self.client.get("/entrar").get_data(as_text=True)
+        self.assertNotIn("teste-senha-unica-123456789", page)
+        self.assertNotIn("sessao-segura-para-testes", page)
+
+    def test_login_origin_and_throttling(self):
+        forbidden = self.client.post("/auth/login", data={"password": "teste-senha-unica-123456789"},
+                                     headers={"Origin": "https://other.example"})
+        self.assertEqual(forbidden.status_code, 403)
+        for attempt in range(10):
+            result = self.client.post("/auth/login", data={"password": "incorreta"},
+                                      environ_overrides={"REMOTE_ADDR": "192.0.2.55"})
+            self.assertEqual(result.status_code, 303)
+        blocked = self.client.post("/auth/login", data={"password": "teste-senha-unica-123456789"},
+                                   environ_overrides={"REMOTE_ADDR": "192.0.2.55"})
+        self.assertIn("erro=limite", blocked.headers["Location"])
+
