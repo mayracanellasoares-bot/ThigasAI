@@ -148,3 +148,13 @@ A folha `server/static/mini-nano-theme.css` incorpora e adapta as regras visuais
 O chat exibe histórico na lateral esquerda no desktop e um painel recolhível no celular, com grupos Hoje / Ontem / Últimos 7 dias / Anteriores, busca por título, renomeação, exclusão e Nova conversa. As conversas ficam no `localStorage` deste navegador, limitadas a 30 conversas com 40 mensagens cada; **não sincronizam entre aparelhos**. O aplicativo omite o conteúdo delimitado por `[ARQUIVO: ...]` e `[FIM DO ARQUIVO]` antes de armazenar mensagens localmente; mensagens antigas são saneadas ao carregar. Não inclua segredos nas perguntas de texto normal.
 
 O ícone SVG foi atualizado com moldura coral e capivara, como o visual aprovado. Os ícones PNG de 192 e 512 pixels foram regenerados com o mesmo símbolo coral para instalação no PWA. Aparelhos que já instalaram o aplicativo podem precisar atualizar ou reinstalar o atalho para ver o novo ícone.
+
+
+## Correção de confiabilidade do chat
+
+- O servidor limita o histórico e a pergunta a 60 mil caracteres quando a pergunta cabe nesse orçamento; fontes web adicionadas são limitadas separadamente pelo leitor. Esse limite é uma proteção por caracteres, não uma contagem de tokens. O sistema fica fora desse orçamento.
+- Mensagens antigas são removidas primeiro, sem iniciar o histórico com uma resposta órfã. Uma pergunta ainda pendente duplicada no fim do histórico não é enviada duas vezes.
+- O prompt prioriza a solicitação atual, correções e encerramento da resposta, sem exigir uma apresentação a cada interação. Isso não garante ausência de repetição pelo modelo.
+- Se `THIGAS_ENABLE_THINKING=true` e houver chave Maritaca, `thinking` usa `MARITACA_THINKING_MODEL`. Caso contrário, preserva o provedor de nuvem habilitado, como nas versões anteriores. `cloud` continua exclusivo da nuvem.
+- `gunicorn.conf.py` aplica uma instância com duas threads, timeout de 660 segundos e encerramento gracioso de 60 segundos, inclusive ao comando Render sem esses argumentos. Argumentos explícitos do Gunicorn têm precedência.
+- JSON inválido é recusado com HTTP 400; modos inválidos são recusados antes de acessar links.

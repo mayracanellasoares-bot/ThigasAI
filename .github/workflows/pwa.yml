@@ -3,9 +3,9 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ["server/**", "scripts/**", ".github/workflows/pwa.yml"]
+    paths: ["server/**", "scripts/**", "gunicorn.conf.py", ".github/workflows/pwa.yml"]
   pull_request:
-    paths: ["server/**", "scripts/**", ".github/workflows/pwa.yml"]
+    paths: ["server/**", "scripts/**", "gunicorn.conf.py", ".github/workflows/pwa.yml"]
 permissions:
   contents: read
 jobs:
