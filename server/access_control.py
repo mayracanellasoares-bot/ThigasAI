@@ -21,9 +21,12 @@ def install(app):
     ready = 12 <= len(password) <= 256 and len(secret) >= 32
     # Diagnóstico seguro: mostra somente se os requisitos foram atendidos.
     # Nunca registrar credenciais, hashes ou comprimentos exatos.
-    app.logger.warning(
-        "THIGAS AUTH: configured=%s; access_password_valid=%s; session_secret_valid=%s",
-        ready, 12 <= len(password) <= 256, len(secret) >= 32,
+    # Gunicorn/Render coleta stdout; não imprime conteúdos de nenhuma variável.
+    print(
+        "THIGAS AUTH: configured={}; access_password_valid={}; session_secret_valid={}".format(
+            ready, 12 <= len(password) <= 256, len(secret) >= 32
+        ),
+        flush=True,
     )
     # A troca da senha invalida cookies autenticados anteriormente.
     session_marker = hashlib.sha256(
