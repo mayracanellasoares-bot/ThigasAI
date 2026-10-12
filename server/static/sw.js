@@ -1,9 +1,10 @@
 "use strict";
 
+// O shell HTML, o histórico e as sessões NUNCA entram no CacheStorage.
+// Sem rede, o acesso por senha não pode ser verificado.
 const CACHE_PREFIX = "thigas-pwa-";
-const CACHE_NAME = CACHE_PREFIX + "v17";
+const CACHE_NAME = CACHE_PREFIX + "v18-auth";
 const APP_SHELL = [
-  "/",
   "/manifest.webmanifest",
   "/static/chat.css?v=caret1",
   "/static/mini-nano-theme.css?v=drawer2",
@@ -44,33 +45,20 @@ if (typeof self !== "undefined" && self.addEventListener) {
     if (event.data && event.data.type === "SKIP_WAITING") void self.skipWaiting();
   });
 
-  async function navigation(request, event) {
-    const cache = await caches.open(CACHE_NAME);
-    const network = fetch(request).then(async response => {
-      if (!response.ok) throw new Error("Navegação indisponível");
-      await cache.put("/", response.clone());
-      return response;
-    });
-    event.waitUntil(network.catch(() => undefined));
-    let timeout;
-    try {
-      return await Promise.race([network, new Promise((_, reject) => {
-        timeout = setTimeout(() => reject(new Error("Navegação lenta")), 5000);
-      })]);
-    } catch (_) {
-      const saved = await cache.match("/");
-      if (saved) return saved;
-      return new Response("<!doctype html><html lang='pt-BR'><meta name='viewport' content='width=device-width'><title>THIGAS offline</title><p>Conecte-se à internet para abrir o THIGAS pela primeira vez.</p></html>", { status: 503, headers: { "Content-Type": "text/html; charset=utf-8" } });
-    } finally { clearTimeout(timeout); }
-  }
-
   self.addEventListener("fetch", event => {
-    if (!cacheable(event.request, self.location.origin)) return;
     const url = new URL(event.request.url);
-    if (event.request.mode === "navigate" && url.pathname === "/") {
-      event.respondWith(navigation(event.request, event));
+    if (url.origin !== self.location.origin) return;
+
+    // Navegações (inclusive /, /workspace e /login) sempre passam pelo servidor.
+    if (event.request.mode === "navigate") {
+      event.respondWith(fetch(event.request).catch(() => new Response(
+        "<!doctype html><html lang='pt-BR'><meta name='viewport' content='width=device-width'><title>THIGAS offline</title><p>Conecte-se à internet para validar seu acesso ao THIGAS AI.</p></html>",
+        { status: 503, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } }
+      )));
       return;
     }
+
+    if (!cacheable(event.request, self.location.origin)) return;
     event.respondWith((async () => {
       const cache = await caches.open(CACHE_NAME);
       const saved = await cache.match(event.request);
