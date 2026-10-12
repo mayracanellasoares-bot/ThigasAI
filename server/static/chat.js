@@ -75,8 +75,9 @@
   }
 
   function apiHistory(value, question) {
-    // Um teto em caracteres evita reenviar indefinidamente arquivos grandes.
-    return sanitizeHistory(value, Math.max(0, 60000 - question.length), 12);
+    // Enviar até 40 mensagens permite ao servidor recuperar tópicos antigos
+    // relevantes; ele continuará limitando a inferência a 12 mensagens/60k chars.
+    return sanitizeHistory(value, Math.max(0, 120000 - 2 * question.length), 40);
   }
 
   function splitCodeBlocks(text) {
@@ -137,6 +138,9 @@
         total_tokens: measured(usage.total_tokens),
       },
       finish_reason: typeof data.finish_reason === "string" ? data.finish_reason : null,
+      quality_flags: Array.isArray(data.quality_flags)
+        ? data.quality_flags.filter(flag => ["output_limit", "possible_repetition", "unclosed_code_block", "possible_python_syntax_error"].includes(flag))
+        : [],
     };
   }
 
@@ -639,9 +643,16 @@
       renderMessage("assistant", answer);
       showUsage(result.usage);
       byId("model-used").textContent = modeSelector.value === "thinking" ? "Alto" : "Padrão";
-      if (result.finish_reason === "length") {
-        info("A resposta atingiu o limite de saída. Peça para continuar a partir do ponto onde parou.", true);
-      }
+      const qualityMessages = {
+        output_limit: "A resposta atingiu o limite de saída; pode estar incompleta.",
+        possible_repetition: "Possível loop de repetição detectado; confira o conteúdo antes de utilizá-lo.",
+        unclosed_code_block: "Um bloco de código não foi fechado; a resposta pode estar incompleta.",
+        possible_python_syntax_error: "O código Python gerado pode conter erro de sintaxe. Confira e teste antes de executar.",
+      };
+      const flags = result.quality_flags.slice();
+      if (result.finish_reason === "length" && !flags.includes("output_limit")) flags.push("output_limit");
+      const warnings = flags.map(flag => qualityMessages[flag]).filter(Boolean);
+      if (warnings.length) info(warnings.join(" "), true);
       history = sanitizeHistory([...history, { role: "user", content: message }, { role: "assistant", content: answer }]);
       persistConversation();
       // Não apaga uma nova pergunta digitada enquanto a resposta estava chegando.
