@@ -7,3 +7,8 @@ __pycache__/
 node_modules/
 coverage/
 *.apk
+
+# Benchmarks podem conter perguntas e respostas privadas.
+eval/results/
+baseline_*.jsonl
+resultados_*.jsonl
