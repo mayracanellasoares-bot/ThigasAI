@@ -17,6 +17,7 @@ class ChatReliabilityTests(unittest.TestCase):
 
     def test_invalid_json_shape_is_rejected(self):
         with gateway.app.test_client() as client:
+            client.post('/auth/login', data={'password': 'teste-senha-unica-123456789'})
             response = client.post('/chat', json=['pergunta'])
         self.assertEqual(response.status_code, 400)
 
@@ -27,6 +28,7 @@ class ChatReliabilityTests(unittest.TestCase):
     def test_invalid_mode_does_not_fetch_url(self):
         with patch.object(gateway.link_inspector, 'fetch_public_page') as fetch:
             with gateway.app.test_client() as client:
+                client.post('/auth/login', data={'password': 'teste-senha-unica-123456789'})
                 response = client.post('/chat', json={'message': 'https://example.com', 'mode': 'invalid'})
         self.assertEqual(response.status_code, 400)
         fetch.assert_not_called()
