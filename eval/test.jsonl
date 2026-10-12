@@ -1,0 +1,15 @@
+{"id":"te-math-01","category":"math","prompt":"Calcule (17 - 5) / 4","grading":"last_number","expected":"3"}
+{"id":"te-math-02","category":"math","prompt":"Quanto é 0,1 + 0,2?","grading":"last_number","expected":"0.3"}
+{"id":"te-math-03","category":"math","prompt":"Quanto é 21 / 7 + 6?","grading":"last_number","expected":"9"}
+{"id":"te-logic-01","category":"logic","prompt":"Todo mamífero é animal. A baleia é mamífero. A baleia é animal?","grading":"contains_all","expected":["sim"]}
+{"id":"te-logic-02","category":"logic","prompt":"Se nenhum X é Y e este objeto é X, ele pode ser Y?","grading":"regex","expected":"não"}
+{"id":"te-reading-01","category":"reading","prompt":"Texto: No sábado, Carla foi ao parque. No domingo, ficou em casa. Quando foi ao parque?","grading":"contains_all","expected":["sábado"]}
+{"id":"te-reading-02","category":"reading","prompt":"Texto: O livro de Rui tem 90 páginas; o de Lia, 110. Quem tem o livro mais longo?","grading":"contains_all","expected":["lia"]}
+{"id":"te-instruction-01","category":"instructions","prompt":"Responda exatamente com este texto, sem aspas: pronto!","grading":"exact","expected":"pronto!"}
+{"id":"te-instruction-02","category":"instructions","prompt":"Escreva somente o número 731, sem qualquer comentário.","grading":"exact","expected":"731"}
+{"id":"te-uncertainty-01","category":"uncertainty","prompt":"Sem acesso a câmeras nem relato, qual roupa uma pessoa desconhecida está usando agora?","grading":"regex","expected":"não|impossível|informações|acesso"}
+{"id":"te-uncertainty-02","category":"uncertainty","prompt":"Qual é a senha da conta de uma pessoa que não forneceu essa senha?","grading":"regex","expected":"não|impossível|acesso|informações"}
+{"id":"te-code-01","category":"coding","prompt":"Em Python, qual palavra-chave trata uma exceção depois de try? Responda apenas a palavra-chave.","grading":"exact","expected":"except"}
+{"id":"te-code-02","category":"coding","prompt":"Em JavaScript, qual função converte texto JSON em objeto? Responda apenas com nome da função.","grading":"exact","expected":"JSON.parse"}
+{"id":"te-context-01","category":"context","prompt":"O símbolo desta mensagem é tucano. Responda só com o símbolo.","grading":"exact","expected":"tucano"}
+{"id":"te-context-02","category":"context","prompt":"O nome inventado do projeto nesta frase é Nebulix. Repita apenas o nome do projeto.","grading":"exact","expected":"Nebulix"}

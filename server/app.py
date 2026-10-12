@@ -4,6 +4,7 @@ import re
 import hmac
 import document_agent
 import link_inspector
+from cognitive_math import solve_simple_arithmetic
 import time
 import threading
 from io import BytesIO
@@ -597,6 +598,16 @@ def chat():
     mode = body.get("mode", "fast")
     try:
         choose_model(mode)
+        # Somente expressão aritmética isolada: resultado exato, sem inferência externa.
+        verified = solve_simple_arithmetic(question)
+        if verified is not None:
+            return jsonify({
+                "answer": verified,
+                "model": "thigas-arithmetic-verifier-v1",
+                "usage": {"prompt_tokens": None, "completion_tokens": None, "total_tokens": None},
+                "max_output_tokens": MARITACA_MAX_TOKENS,
+                "finish_reason": "verified",
+            })
         enriched_question = attach_public_web_context(question)
         # Keep the original two-argument contract for current clients and Telegram.
         if mode == "fast":

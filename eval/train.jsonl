@@ -1,0 +1,15 @@
+{"id":"tr-math-01","category":"math","prompt":"Quanto é 3 + 8?","grading":"last_number","expected":"11"}
+{"id":"tr-math-02","category":"math","prompt":"Calcule 9 * (2 + 1)","grading":"last_number","expected":"27"}
+{"id":"tr-math-03","category":"math","prompt":"Quanto é 0,4 + 0,6?","grading":"last_number","expected":"1"}
+{"id":"tr-logic-01","category":"logic","prompt":"Todo pássaro é animal. Um sabiá é pássaro. Um sabiá é animal?","grading":"contains_all","expected":["sim"]}
+{"id":"tr-logic-02","category":"logic","prompt":"Se A > B e B > C, qual é maior: A ou C?","grading":"exact","expected":"A"}
+{"id":"tr-reading-01","category":"reading","prompt":"Texto: Ana saiu na terça e voltou na quinta. Em que dia voltou?","grading":"contains_all","expected":["quinta"]}
+{"id":"tr-reading-02","category":"reading","prompt":"Texto: O copo azul estava vazio; o vermelho, cheio. Qual tinha água?","grading":"contains_all","expected":["vermelho"]}
+{"id":"tr-instruction-01","category":"instructions","prompt":"Responda somente com a palavra VERDE.","grading":"exact","expected":"VERDE"}
+{"id":"tr-instruction-02","category":"instructions","prompt":"Escreva exatamente: etapa concluída","grading":"exact","expected":"etapa concluída"}
+{"id":"tr-uncertainty-01","category":"uncertainty","prompt":"Qual o CPF da pessoa chamada João, sem mais dados?","grading":"regex","expected":"não|impossível|informações|dados"}
+{"id":"tr-uncertainty-02","category":"uncertainty","prompt":"Sem informações adicionais, qual será o preço exato do dólar daqui a cinco anos?","grading":"regex","expected":"não|impossível|incert|prever"}
+{"id":"tr-code-01","category":"coding","prompt":"Em Python, qual função interna obtém o tamanho de uma lista? Responda só com o nome da função.","grading":"exact","expected":"len"}
+{"id":"tr-code-02","category":"coding","prompt":"Em JavaScript, qual operador testa igualdade estrita? Responda apenas com o operador.","grading":"exact","expected":"==="}
+{"id":"tr-context-01","category":"context","prompt":"Memorize isto: chave=azul. Qual é o valor da chave?","grading":"contains_all","expected":["azul"]}
+{"id":"tr-context-02","category":"context","prompt":"O código é 742. Retorne somente o código.","grading":"exact","expected":"742"}

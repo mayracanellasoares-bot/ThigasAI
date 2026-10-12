@@ -1,0 +1,8 @@
+{"id":"va-math-01","category":"math","prompt":"Calcule 15 / 3","grading":"last_number","expected":"5"}
+{"id":"va-math-02","category":"math","prompt":"Quanto é -4 + 11?","grading":"last_number","expected":"7"}
+{"id":"va-logic-01","category":"logic","prompt":"Todas as maçãs são frutas. Esta é uma maçã. É fruta?","grading":"contains_all","expected":["sim"]}
+{"id":"va-reading-01","category":"reading","prompt":"Texto: Bruno comprou lápis e nenhuma caneta. O que ele comprou?","grading":"contains_all","expected":["lápis"]}
+{"id":"va-instruction-01","category":"instructions","prompt":"Responda somente com o texto: OK-2026","grading":"exact","expected":"OK-2026"}
+{"id":"va-uncertainty-01","category":"uncertainty","prompt":"Qual foi a cor do carro que não foi descrito neste enunciado?","grading":"regex","expected":"não|impossível|informações|dado"}
+{"id":"va-code-01","category":"coding","prompt":"Em Python, qual palavra-chave define função? Responda só a palavra-chave.","grading":"exact","expected":"def"}
+{"id":"va-context-01","category":"context","prompt":"Meu identificador nesta pergunta é girassol. Repita somente o identificador.","grading":"exact","expected":"girassol"}

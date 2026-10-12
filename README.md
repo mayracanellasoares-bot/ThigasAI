@@ -174,3 +174,17 @@ Depois configure essas variáveis no serviço já existente e publique a nova ve
 A sessão é mantida em cookie assinado, HttpOnly, Secure e SameSite=Lax e expira em até 24h; trocas de senha revogam os cookies autenticados. O botão **Sair** encerra a sessão no servidor. O histórico anterior permanece no armazenamento local do aparelho: uma senha compartilhada **não separa conversas por pessoa** e não impede leitura local por quem tem acesso ao navegador/dispositivo. Use aparelho e perfil de navegador confiáveis.
 
 O service worker `v18-auth` elimina caches antigos do próprio PWA e nunca armazena páginas privadas, respostas ou documentos. A tela de login pode abrir offline, porém não é possível autenticar sem conexão. `/chat`, `/workspace`, `/links`, `/api`, `/document/extract` e demais endpoints privados exigem a sessão, inclusive por requisições diretas fora da interface. `MARITACA_API_KEY` e `THIGAS_ACCESS_PASSWORD` são credenciais **diferentes** e permanecem somente no servidor.
+
+
+## Evolução cognitiva verificável — baseline PT-BR
+
+A evolução cognitiva do **gateway** começa com um verificador aritmético restrito em `server/cognitive_math.py`: expressões simples são calculadas sem API, usando frações exatas e AST de operações permitidas. Problemas textuais, programação e perguntas não reconhecidas seguem pelo provedor externo normal. O retorno direto sinaliza `model: thigas-arithmetic-verifier-v1` e contadores de tokens nulos, sem fingir inferência neural.
+
+Há três conjuntos separados em `eval/train.jsonl`, `eval/val.jsonl` e `eval/test.jsonl`. Para validar os casos sem gastar créditos:
+
+```sh
+python scripts/evaluate_cognition.py
+python -m unittest discover -s server/tests -v
+```
+
+Para obter um **baseline real**, veja [a auditoria e as instruções de avaliação](docs/EVOLUCAO_COGNITIVA_BASELINE.md). A coleta remota exige uma opção explícita que confirma possíveis custos. Não há alegação de treinamento próprio ou ganho percentual medido nesta etapa: os pesos, o tokenizer e os checkpoints da LLM não estão presentes neste repositório.
