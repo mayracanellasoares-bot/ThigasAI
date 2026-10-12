@@ -97,25 +97,25 @@ test("instalação salva interface completa e ativação mantém caches alheios 
   assert.equal(harness.buckets.has(worker.CACHE_NAME), true);
 });
 
-test("offline abre a tela salva e entrega CSS sem solicitar inferência", async () => {
+test("offline abre somente o login público, nunca histórico ou chat", async () => {
   let online = true, calls = 0;
   const harness = workerHarness(async request => {
     calls++;
     if (!online) throw new TypeError("offline");
-    return new Response(new URL(request.url).pathname === "/" ? "THIGAS HTML" : "asset");
+    return new Response(new URL(request.url).pathname === "/entrar" ? "LOGIN HTML" : "asset");
   });
   await harness.lifecycle("install");
   online = false;
   const page = await harness.request("/", "GET", "navigate");
-  assert.equal(await page.text(), "THIGAS HTML");
+  assert.equal(await page.text(), "LOGIN HTML");
   const beforeAsset = calls;
-  const css = await harness.request(worker.APP_SHELL.find(path => path.startsWith("/static/chat.css?")));
-  assert.equal(await css.text(), "asset");
+  const loginJS = await harness.request(worker.APP_SHELL.find(path => path.startsWith("/static/login.js?")));
+  assert.equal(await loginJS.text(), "asset");
   assert.equal(calls, beforeAsset);
   assert.equal(await harness.request("/chat", "POST"), undefined);
 });
 
-test("navegação online atualiza cache da raiz sem persistir resposta da IA", async () => {
+test("navegação online nunca salva HTML autenticado no cache", async () => {
   let version = "v1";
   const harness = workerHarness(async () => new Response(version));
   await harness.lifecycle("install");
@@ -123,7 +123,8 @@ test("navegação online atualiza cache da raiz sem persistir resposta da IA", a
   const response = await harness.request("/", "GET", "navigate");
   assert.equal(await response.text(), "v2");
   const cache = await harness.cacheStorage.open(worker.CACHE_NAME);
-  assert.equal(await (await cache.match("/")).text(), "v2");
+  assert.equal(await cache.match("/"), undefined);
+  assert.equal(await (await cache.match("/entrar")).text(), "v1");
   assert.equal(await harness.request("/health"), undefined);
 });
 
@@ -142,9 +143,12 @@ test("nova versão só ativa imediatamente após comando explícito", async () =
   assert.equal(harness.skipped(), true);
 });
 
-test("recursos versionados do HTML e ícones pertencem ao precache", () => {
-  const html = fs.readFileSync(path.join(__dirname, "../static/index.html"), "utf8");
+test("somente os arquivos de login e ícones fazem parte do precache", () => {
+  const html = fs.readFileSync(path.join(__dirname, "../static/login.html"), "utf8");
   for (const match of html.matchAll(/(?:src|href)="(\/static\/[^\"]+)"/g)) assert.ok(worker.APP_SHELL.includes(match[1]), match[1]);
+  assert.ok(worker.APP_SHELL.includes("/entrar"));
+  assert.ok(!worker.APP_SHELL.includes("/"));
+  assert.ok(!worker.APP_SHELL.some(name => name.includes("chat.js")));
 });
 
 test("elementos do instalador e aviso de atualização existem e são seguros", () => {
