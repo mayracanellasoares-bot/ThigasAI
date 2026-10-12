@@ -87,8 +87,8 @@ def install(app):
 
     @app.get("/entrar")
     def login_page():
-        if authenticated():
-            return redirect("/", code=303)
+        # Deve servir sempre a tela pública: o service worker armazena /entrar.
+        # Redirecionar para / em sessão ativa armazenaria HTML privado no cache.
         return app.send_static_file("login.html")
 
     @app.post("/auth/login")
