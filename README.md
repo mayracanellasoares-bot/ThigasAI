@@ -123,7 +123,7 @@ A extração de texto não equivale a interpretação visual de páginas digital
 - Motor: Maritaca `sabia-4`, cujo limite documentado é até 32K tokens de saída; THIGAS solicita **até 16.384 tokens** de saída em cada requisição. Variável `MARITACA_MAX_TOKENS=16384` (o servidor impede valores acima de 16.384 e usa esse padrão se estiver ausente ou for inválido).
 - A resposta de `POST /chat` inclui `usage.prompt_tokens` (enviados), `usage.completion_tokens` (recebidos), `usage.total_tokens` (total consumido), `max_output_tokens` e `finish_reason`. Todos os contadores vêm diretamente da resposta do provedor externo selecionado. Sem `usage`, os campos retornam `null` e o navegador mostra **— / não informado**; **não há estimativa por caractere ou soma fictícia**.
 - O painel de tokens mostra **apenas a última requisição de chat**, não uma soma entre múltiplas chamadas. Documentos no `/workspace` e comandos Telegram preservam o formato anterior e não exibem painel próprio de tokens.
-- O histórico de entrada continua limitado pelo aplicativo a 12 mensagens anteriores, com orçamento máximo de 60 mil caracteres (além do prompt de sistema). Este valor **não é** uma medição de tokens.
+- O navegador pode encaminhar até 40 mensagens do histórico local para o backend, que seleciona **no máximo 12 mensagens** relevantes/recentes, dentro do orçamento de 60 mil caracteres incluindo a pergunta (além do prompt de sistema). Este valor **não é** uma medição de tokens.
 - Foram aumentados os tempos de espera para chamadas longas: timeout de leitura da API (300 s), cancelamento visual da conversa (325 s) e worker Gunicorn (660 s). Isso **não garante** que qualquer resposta de 16 mil tokens concluirá dentro desses prazos.
 - Para o site em produção, confirme no Render **Environment** que `MARITACA_MAX_TOKENS` não tenha um valor antigo como `3072`. O `render.yaml` define 16.384 para novos Blueprints, mas uma variável manual existente pode ter precedência.
 - Cada resposta pode consumir mais tokens e saldo da Maritaca. Considere configurar limite de gastos e controle de uso por origem no backend, pois o chat permanece público e sem cadastro.
@@ -188,3 +188,18 @@ python -m unittest discover -s server/tests -v
 ```
 
 Para obter um **baseline real**, veja [a auditoria e as instruções de avaliação](docs/EVOLUCAO_COGNITIVA_BASELINE.md). A coleta remota exige uma opção explícita que confirma possíveis custos. Não há alegação de treinamento próprio ou ganho percentual medido nesta etapa: os pesos, o tokenizer e os checkpoints da LLM não estão presentes neste repositório.
+
+
+## Retenção de contexto e avisos de qualidade (v2)
+
+O backend agora considera até 40 mensagens anteriores recebidas do cliente, prioriza as trocas mais recentes e pode recuperar uma troca antiga quando ela compartilha termos significativos com a pergunta atual. Mantém a ordem original, pares íntegros e limite de até 12 mensagens na inferência. **Não adiciona memória permanente** nem altera pesos da LLM.
+
+O backend também pode devolver `quality_flags` quando encontra repetição contígua anormal, saída truncada, um bloco de código não fechado ou possível sintaxe Python inválida. São alertas de revisão apresentados no chat, e **não** uma verificação geral de veracidade; não executam o código.
+
+Para comparar o recorte anterior com a seleção atual, sem API externa:
+
+```sh
+python scripts/bench_context_retention.py
+```
+
+Para avaliar a acurácia **real** nas duas versões, é necessário autenticação e autorização de custos do provedor. Há um comparador para resultados JSONL: `scripts/compare_cognition.py --before baseline_test.jsonl --after candidato_test.jsonl`. Consulte [o relatório de contexto e confiabilidade](docs/EVOLUCAO_COGNITIVA_V2.md).
