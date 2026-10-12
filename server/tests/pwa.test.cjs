@@ -72,42 +72,44 @@ test("manifest possui identidade, escopo e ícones realmente presentes", () => {
   }
 });
 
-test("cache aceita somente recursos públicos, nunca chat, health, API, anexos ou terceiros", () => {
+test("cache aceita apenas assets estáticos; nunca salva HTML autenticado ou dados privados", () => {
+  assert.ok(!worker.APP_SHELL.includes("/"));
   for (const resource of worker.APP_SHELL) assert.equal(worker.cacheable(new Request(new URL(resource, ORIGIN)), ORIGIN), true);
-  for (const resource of ["/chat", "/health", "/api", "/telegram/webhook", "/upload", "/static/secret.txt"]) {
+  for (const resource of ["/", "/login", "/logout", "/workspace", "/chat", "/health", "/api", "/telegram/webhook", "/upload", "/static/index.html", "/static/workspace.html", "/static/secret.txt"]) {
     assert.equal(worker.cacheable(new Request(new URL(resource, ORIGIN)), ORIGIN), false);
     assert.equal(worker.cacheable(new Request(new URL(resource, ORIGIN), { method: "POST" }), ORIGIN), false);
   }
-  assert.equal(worker.cacheable(new Request(ORIGIN + "/", { method: "POST" }), ORIGIN), false);
   assert.equal(worker.cacheable(new Request("https://other.test/"), ORIGIN), false);
 });
 
-test("instalação salva interface completa e ativação mantém caches alheios e histórico fora do cache", async () => {
+test("instalação salva só assets e ativação elimina caches de versões antigas", async () => {
   const seen = [];
-  const harness = workerHarness(async request => { seen.push(new URL(request.url).pathname); return new Response("shell"); });
-  await harness.cacheStorage.open("thigas-pwa-antigo");
+  const harness = workerHarness(async request => { seen.push(new URL(request.url).pathname); return new Response("asset"); });
+  const previous = await harness.cacheStorage.open("thigas-pwa-v17");
+  await previous.put("/", new Response("HTML privado da versão antiga"));
   await harness.cacheStorage.open("outra-aplicacao");
   await harness.lifecycle("install");
   assert.equal(harness.buckets.get(worker.CACHE_NAME).size, worker.APP_SHELL.length);
-  assert.ok(!seen.includes("/chat"));
+  assert.ok(!seen.includes("/"));
   await harness.lifecycle("activate");
   assert.equal(harness.claimed(), true);
-  assert.equal(harness.buckets.has("thigas-pwa-antigo"), false);
+  assert.equal(harness.buckets.has("thigas-pwa-v17"), false);
   assert.equal(harness.buckets.has("outra-aplicacao"), true);
   assert.equal(harness.buckets.has(worker.CACHE_NAME), true);
 });
 
-test("offline abre a tela salva e entrega CSS sem solicitar inferência", async () => {
+test("navegação offline não revela HTML nem histórico; CSS público continua no cache", async () => {
   let online = true, calls = 0;
   const harness = workerHarness(async request => {
     calls++;
     if (!online) throw new TypeError("offline");
-    return new Response(new URL(request.url).pathname === "/" ? "THIGAS HTML" : "asset");
+    return new Response("asset");
   });
   await harness.lifecycle("install");
   online = false;
   const page = await harness.request("/", "GET", "navigate");
-  assert.equal(await page.text(), "THIGAS HTML");
+  assert.equal(page.status, 503);
+  assert.match(await page.text(), /Conecte-se à internet/);
   const beforeAsset = calls;
   const css = await harness.request(worker.APP_SHELL.find(path => path.startsWith("/static/chat.css?")));
   assert.equal(await css.text(), "asset");
@@ -115,27 +117,30 @@ test("offline abre a tela salva e entrega CSS sem solicitar inferência", async 
   assert.equal(await harness.request("/chat", "POST"), undefined);
 });
 
-test("navegação online atualiza cache da raiz sem persistir resposta da IA", async () => {
+test("navegação online consulta sempre servidor e nunca persiste a resposta na raiz", async () => {
   let version = "v1";
   const harness = workerHarness(async () => new Response(version));
   await harness.lifecycle("install");
   version = "v2";
   const response = await harness.request("/", "GET", "navigate");
   assert.equal(await response.text(), "v2");
+  const login = await harness.request("/login", "GET", "navigate");
+  assert.equal(await login.text(), "v2");
   const cache = await harness.cacheStorage.open(worker.CACHE_NAME);
-  assert.equal(await (await cache.match("/")).text(), "v2");
+  assert.equal(await cache.match("/"), undefined);
+  assert.equal(await cache.match("/login"), undefined);
   assert.equal(await harness.request("/health"), undefined);
 });
 
-test("primeiro acesso offline sem cache informa a necessidade de conexão", async () => {
+test("sem rede na primeira visita a navegação pede conexão para validar login", async () => {
   const harness = workerHarness(async () => { throw new TypeError("offline"); });
   const response = await harness.request("/", "GET", "navigate");
   assert.equal(response.status, 503);
-  assert.match(await response.text(), /primeira vez/);
+  assert.match(await response.text(), /validar seu acesso/);
 });
 
 test("nova versão só ativa imediatamente após comando explícito", async () => {
-  const harness = workerHarness(async () => new Response("shell"));
+  const harness = workerHarness(async () => new Response("asset"));
   await harness.lifecycle("install");
   assert.equal(harness.skipped(), false);
   await harness.lifecycle("message", { type: "SKIP_WAITING" });
