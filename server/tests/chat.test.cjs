@@ -46,13 +46,13 @@ test("histórico só inclui texto user/assistant, com limites e sem system injet
   assert.deepEqual(chat.sanitizeHistory(value, 1), []);
 });
 
-test("histórico da API fica limitado a 12 mensagens e ao orçamento de caracteres", () => {
+test("cliente envia até 40 mensagens para seleção contextual no servidor", () => {
   const value = Array.from({ length: 50 }, (_, i) => ({ role: i % 2 ? "assistant" : "user", content: "a".repeat(1000) }));
   const limited = chat.apiHistory(value, "pergunta");
-  assert.equal(limited.length, 12);
+  assert.equal(limited.length, 40);
   assert.equal(limited[0].role, "user");
   assert.deepEqual(chat.apiHistory(value, "b".repeat(60000)), []);
-  assert.ok(chat.apiHistory(value, "b".repeat(58000)).reduce((sum, item) => sum + item.content.length, 0) <= 2000);
+  assert.ok(chat.apiHistory(value, "b".repeat(58000)).reduce((sum, item) => sum + item.content.length, 0) <= 4000);
 });
 
 test("blocos de código são extraídos, incluindo cerca não fechada por limite da IA", () => {
@@ -178,4 +178,26 @@ test("menu de histórico lateral existe e mantém funções de conversa", () => 
     assert.ok(js.includes(fn), fn);
   }
   assert.ok(css.includes("@media(max-width:780px)"));
+});
+
+test("cliente preserva fatos antigos para seleção contextual do backend", () => {
+  const history = [
+    { role: "user", content: "Meu cachorro se chama Pipoca." },
+    { role: "assistant", content: "Entendi." },
+  ];
+  for (let i = 0; i < 14; i++) history.push({ role: "user", content: "Assunto " + i }, { role: "assistant", content: "Certo." });
+  const sent = chat.apiHistory(history, "Qual era o nome do meu cachorro?");
+  assert.equal(sent.length, 30);
+  assert.match(sent[0].content, /Pipoca/);
+});
+
+test("alertas de qualidade só aceitam indicadores reconhecidos pelo cliente", async () => {
+  const response = await chat.requestChat(async () => ({
+    ok: true,
+    json: async () => ({
+      answer: "resposta",
+      quality_flags: ["possible_repetition", "desconhecido", "possible_python_syntax_error"],
+    }),
+  }), "Faça um teste", []);
+  assert.deepEqual(response.quality_flags, ["possible_repetition", "possible_python_syntax_error"]);
 });
