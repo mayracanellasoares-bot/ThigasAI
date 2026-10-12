@@ -5,6 +5,8 @@ import hmac
 import document_agent
 import link_inspector
 from cognitive_math import solve_simple_arithmetic
+from context_selector import select_relevant_history
+from generation_quality import inspect_generation
 import time
 import threading
 from io import BytesIO
@@ -150,17 +152,10 @@ def build_messages(question: str, history: Any, model: str | None = None) -> lis
             if old_answer:
                 previous.append({"role": "assistant", "content": old_answer})
 
-    # Character safety budget, not a claimed tokenizer measurement.
-    previous = previous[-12:]
-    while previous and previous[-1] == {"role": "user", "content": question}:
-        previous.pop()
-    budget = max(0, 60000 - len(question))
-    size = sum(len(item["content"]) for item in previous)
-    while previous and size > budget:
-        size -= len(previous.pop(0)["content"])
-    while previous and previous[0]["role"] != "user":
-        previous.pop(0)
-    messages.extend(previous)
+    # Orçamento aproximado em caracteres, não medição do tokenizer.
+    # O seletor combina trocas recentes e antigas relevantes, sem mudar o limite.
+    selected = select_relevant_history(question, previous, budget_chars=max(0, 60000 - len(question)), limit_messages=12)
+    messages.extend(selected)
     messages.append({"role": "user", "content": question})
     return messages
 
@@ -607,6 +602,7 @@ def chat():
                 "usage": {"prompt_tokens": None, "completion_tokens": None, "total_tokens": None},
                 "max_output_tokens": MARITACA_MAX_TOKENS,
                 "finish_reason": "verified",
+                "quality_flags": [],
             })
         enriched_question = attach_public_web_context(question)
         # Keep the original two-argument contract for current clients and Telegram.
@@ -624,6 +620,7 @@ def chat():
         "usage": result["usage"],
         "max_output_tokens": MARITACA_MAX_TOKENS,
         "finish_reason": result["finish_reason"],
+        "quality_flags": inspect_generation(result["answer"], result.get("finish_reason")),
     })
 
 
