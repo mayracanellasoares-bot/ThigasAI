@@ -5,6 +5,7 @@ import sys
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+import access_gate
 
 SERVER = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SERVER))
@@ -32,7 +33,7 @@ class AccessGateTests(unittest.TestCase):
         self.addCleanup(self.patch.stop)
         gateway.app.config["TESTING"] = True
         self.client = gateway.app.test_client()
-        gateway.access_gate._FAILED_LOGINS.clear() if hasattr(gateway, "access_gate") else None
+        access_gate._FAILED_LOGINS.clear()
 
     def get(self, path):
         return self.client.get(path, base_url="https://thigas.test")
@@ -51,7 +52,7 @@ class AccessGateTests(unittest.TestCase):
         self.assertEqual(self.get("/api").status_code, 401)
         self.assertEqual(self.post("/chat", json={"message": "Olá"}).status_code, 401)
         self.assertEqual(self.post("/document/extract").status_code, 401)
-        self.assertEqual(self.post("/workspace/api/upload").status_code, 401 if False else 403)
+        self.assertEqual(self.post("/workspace/api/upload").status_code, 403)
         self.assertEqual(self.get("/health").status_code, 200)
         self.assertEqual(self.get("/sw.js").status_code, 200)
         self.assertEqual(self.get("/manifest.webmanifest").status_code, 200)
