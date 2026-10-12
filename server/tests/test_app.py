@@ -80,7 +80,7 @@ class GatewayTests(unittest.TestCase):
         response = self.get("/")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.mimetype, "text/html")
-        self.assertEqual(response.headers["Cache-Control"], "no-cache")
+        self.assertEqual(response.headers["Cache-Control"], "no-store")
         html = response.get_data(as_text=True)
         for marker in ('lang="pt-BR"', 'id="chat-form"', 'id="file-input"'):
             self.assertIn(marker, html)
