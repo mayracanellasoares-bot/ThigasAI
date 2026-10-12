@@ -508,7 +508,7 @@ body.is-offline .lamp { background: #d7aa55; box-shadow: none; }
   outline: 0;
   background: transparent;
   color: var(--text);
-  caret-color: #fff;
+  caret-color: currentColor;
   font-size: 15px;
   line-height: 1.55;
 }
@@ -819,7 +819,7 @@ body.light-mode .icon-btn:hover:not(:disabled) {
 }
 body.light-mode #chat-input {
   color: #171717;
-  caret-color: #111;
+  caret-color: currentColor;
 }
 body.light-mode #chat-input::placeholder { color: #8d8d92; }
 body.light-mode dialog {
