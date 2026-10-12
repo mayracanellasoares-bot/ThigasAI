@@ -19,6 +19,7 @@
   <link rel="stylesheet" href="/static/history-sidebar.css?v=drawer2">
   <script src="/static/chat.js?v=drawer2" defer></script>
   <script src="/static/pwa.js?v=llama2" defer></script>
+  <style>.logout-area{margin:8px 7px}.logout-area .sidebar-btn{width:100%}@media(max-width:768px){.logout-area{margin:8px 10px}}</style>
 </head>
 <body class="theme-green">
   <div class="app-shell">
@@ -79,6 +80,7 @@
         </button>
       </nav>
 
+      <!--THIGAS-AUTH-ACTION-->
       <div class="legacy-controls" aria-hidden="true">
         <button id="btn-theme" type="button">TEMA: VERDE</button>
         <button id="btn-scanlines" type="button" aria-pressed="true">CRT: ON</button>
@@ -225,7 +227,7 @@
     <h3>Privacidade</h3>
     <p>Seu texto, anexos enviados e parte do histórico são encaminhados ao provedor de IA configurado no servidor para gerar a resposta. Não envie senhas, chaves de API ou dados sensíveis.</p>
     <p>O contador mostra somente os tokens efetivamente reportados na última resposta pela API: entrada, saída e total. O símbolo — significa que a API não forneceu a medição. O limite máximo de saída é 16.384 tokens, não uma garantia de tamanho; solicitações longas podem demorar e consumir mais saldo.</p>
-    <p>O histórico de conversas fica salvo apenas neste navegador, com até 30 conversas recentes. O PWA pode reabrir esse histórico sem internet depois do primeiro carregamento, mas novas respostas exigem conexão.</p>
+    <p>O histórico de conversas fica salvo apenas neste navegador, com até 30 conversas recentes. Com o acesso por senha ativado, o PWA exige conexão para validar a sessão; o histórico local não é criptografado e deve ser apagado no dispositivo compartilhado.</p>
   </dialog>
 
   <dialog id="history-modal" class="history-modal" aria-labelledby="history-title">
