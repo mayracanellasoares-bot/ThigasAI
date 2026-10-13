@@ -264,3 +264,17 @@ Configure `THIGAS_NVIDIA_MODEL` com um ID existente em `https://docs.api.nvidia.
 As novas variáveis em `render.yaml` usam `sync: false`; no Render já existente, os valores precisam ser configurados no painel do serviço. **Não insira as chaves no GitHub ou chat**. O contador de credenciais em `/api` inclui apenas números, não conteúdo das chaves.
 
 Fontes: https://docs.api.nvidia.com/nim/reference/openai-gpt-oss-20b-infer e https://docs.api.nvidia.com/nim/reference/llm-apis.
+
+
+### Alternância automática reforçada (13/10/2026)
+
+Ao enviar uma pergunta no modo **Groq ou NVIDIA**, o THIGAS AI escolhe uma chave disponível. Se o provedor recusar uma chave com status HTTP `401`, `403`, `429` ou certos erros de servidor `5xx`, tenta a próxima chave válida **do mesmo provedor**. Agora também alterna quando ocorre um `ConnectTimeout` (não foi possível estabelecer a conexão HTTP), preservando o mesmo modelo e a mesma pergunta.
+
+- Cada chave é tentada **no máximo uma vez por consulta**. O número total de tentativas é limitado ao número de chaves disponíveis (até três).
+- Chaves com falha recebem pausa em memória (10 segundos para falha de conexão, até 60 segundos para `429`, 5 minutos para `401/403` e 5 segundos para erros de servidor), e voltam a ser elegíveis depois.
+- Não repete automaticamente ao sofrer `ReadTimeout`, `ConnectionError` genérico ou timeout cujo envio seja incerto; isso evita duplicar solicitações e possíveis cobranças.
+- Se uma segunda chave resolver a consulta, o chat informa **“Alternância automática realizada”**, mostrando só o total de tentativas. Nunca mostra chaves, índice da chave ou valores de ambiente.
+- Não muda silenciosamente de NVIDIA para Groq ou vice-versa; cada provedor mantém sua configuração, limites, preços e escolhas do usuário.
+- A rotação/pausa ocorre localmente em cada processo do Gunicorn. Não é monitoramento independente nem garante continuidade se o provedor inteiro estiver indisponível ou todas as chaves compartilharem o limite da organização.
+
+Os cenários são validados por testes locais simulados, sem chamar os serviços pagos. A aplicação continua exigindo `THIGAS_CLOUD_ENABLED=true` para ativar Groq no chat, e `THIGAS_NVIDIA_ENABLED=true` para NVIDIA.
