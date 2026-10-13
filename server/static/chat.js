@@ -163,6 +163,9 @@
       },
       finish_reason: typeof data.finish_reason === "string" ? data.finish_reason : null,
       reasoning_effort: data.reasoning_effort === "high" || data.reasoning_effort === "medium" ? data.reasoning_effort : null,
+      provider_attempt_count: Number.isSafeInteger(data.provider_attempt_count) &&
+        data.provider_attempt_count >= 0 && data.provider_attempt_count <= 3 ? data.provider_attempt_count : 0,
+      provider_failover_used: data.provider_failover_used === true,
       search_provider: ["brave", "wikipedia"].includes(data.search_provider) ? data.search_provider : null,
       sources: Array.isArray(data.sources)
         ? data.sources.filter(source => source && typeof source.title === "string" &&
@@ -740,6 +743,9 @@
       if (result.finish_reason === "length" && !flags.includes("output_limit")) flags.push("output_limit");
       const warnings = flags.map(flag => qualityMessages[flag]).filter(Boolean);
       if (warnings.length) info(warnings.join(" "), true);
+      else if (result.provider_failover_used)
+        info("Alternância automática realizada: o provedor respondeu com outra chave disponível (" +
+          result.provider_attempt_count + " tentativas).");
       history = sanitizeHistory([...history, { role: "user", content: message }, { role: "assistant", content: answer }]);
       persistConversation();
       // Não apaga uma nova pergunta digitada enquanto a resposta estava chegando.

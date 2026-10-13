@@ -276,13 +276,16 @@ def ask_maritaca_result(question: str, history: Any, *, mode: str = "fast") -> d
         payload["temperature"] = 0.6
         payload["top_p"] = 0.95
 
+    provider_attempts: list[str] = []
     try:
         if use_nvidia:
-            upstream = post_nvidia(requests.post, payload, keys, url=api_url)
+            upstream = post_nvidia(requests.post, payload, keys, url=api_url,
+                                   attempts=provider_attempts)
             if upstream is None:
                 raise GatewayError("Chaves NVIDIA temporariamente em limite de uso. Tente novamente mais tarde.", 429)
         elif use_cloud and is_groq_endpoint(api_url):
-            upstream = post_with_failover(requests.post, api_url, payload, keys)
+            upstream = post_with_failover(requests.post, api_url, payload, keys,
+                                          attempts=provider_attempts)
             if upstream is None:
                 raise GatewayError("Chaves Groq temporariamente em limite de uso. Tente novamente mais tarde.", 429)
         else:
@@ -357,6 +360,9 @@ def ask_maritaca_result(question: str, history: Any, *, mode: str = "fast") -> d
         "usage": _maritaca_usage(data),
         "finish_reason": choice.get("finish_reason") if isinstance(choice.get("finish_reason"), str) else None,
         "reasoning_effort": reasoning_effort,
+        # Counters only; never return key values, indices or upstream messages.
+        "provider_attempt_count": len(provider_attempts),
+        "provider_failover_used": len(provider_attempts) > 1,
     }
 
 
@@ -762,6 +768,8 @@ def chat():
         "finish_reason": result["finish_reason"],
         "quality_flags": inspect_generation(result["answer"], result.get("finish_reason")),
         "reasoning_effort": result.get("reasoning_effort"),
+        "provider_attempt_count": result.get("provider_attempt_count", 0),
+        "provider_failover_used": result.get("provider_failover_used", False),
         "sources": sources,
         "search_provider": search_provider,
     })
