@@ -37,7 +37,8 @@ def configured_nvidia_keys(*, environ: Mapping[str, str] | None = None) -> tuple
     return tuple(output)
 
 
-def post_nvidia(post, payload: dict, keys: tuple[str, ...], *, url: str = NVIDIA_URL):
+def post_nvidia(post, payload: dict, keys: tuple[str, ...], *, url: str = NVIDIA_URL,
+                attempts: list[str] | None = None):
     if not is_nvidia_endpoint(url):
         raise ValueError("Endpoint NVIDIA não autorizado.")
-    return post_with_failover(post, url, payload, keys, pool=nvidia_keys)
+    return post_with_failover(post, url, payload, keys, pool=nvidia_keys, attempts=attempts)
