@@ -2,8 +2,8 @@
 import unittest
 from unittest.mock import Mock, patch
 
-import aion_provider
 from test_app import gateway
+import aion_provider
 
 
 def upstream(status=200, answer="Aion respondeu"):
