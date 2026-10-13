@@ -81,7 +81,7 @@ class WebSearchTests(unittest.TestCase):
             result = web_search.search_web("Busca geral", brave_key="set-but-disabled", brave_enabled=False)
         self.assertEqual(result["provider"], "wikipedia")
         self.assertEqual(result["sources"][0]["url"], "https://pt.wikipedia.org/?curid=12")
-        self.assertEqual(result["sources"][0]["snippet"], "Resultado  público.")
+        self.assertEqual(result["sources"][0]["snippet"], "Resultado público.")
         self.assertNotIn("set-but-disabled", str(get_json.call_args))
 
     def test_brave_only_when_enabled_and_key_present(self):
