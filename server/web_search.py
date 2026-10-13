@@ -55,7 +55,8 @@ def _clean_text(value: object, limit: int) -> str:
 
 
 def _safe_link(value: object) -> str | None:
-    if not isinstance(value, str) or len(value) > 1800:
+    if (not isinstance(value, str) or len(value) > 1800
+            or any(ord(char) < 32 or ord(char) == 127 for char in value)):
         return None
     try:
         parsed = urlsplit(value)
