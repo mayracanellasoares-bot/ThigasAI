@@ -46,7 +46,7 @@ body:not(.light-mode) .workspace,body:not(.light-mode) .chat-panel{background:va
 .quick-menu{border:1px solid #deded4;border-radius:17px;box-shadow:0 18px 50px #201e1b24;background:#fff}
 .quick-menu button:hover{background:#f0f2ea}
 .log-entry.user .message-text{background:#e7e9df;color:#292821;border-radius:20px 20px 6px 20px}
-.token-meter{display:none!important}
+.token-meter{display:flex!important;flex-wrap:wrap;align-items:center}.composer-footer{display:flex!important;align-items:center;justify-content:space-between}
 .composer-footer{font-size:11px;color:#76776c}
 .composer-footer span:first-child{display:inline}
 .site-footer{display:none!important}
