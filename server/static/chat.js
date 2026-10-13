@@ -832,6 +832,12 @@
       const response = await fetch("/api", { cache: "no-store" });
       if (!response.ok) return;
       const capabilities = await response.json();
+      const poolCount = Number.isInteger(capabilities?.cloud_key_count) && capabilities.cloud_key_count >= 0
+        ? Math.min(3, capabilities.cloud_key_count) : null;
+      const status = byId("cloud-key-status");
+      if (status) status.textContent = poolCount === null ? "Groq: configuração não verificada"
+        : poolCount === 0 ? "Groq: modo nuvem desativado"
+        : "Groq: " + poolCount + (poolCount === 1 ? " chave configurada" : " chaves configuradas");
       searchProviderName = capabilities?.web_search_provider === "brave" ? "Web (Brave)" : "Wikipédia";
       setWebSearch(webSearchActive);
       const allowThinking = capabilities?.thinking_enabled === true;
