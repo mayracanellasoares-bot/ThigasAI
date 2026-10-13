@@ -136,7 +136,7 @@
 
   async function requestChat(fetcher, message, history, signal, mode = "fast", webSearch = false) {
     const payload = { message, history: apiHistory(history, message) };
-    if (mode === "thinking" || mode === "cloud") payload.mode = mode;
+    if (["thinking", "cloud", "nvidia", "nvidia_thinking"].includes(mode)) payload.mode = mode;
     if (webSearch === true) payload.web_search = true;
     const response = await fetcher("/chat", {
       method: "POST",
@@ -832,6 +832,28 @@
       const response = await fetch("/api", { cache: "no-store" });
       if (!response.ok) return;
       const capabilities = await response.json();
+      const poolCount = Number.isInteger(capabilities?.cloud_key_count) && capabilities.cloud_key_count >= 0
+        ? Math.min(3, capabilities.cloud_key_count) : null;
+      const status = byId("cloud-key-status");
+      if (status) status.textContent = poolCount === null ? "Groq: configuração não verificada"
+        : poolCount === 0 ? "Groq: modo nuvem desativado"
+        : "Groq: " + poolCount + (poolCount === 1 ? " chave configurada" : " chaves configuradas");
+      const nvidiaCount = Number.isInteger(capabilities?.nvidia_key_count) && capabilities.nvidia_key_count >= 0
+        ? Math.min(3, capabilities.nvidia_key_count) : null;
+      const nvidiaStatus = byId("nvidia-key-status");
+      if (nvidiaStatus) nvidiaStatus.textContent = nvidiaCount === null ? "NVIDIA: configuração não verificada"
+        : nvidiaCount === 0 ? "NVIDIA: indisponível"
+        : "NVIDIA: " + nvidiaCount + (nvidiaCount === 1 ? " chave configurada" : " chaves configuradas");
+      const nvidia = modeSelector.querySelector('option[value="nvidia"]');
+      const nvidiaThinking = modeSelector.querySelector('option[value="nvidia_thinking"]');
+      if (nvidia) {
+        nvidia.disabled = capabilities?.nvidia_enabled !== true;
+        nvidia.textContent = nvidia.disabled ? "NVIDIA (indisponível)" : "NVIDIA · padrão";
+      }
+      if (nvidiaThinking) {
+        nvidiaThinking.disabled = capabilities?.nvidia_thinking_enabled !== true;
+        nvidiaThinking.textContent = nvidiaThinking.disabled ? "NVIDIA · alto (indisponível)" : "NVIDIA · esforço alto";
+      }
       searchProviderName = capabilities?.web_search_provider === "brave" ? "Web (Brave)" : "Wikipédia";
       setWebSearch(webSearchActive);
       const allowThinking = capabilities?.thinking_enabled === true;
