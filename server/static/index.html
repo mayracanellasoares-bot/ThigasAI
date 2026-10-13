@@ -17,7 +17,7 @@
   <link rel="stylesheet" href="/static/chat.css?v=audit3">
   <link rel="stylesheet" href="/static/mini-nano-theme.css?v=audit3">
   <link rel="stylesheet" href="/static/history-sidebar.css?v=drawer2">
-  <script src="/static/chat.js?v=groq3" defer></script>
+  <script src="/static/chat.js?v=nvidia3" defer></script>
   <script src="/static/pwa.js?v=llama2" defer></script>
 </head>
 <body class="theme-green">
@@ -170,6 +170,8 @@
                   <select id="reasoning-mode" aria-label="Nível de esforço">
                     <option value="fast">Esforço: padrão</option>
                     <option value="thinking" disabled>Esforço: alto (indisponível)</option>
+                    <option value="nvidia" disabled>NVIDIA (indisponível)</option>
+                    <option value="nvidia_thinking" disabled>NVIDIA · esforço alto (indisponível)</option>
                   </select>
                 </div>
               </div>
@@ -188,6 +190,7 @@
           <div class="token-meter" role="group" aria-label="Tokens medidos na última resposta">
             <span>Última resposta · Modo <strong id="model-used">—</strong></span>
             <span id="cloud-key-status" aria-live="polite">Groq: verificando configuração…</span>
+            <span id="nvidia-key-status" aria-live="polite">NVIDIA: verificando configuração…</span>
             <span>Enviados <strong id="tokens-input">—</strong></span>
             <span>Recebidos <strong id="tokens-output">—</strong></span>
             <span>Total <strong id="tokens-total">—</strong></span>
