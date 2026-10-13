@@ -301,3 +301,13 @@ test("fontes externas rejeitam javascript, URLs com credenciais e destinos locai
   }), "Pesquisar", [], undefined, "fast", true);
   assert.deepEqual(response.sources.map(source => source.title), ["Manual público"]);
 });
+
+test("UI mostra número de chaves Groq sem revelar credenciais", () => {
+  const html = fs.readFileSync(path.join(__dirname, "../static/index.html"), "utf8");
+  const js = fs.readFileSync(path.join(__dirname, "../static/chat.js"), "utf8");
+  assert.match(html, /id="cloud-key-status"/);
+  assert.match(js, /capabilities\.cloud_key_count/);
+  assert.match(js, /Groq: modo nuvem desativado/);
+  assert.match(js, /chaves configuradas/);
+  assert.doesNotMatch(html, /gsk_[A-Za-z0-9_-]{10,}/);
+});
