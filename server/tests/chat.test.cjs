@@ -224,3 +224,44 @@ test("revisão de código prepara mensagem sem fazer outra chamada automática",
   assert.ok(review.length < 15000);
   assert.match(chat.codeRevisionPrompt("x".repeat(20000)), /x{50}/);
 });
+
+test("planeta ao lado do microfone existe e está desligado inicialmente", () => {
+  const html = fs.readFileSync(path.join(__dirname, "../static/index.html"), "utf8");
+  const micIndex = html.indexOf('id="btn-microphone"');
+  const globeIndex = html.indexOf('id="btn-web-search"');
+  const sendIndex = html.indexOf('id="btn-send"');
+  assert.ok(micIndex > 0 && globeIndex > micIndex && sendIndex > globeIndex);
+  assert.match(html.slice(globeIndex, globeIndex + 180), /aria-pressed="false"/);
+  assert.match(html.slice(globeIndex, globeIndex + 240), /🌐/);
+});
+
+test("pesquisa online envia web_search true somente com planeta ativado", async () => {
+  let received;
+  const fakeFetch = async (_, options) => {
+    received = JSON.parse(options.body);
+    return {
+      ok: true, json: async () => ({
+        answer: "Fonte [1]", search_provider: "wikipedia",
+        sources: [{title: "Título", url: "https://pt.wikipedia.org/?curid=17",
+                   snippet: "Trecho da fonte"}],
+      }),
+    };
+  };
+  const searched = await chat.requestChat(fakeFetch, "Pesquise Python", [], undefined, "fast", true);
+  assert.equal(received.web_search, true);
+  assert.equal(searched.search_provider, "wikipedia");
+  assert.equal(searched.sources[0].title, "Título");
+  assert.equal(searched.usage.total_tokens, null);
+  await chat.requestChat(fakeFetch, "Pergunta normal", [], undefined, "fast", false);
+  assert.equal(Object.hasOwn(received, "web_search"), false);
+});
+
+test("links inválidos não são expostos pela UI", async () => {
+  const result = await chat.requestChat(async () => ({
+    ok: true, json: async () => ({
+      answer: "Resultado", search_provider: "brave",
+      sources: [{title: "Fonte", url: "javascript:alert(1)"}, {title: "Boa", url: "https://example.org"}]
+    })
+  }), "Busca", [], undefined, "fast", true);
+  assert.deepEqual(result.sources.map(x => x.title), ["Boa"]);
+});
