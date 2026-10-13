@@ -360,3 +360,43 @@ test("telemetria de failover inválida não é exibida", async () => {
   assert.equal(result.provider_attempt_count, 0);
   assert.equal(result.provider_failover_used, false);
 });
+
+test("Aion aparece no seletor, inicialmente bloqueado até confirmação do servidor", () => {
+  const html = fs.readFileSync(path.join(__dirname, "../static/index.html"), "utf8");
+  const frontend = fs.readFileSync(path.join(__dirname, "../static/chat.js"), "utf8");
+  assert.match(html, /<option value="aion" disabled>/);
+  assert.match(html, /<option value="aion_thinking" disabled>/);
+  assert.match(html, /id="aion-key-status"/);
+  assert.match(frontend, /capabilities\?\.aion_enabled/);
+  assert.match(frontend, /capabilities\?\.aion_thinking_enabled/);
+  assert.doesNotMatch(html, /sk-[A-Za-z0-9_-]{12,}/);
+});
+
+test("Aion usa o backend privado e preserva contagem real sem inventar tokens", async () => {
+  for (const mode of ["aion", "aion_thinking"]) {
+    const result = await chat.requestChat(async (url, options) => {
+      assert.equal(url, "/chat");
+      const body = JSON.parse(options.body);
+      assert.equal(body.mode, mode);
+      return { ok: true, json: async () => ({
+        answer: "Resposta Aion", model: "aion-labs/aion-3.5-mini",
+        reasoning_effort: mode === "aion" ? "low" : "high",
+        usage: { prompt_tokens: 9, completion_tokens: 11, total_tokens: 20 },
+        provider_attempt_count: 1, provider_failover_used: false,
+      }) };
+    }, "Explique um texto", [], undefined, mode, false);
+    assert.equal(result.answer, "Resposta Aion");
+    assert.equal(result.model, "aion-labs/aion-3.5-mini");
+    assert.equal(result.reasoning_effort, mode === "aion" ? "low" : "high");
+    assert.equal(result.usage.total_tokens, 20);
+    assert.equal(result.provider_failover_used, false);
+  }
+});
+
+test("Aion sem medição mantém tokens não informados", async () => {
+  const result = await chat.requestChat(async () => ({ ok: true, json: async () => ({
+    answer: "Ok", model: "aion-labs/aion-3.5-mini",
+  }) }), "Teste", [], undefined, "aion", false);
+  assert.equal(result.usage.total_tokens, null);
+  assert.equal(result.provider_attempt_count, 0);
+});
