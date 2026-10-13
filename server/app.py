@@ -4,6 +4,7 @@ import re
 import hmac
 import document_agent
 import link_inspector
+import web_search
 from cognitive_math import solve_simple_arithmetic
 from context_selector import select_relevant_history
 from generation_quality import inspect_generation
@@ -39,6 +40,9 @@ THIGAS_CLOUD_URL = os.getenv("THIGAS_CLOUD_URL", "https://api.groq.com/openai/v1
 THIGAS_CLOUD_MODEL = os.getenv("THIGAS_CLOUD_MODEL", "openai/gpt-oss-20b").strip() or "openai/gpt-oss-20b"
 # No public cloud spending without an explicit opt-in from the server owner.
 THIGAS_CLOUD_ENABLED = os.getenv("THIGAS_CLOUD_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
+THIGAS_BRAVE_SEARCH_KEY = os.getenv("THIGAS_BRAVE_SEARCH_KEY", "").strip()
+# Explicit opt-in avoids unexpectedly consuming paid search API quota.
+THIGAS_BRAVE_SEARCH_ENABLED = os.getenv("THIGAS_BRAVE_SEARCH_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
 try:
     MARITACA_MAX_TOKENS = int(os.getenv("MARITACA_MAX_TOKENS", "16384"))
 except ValueError:
@@ -468,6 +472,8 @@ def api_info():
             "telegram_webhook": "/telegram/webhook",
             "thinking_enabled": bool((THIGAS_ENABLE_THINKING and MARITACA_API_KEY) or (THIGAS_CLOUD_ENABLED and THIGAS_CLOUD_API_KEY)),
             "cloud_enabled": THIGAS_CLOUD_ENABLED and bool(THIGAS_CLOUD_API_KEY),
+            "web_search_enabled": True,
+            "web_search_provider": "brave" if THIGAS_BRAVE_SEARCH_ENABLED and THIGAS_BRAVE_SEARCH_KEY else "wikipedia",
             "thinking_effort_high": bool(
                 not (THIGAS_ENABLE_THINKING and MARITACA_API_KEY)
                 and THIGAS_CLOUD_ENABLED and THIGAS_CLOUD_API_KEY
@@ -623,6 +629,24 @@ def describe_uploaded_image():
         return jsonify(error="Não foi possível interpretar a imagem neste momento."), 502
 
 
+_web_search_hits: dict[str, list[float]] = {}
+_web_search_lock = threading.Lock()
+
+
+def _enforce_web_search_rate_limit() -> None:
+    """Best-effort worker-local limiter; no private content retained in the log."""
+    visitor = request.remote_addr or "unknown"
+    now = time.monotonic()
+    with _web_search_lock:
+        hits = [t for t in _web_search_hits.get(visitor, []) if now - t < 60]
+        if len(hits) >= 6:
+            raise GatewayError("Limite de 6 pesquisas por minuto. Tente mais tarde.", 429)
+        hits.append(now)
+        _web_search_hits[visitor] = hits
+        if len(_web_search_hits) > 1000:
+            _web_search_hits.clear()
+
+
 @app.post("/chat")
 def chat():
     body = request.get_json(silent=True)
@@ -639,6 +663,11 @@ def chat():
         ), 413
 
     mode = body.get("mode", "fast")
+    web_enabled = body.get("web_search", False)
+    if not isinstance(web_enabled, bool):
+        return jsonify(error="O campo web_search deve ser booleano."), 400
+    sources: list[dict[str, str]] = []
+    search_provider = None
     try:
         choose_model(mode)
         # Somente expressão aritmética isolada: resultado exato, sem inferência externa.
@@ -652,8 +681,24 @@ def chat():
                 "finish_reason": "verified",
                 "quality_flags": [],
                 "reasoning_effort": None,
+                "sources": [],
+                "search_provider": None,
             })
-        enriched_question = attach_public_web_context(question)
+        if web_enabled:
+            _enforce_web_search_rate_limit()
+            try:
+                search_result = web_search.search_web(
+                    question,
+                    brave_key=THIGAS_BRAVE_SEARCH_KEY,
+                    brave_enabled=THIGAS_BRAVE_SEARCH_ENABLED,
+                )
+            except web_search.WebSearchError as exc:
+                raise GatewayError(str(exc), 503) from exc
+            search_provider = search_result["provider"]
+            sources = search_result["sources"]
+            enriched_question = web_search.attach_search_context(question, search_result)
+        else:
+            enriched_question = attach_public_web_context(question)
         # Keep the original two-argument contract for current clients and Telegram.
         if mode == "fast":
             result = ask_maritaca_result(enriched_question, body.get("history", []))
@@ -671,6 +716,8 @@ def chat():
         "finish_reason": result["finish_reason"],
         "quality_flags": inspect_generation(result["answer"], result.get("finish_reason")),
         "reasoning_effort": result.get("reasoning_effort"),
+        "sources": sources,
+        "search_provider": search_provider,
     })
 
 
