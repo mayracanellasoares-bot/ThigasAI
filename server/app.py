@@ -503,7 +503,7 @@ def api_info():
             ),
             "models": {
                 "fast": MARITACA_MODEL,
-                "thinking": (MARITACA_THINKING_MODEL if THIGAS_ENABLE_THINKING and MARITACA_API_KEY else THIGAS_CLOUD_MODEL if THIGAS_CLOUD_ENABLED and THIGAS_CLOUD_API_KEY else None),
+                "thinking": (MARITACA_THINKING_MODEL if THIGAS_ENABLE_THINKING and MARITACA_API_KEY else THIGAS_CLOUD_MODEL if THIGAS_CLOUD_ENABLED and cloud_api_keys() else None),
                 "cloud": THIGAS_CLOUD_MODEL if (THIGAS_CLOUD_ENABLED and cloud_api_keys()) else None,
             },
         }
