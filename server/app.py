@@ -7,6 +7,8 @@ import link_inspector
 import web_search
 from groq_key_pool import configured_keys, is_groq_endpoint, post_with_failover
 from nvidia_key_pool import NVIDIA_URL, configured_nvidia_keys, post_nvidia
+from aion_provider import (AION_URL, AION_DEFAULT_MODEL, REASONING_MODELS,
+                           configured_aion_keys, reasoning_effort_for_mode, post_aion)
 from cognitive_math import solve_simple_arithmetic
 from context_selector import select_relevant_history
 from generation_quality import inspect_generation
@@ -43,6 +45,9 @@ THIGAS_CLOUD_MODEL = os.getenv("THIGAS_CLOUD_MODEL", "openai/gpt-oss-20b").strip
 THIGAS_NVIDIA_MODEL = os.getenv("THIGAS_NVIDIA_MODEL", "openai/gpt-oss-20b").strip() or "openai/gpt-oss-20b"
 # NVIDIA is only queried following an explicit selection in the chat UI.
 THIGAS_NVIDIA_ENABLED = os.getenv("THIGAS_NVIDIA_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}
+# Aion Labs: available only after the user explicitly selects Aion in chat.
+THIGAS_AION_MODEL = (os.getenv("THIGAS_AION_MODEL") or os.getenv("AION_MODEL") or AION_DEFAULT_MODEL).strip() or AION_DEFAULT_MODEL
+THIGAS_AION_ENABLED = (os.getenv("THIGAS_AION_ENABLED") or os.getenv("AION_ENABLED") or "true").strip().lower() in {"1", "true", "yes", "on"}
 # No public cloud spending without an explicit opt-in from the server owner.
 THIGAS_CLOUD_ENABLED = os.getenv("THIGAS_CLOUD_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
 THIGAS_BRAVE_SEARCH_KEY = os.getenv("THIGAS_BRAVE_SEARCH_KEY", "").strip()
@@ -218,6 +223,12 @@ def choose_model(mode: Any) -> str:
         return MARITACA_MODEL
     if mode == "thinking" and THIGAS_ENABLE_THINKING and MARITACA_API_KEY:
         return MARITACA_THINKING_MODEL
+    if mode in ("aion", "aion_thinking"):
+        if not (THIGAS_AION_ENABLED and configured_aion_keys()):
+            raise GatewayError("Aion indisponível. Configure AION_API_KEY no Render.", 403)
+        if mode == "aion_thinking" and THIGAS_AION_MODEL not in REASONING_MODELS:
+            raise GatewayError("Esforço alto indisponível neste modelo Aion.", 403)
+        return THIGAS_AION_MODEL
     if mode in ("nvidia", "nvidia_thinking"):
         if not (THIGAS_NVIDIA_ENABLED and configured_nvidia_keys()):
             raise GatewayError("Modo NVIDIA indisponível. Configure chaves NVIDIA no Render.", 403)
@@ -245,10 +256,11 @@ def is_groq_gpt_oss(url: str, model: str) -> bool:
 def ask_maritaca_result(question: str, history: Any, *, mode: str = "fast") -> dict[str, Any]:
     selected_model = choose_model(mode)
     use_nvidia = mode in ("nvidia", "nvidia_thinking")
+    use_aion = mode in ("aion", "aion_thinking")
     use_cloud = mode == "cloud" or (mode == "thinking" and not (THIGAS_ENABLE_THINKING and MARITACA_API_KEY))
-    api_url = NVIDIA_URL if use_nvidia else THIGAS_CLOUD_URL if use_cloud else MARITACA_URL
-    keys = configured_nvidia_keys() if use_nvidia else cloud_api_keys() if use_cloud else ()
-    api_key = keys[0] if (use_nvidia or use_cloud) and keys else MARITACA_API_KEY if not (use_nvidia or use_cloud) else ""
+    api_url = AION_URL if use_aion else NVIDIA_URL if use_nvidia else THIGAS_CLOUD_URL if use_cloud else MARITACA_URL
+    keys = configured_aion_keys() if use_aion else configured_nvidia_keys() if use_nvidia else cloud_api_keys() if use_cloud else ()
+    api_key = keys[0] if (use_aion or use_nvidia or use_cloud) and keys else MARITACA_API_KEY if not (use_aion or use_nvidia or use_cloud) else ""
     if not api_key:
         raise GatewayError("Chave de acesso do provedor não configurada no servidor.", 503)
 
@@ -260,6 +272,11 @@ def ask_maritaca_result(question: str, history: Any, *, mode: str = "fast") -> d
         "stream": False,
     }
     reasoning_effort = None
+    if use_aion:
+        reasoning_effort = reasoning_effort_for_mode(selected_model, mode)
+        if reasoning_effort is not None:
+            payload["reasoning_effort"] = reasoning_effort
+            payload["reasoning_split"] = True
     if use_nvidia and selected_model in {"openai/gpt-oss-20b", "openai/gpt-oss-120b"}:
         reasoning_effort = "high" if mode == "nvidia_thinking" else "medium"
         payload["reasoning_effort"] = reasoning_effort
@@ -278,7 +295,12 @@ def ask_maritaca_result(question: str, history: Any, *, mode: str = "fast") -> d
 
     provider_attempts: list[str] = []
     try:
-        if use_nvidia:
+        if use_aion:
+            upstream = post_aion(requests.post, payload, keys, url=api_url,
+                                 attempts=provider_attempts)
+            if upstream is None:
+                raise GatewayError("Chaves Aion temporariamente indisponíveis. Tente novamente mais tarde.", 429)
+        elif use_nvidia:
             upstream = post_nvidia(requests.post, payload, keys, url=api_url,
                                    attempts=provider_attempts)
             if upstream is None:
@@ -523,6 +545,9 @@ def api_info():
             "nvidia_enabled": THIGAS_NVIDIA_ENABLED and bool(configured_nvidia_keys()),
             "nvidia_key_count": len(configured_nvidia_keys()) if THIGAS_NVIDIA_ENABLED else 0,
             "nvidia_thinking_enabled": bool(THIGAS_NVIDIA_ENABLED and configured_nvidia_keys() and THIGAS_NVIDIA_MODEL in {"openai/gpt-oss-20b", "openai/gpt-oss-120b"}),
+            "aion_enabled": bool(THIGAS_AION_ENABLED and configured_aion_keys()),
+            "aion_key_count": len(configured_aion_keys()) if THIGAS_AION_ENABLED else 0,
+            "aion_thinking_enabled": bool(THIGAS_AION_ENABLED and configured_aion_keys() and THIGAS_AION_MODEL in REASONING_MODELS),
             "web_search_enabled": True,
             "web_search_provider": "brave" if THIGAS_BRAVE_SEARCH_ENABLED and THIGAS_BRAVE_SEARCH_KEY else "wikipedia",
             "thinking_effort_high": bool(
@@ -533,6 +558,7 @@ def api_info():
             "models": {
                 "fast": MARITACA_MODEL,
                 "nvidia": THIGAS_NVIDIA_MODEL if THIGAS_NVIDIA_ENABLED and configured_nvidia_keys() else None,
+                "aion": THIGAS_AION_MODEL if THIGAS_AION_ENABLED and configured_aion_keys() else None,
                 "thinking": (MARITACA_THINKING_MODEL if THIGAS_ENABLE_THINKING and MARITACA_API_KEY else THIGAS_CLOUD_MODEL if THIGAS_CLOUD_ENABLED and cloud_api_keys() else None),
                 "cloud": THIGAS_CLOUD_MODEL if (THIGAS_CLOUD_ENABLED and cloud_api_keys()) else None,
             },
