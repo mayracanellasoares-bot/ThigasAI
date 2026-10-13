@@ -5,6 +5,7 @@ import hmac
 import document_agent
 import link_inspector
 import web_search
+from groq_key_pool import configured_keys, is_groq_endpoint, post_with_failover
 from cognitive_math import solve_simple_arithmetic
 from context_selector import select_relevant_history
 from generation_quality import inspect_generation
@@ -200,13 +201,21 @@ def _maritaca_usage(data: Any) -> dict[str, int | None]:
     }
 
 
+def cloud_api_keys() -> tuple[str, ...]:
+    """Expose credentials only within the server, never in responses or logs."""
+    if is_groq_endpoint(THIGAS_CLOUD_URL):
+        return configured_keys(THIGAS_CLOUD_API_KEY)
+    # Never send Groq spare credentials to a custom third-party endpoint.
+    return (THIGAS_CLOUD_API_KEY,) if THIGAS_CLOUD_API_KEY else ()
+
+
 def choose_model(mode: Any) -> str:
     if mode in (None, "fast"):
         return MARITACA_MODEL
     if mode == "thinking" and THIGAS_ENABLE_THINKING and MARITACA_API_KEY:
         return MARITACA_THINKING_MODEL
     if mode in ("thinking", "cloud"):
-        if not (THIGAS_CLOUD_ENABLED and THIGAS_CLOUD_API_KEY):
+        if not (THIGAS_CLOUD_ENABLED and cloud_api_keys()):
             raise GatewayError("Modo Pensamento indisponível. Configure o acesso no servidor.", 403)
         return THIGAS_CLOUD_MODEL
     raise GatewayError("Modo de resposta inválido.", 400)
@@ -226,8 +235,9 @@ def is_groq_gpt_oss(url: str, model: str) -> bool:
 def ask_maritaca_result(question: str, history: Any, *, mode: str = "fast") -> dict[str, Any]:
     selected_model = choose_model(mode)
     use_cloud = mode == "cloud" or (mode == "thinking" and not (THIGAS_ENABLE_THINKING and MARITACA_API_KEY))
-    api_key = THIGAS_CLOUD_API_KEY if use_cloud else MARITACA_API_KEY
     api_url = THIGAS_CLOUD_URL if use_cloud else MARITACA_URL
+    keys = cloud_api_keys() if use_cloud else ()
+    api_key = keys[0] if use_cloud and keys else MARITACA_API_KEY if not use_cloud else ""
     if not api_key:
         raise GatewayError("Chave de acesso do provedor não configurada no servidor.", 503)
 
@@ -251,15 +261,20 @@ def ask_maritaca_result(question: str, history: Any, *, mode: str = "fast") -> d
         payload["top_p"] = 0.95
 
     try:
-        upstream = requests.post(
-            api_url,
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
-            json=payload,
-            timeout=(10, 300),
-        )
+        if use_cloud and is_groq_endpoint(api_url):
+            upstream = post_with_failover(requests.post, api_url, payload, keys)
+            if upstream is None:
+                raise GatewayError("Chaves Groq temporariamente em limite de uso. Tente novamente mais tarde.", 429)
+        else:
+            upstream = requests.post(
+                api_url,
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json=payload,
+                timeout=(10, 300),
+            )
     except requests.Timeout:
         app.logger.warning("Timeout ao consultar o provedor de IA")
         raise GatewayError("O provedor de IA demorou para responder.", 504)
@@ -476,19 +491,20 @@ def api_info():
             "status": "ok",
             "endpoint": "/chat",
             "telegram_webhook": "/telegram/webhook",
-            "thinking_enabled": bool((THIGAS_ENABLE_THINKING and MARITACA_API_KEY) or (THIGAS_CLOUD_ENABLED and THIGAS_CLOUD_API_KEY)),
-            "cloud_enabled": THIGAS_CLOUD_ENABLED and bool(THIGAS_CLOUD_API_KEY),
+            "thinking_enabled": bool((THIGAS_ENABLE_THINKING and MARITACA_API_KEY) or (THIGAS_CLOUD_ENABLED and cloud_api_keys())),
+            "cloud_enabled": THIGAS_CLOUD_ENABLED and bool(cloud_api_keys()),
+            "cloud_key_count": len(cloud_api_keys()) if THIGAS_CLOUD_ENABLED else 0,
             "web_search_enabled": True,
             "web_search_provider": "brave" if THIGAS_BRAVE_SEARCH_ENABLED and THIGAS_BRAVE_SEARCH_KEY else "wikipedia",
             "thinking_effort_high": bool(
                 not (THIGAS_ENABLE_THINKING and MARITACA_API_KEY)
-                and THIGAS_CLOUD_ENABLED and THIGAS_CLOUD_API_KEY
+                and THIGAS_CLOUD_ENABLED and cloud_api_keys()
                 and is_groq_gpt_oss(THIGAS_CLOUD_URL, THIGAS_CLOUD_MODEL)
             ),
             "models": {
                 "fast": MARITACA_MODEL,
                 "thinking": (MARITACA_THINKING_MODEL if THIGAS_ENABLE_THINKING and MARITACA_API_KEY else THIGAS_CLOUD_MODEL if THIGAS_CLOUD_ENABLED and THIGAS_CLOUD_API_KEY else None),
-                "cloud": THIGAS_CLOUD_MODEL if (THIGAS_CLOUD_ENABLED and THIGAS_CLOUD_API_KEY) else None,
+                "cloud": THIGAS_CLOUD_MODEL if (THIGAS_CLOUD_ENABLED and cloud_api_keys()) else None,
             },
         }
     )
