@@ -237,7 +237,7 @@ O THIGAS AI utiliza agora **até três credenciais privadas**, sem enviar ou reg
 
 O uso exige `THIGAS_CLOUD_ENABLED=true` no serviço. O backend seleciona chaves distintas em rodízio, alternando para outras elegíveis em caso de HTTP 401, 403, 429, 498 ou erros 500/502/503/504 retornados **pela Groq**. Chaves recusadas entram em cooldown temporário (429 respeita Retry-After, limitado a 60 segundos por processo; credenciais 401/403 permanecem em cooldown por cinco minutos). Não repete automaticamente uma solicitação após timeout ou erro de conexão que possa ter consumido tokens; não altera contratos da Maritaca nem compartilha reservas de chaves com provedores externos.
 
-`/api` público divulga **somente o número de chaves configuradas**, não quais são; o painel exibe o total. Colocar segredos em `render.yaml` ou no repositório é proibido: as variáveis estão declaradas apenas com `sync: false`. Para serviços Render existentes, novas variáveis devem ser preenchidas manualmente no Dashboard, pois o `sync: false` em atualizações do Blueprint não solicita novamente os valores. Ao atualizar variáveis, é necessário aplicar a alteração e implantar a nova versão do código.
+`/api` público informa apenas a disponibilidade dos provedores e os modelos habilitados, **sem números ou valores de chaves**. O painel não exibe indicadores de chaves API. Colocar segredos em `render.yaml` ou no repositório é proibido: as variáveis estão declaradas apenas com `sync: false`. Para serviços Render existentes, novas variáveis devem ser preenchidas manualmente no Dashboard, pois o `sync: false` em atualizações do Blueprint não solicita novamente os valores. Ao atualizar variáveis, é necessário aplicar a alteração e implantar a nova versão do código.
 
 **Atenção:** a Groq aplica limites no âmbito da organização e projetos, não concede três vezes a quota por haver três chaves. A recuperação é best-effort e pode não funcionar quando todas as credenciais compartilham o mesmo limite. O algoritmo usa cooldown **local a cada processo**, não sincronizado entre vários serviços. A ativação de APIs pagas depende das configurações e limites da conta da Groq. Não foram realizadas chamadas remuneradas para testar essas três chaves.
 
@@ -253,7 +253,7 @@ As credenciais NVIDIA são lidas no Render pelas variáveis `NVIDIA_API_KEY`, `N
 
 Configure `THIGAS_NVIDIA_MODEL` com um ID existente em `https://docs.api.nvidia.com/nim/reference/llm-apis` (padrão `openai/gpt-oss-20b`); `THIGAS_NVIDIA_ENABLED` controla o acesso (padrão `true`, mas o botão fica desativado se não houver chave). A NVIDIA pode impor limites por conta e modelo; chaves adicionais não garantem aumento de quota. Uma resposta de produção só pode ser considerada verificada após uma consulta real autorizada.
 
-As novas variáveis em `render.yaml` usam `sync: false`; no Render já existente, os valores precisam ser configurados no painel do serviço. **Não insira as chaves no GitHub ou chat**. O contador de credenciais em `/api` inclui apenas números, não conteúdo das chaves.
+As novas variáveis em `render.yaml` usam `sync: false`; no Render já existente, os valores precisam ser configurados no painel do serviço. **Não insira as chaves no GitHub ou chat**. O endpoint público `/api` não expõe quantidades nem valores de credenciais; a rotação continua exclusiva do servidor.
 
 Fontes: https://docs.api.nvidia.com/nim/reference/openai-gpt-oss-20b-infer e https://docs.api.nvidia.com/nim/reference/llm-apis.
 
@@ -285,7 +285,7 @@ O chat oferece agora **Aion Labs · padrão** e **Aion Labs · esforço alto** c
 - **Timeout:** a documentação Aion informa limite de 120 segundos para respostas não streaming; respostas extensas podem expirar. Este gateway continua não streaming.
 - **Preço e limites:** a disponibilidade de chaves, créditos e cobrança segue sua conta Aion Labs. Múltiplas chaves não garantem cotas independentes.
 
-Para serviços Render que já existem, declarar `sync: false` em `render.yaml` **não cria nem lê a chave do painel**. Se você já cadastrou `AION_API_KEY`, basta garantir que o nome corresponde e que a alteração foi aplicada. Caso contrário, cadastre-a em **Render → thigas-coder-gateway → Environment** sem publicá-la no GitHub. A tela `/api` pública divulga apenas disponibilidade, modelo e quantidade de chaves; nunca o segredo.
+Para serviços Render que já existem, declarar `sync: false` em `render.yaml` **não cria nem lê a chave do painel**. Se você já cadastrou `AION_API_KEY`, basta garantir que o nome corresponde e que a alteração foi aplicada. Caso contrário, cadastre-a em **Render → thigas-coder-gateway → Environment** sem publicá-la no GitHub. A rota `/api` pública divulga somente disponibilidade e modelo, sem valores nem quantidades de chaves.
 
 Documentação oficial: https://api.aionlabs.ai/docs/api-reference/ e https://www.aionlabs.ai/docs/quickstart/.
 Testes isolados sem consumir créditos: `python -m unittest discover -s server/tests -v` e `node --test server/tests/chat.test.cjs`.

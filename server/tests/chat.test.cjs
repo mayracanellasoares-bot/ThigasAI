@@ -302,13 +302,18 @@ test("fontes externas rejeitam javascript, URLs com credenciais e destinos locai
   assert.deepEqual(response.sources.map(source => source.title), ["Manual público"]);
 });
 
-test("UI mostra número de chaves Groq sem revelar credenciais", () => {
+test("interface limpa não mostra marcações ou contagem de chaves API", () => {
   const html = fs.readFileSync(path.join(__dirname, "../static/index.html"), "utf8");
   const js = fs.readFileSync(path.join(__dirname, "../static/chat.js"), "utf8");
-  assert.match(html, /id="cloud-key-status"/);
-  assert.match(js, /capabilities\.cloud_key_count/);
-  assert.match(js, /Groq: modo nuvem desativado/);
-  assert.match(js, /chaves configuradas/);
+  for (const id of ["cloud-key-status", "nvidia-key-status", "aion-key-status"]) {
+    assert.doesNotMatch(html, new RegExp(id));
+    assert.doesNotMatch(js, new RegExp(id));
+  }
+  for (const key of ["cloud_key_count", "nvidia_key_count", "aion_key_count"]) {
+    assert.doesNotMatch(js, new RegExp(key));
+  }
+  assert.match(html, /id="model-used"/);
+  assert.match(html, /id="tokens-total"/);
   assert.doesNotMatch(html, /gsk_[A-Za-z0-9_-]{10,}/);
 });
 
@@ -316,7 +321,6 @@ test("modelos NVIDIA aparecem no seletor mas aguardam autorização do servidor"
   const html = fs.readFileSync(path.join(__dirname, "../static/index.html"), "utf8");
   assert.match(html, /<option value="nvidia" disabled>/);
   assert.match(html, /<option value="nvidia_thinking" disabled>/);
-  assert.match(html, /id="nvidia-key-status"/);
 });
 
 test("modo NVIDIA usa endpoint do chat do site, sem expor chaves", async () => {
@@ -366,7 +370,6 @@ test("Aion aparece no seletor, inicialmente bloqueado até confirmação do serv
   const frontend = fs.readFileSync(path.join(__dirname, "../static/chat.js"), "utf8");
   assert.match(html, /<option value="aion" disabled>/);
   assert.match(html, /<option value="aion_thinking" disabled>/);
-  assert.match(html, /id="aion-key-status"/);
   assert.match(frontend, /capabilities\?\.aion_enabled/);
   assert.match(frontend, /capabilities\?\.aion_thinking_enabled/);
   assert.doesNotMatch(html, /sk-[A-Za-z0-9_-]{12,}/);

@@ -139,7 +139,7 @@ class AionLabsTests(unittest.TestCase):
         self.assertEqual(post.call_args.kwargs["headers"]["Authorization"], "Bearer aion-secret")
         self.assertTrue(public_config["aion_enabled"])
         self.assertTrue(public_config["aion_thinking_enabled"])
-        self.assertEqual(public_config["aion_key_count"], 1)
+        self.assertNotIn("aion_key_count", public_config)
         self.assertEqual(public_config["models"]["aion"], "aion-labs/aion-3.5-mini")
         for secret in ("aion-secret", "nvidia-secret", "groq-secret"):
             self.assertNotIn(secret, str(public_config))
@@ -157,7 +157,7 @@ class AionLabsTests(unittest.TestCase):
                 client.post("/auth/login", data={"password": "teste-senha-unica-123456789"})
                 data = client.get("/api").get_json()
             self.assertFalse(data["aion_enabled"])
-            self.assertEqual(data["aion_key_count"], 0)
+            self.assertNotIn("aion_key_count", data)
 
     def test_aion_explicitly_disabled_ignores_configured_key(self):
         with patch.dict(gateway.os.environ, {"AION_API_KEY": "private"}, clear=True), \
