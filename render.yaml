@@ -22,6 +22,10 @@ services:
         value: "false"
       - key: THIGAS_CLOUD_API_KEY
         sync: false
+      - key: THIGAS_CLOUD_API_KEY_2
+        sync: false
+      - key: THIGAS_CLOUD_API_KEY_3
+        sync: false
       - key: THIGAS_CLOUD_ENABLED
         value: "false"
       - key: THIGAS_CLOUD_URL
