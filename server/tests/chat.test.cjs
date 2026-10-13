@@ -311,3 +311,26 @@ test("UI mostra número de chaves Groq sem revelar credenciais", () => {
   assert.match(js, /chaves configuradas/);
   assert.doesNotMatch(html, /gsk_[A-Za-z0-9_-]{10,}/);
 });
+
+test("modelos NVIDIA aparecem no seletor mas aguardam autorização do servidor", () => {
+  const html = fs.readFileSync(path.join(__dirname, "../static/index.html"), "utf8");
+  assert.match(html, /<option value="nvidia" disabled>/);
+  assert.match(html, /<option value="nvidia_thinking" disabled>/);
+  assert.match(html, /id="nvidia-key-status"/);
+});
+
+test("modo NVIDIA usa endpoint do chat do site, sem expor chaves", async () => {
+  let body;
+  const reply = await chat.requestChat(async (url, options) => {
+    assert.equal(url, "/chat");
+    body = JSON.parse(options.body);
+    return { ok: true, json: async () => ({
+      answer: "NVIDIA respondeu", model: "openai/gpt-oss-20b",
+      reasoning_effort: "high",
+    }) };
+  }, "Revise este código", [], undefined, "nvidia_thinking", false);
+  assert.equal(body.mode, "nvidia_thinking");
+  assert.equal(body.web_search, undefined);
+  assert.equal(reply.reasoning_effort, "high");
+  assert.equal(reply.usage.total_tokens, null);
+});
