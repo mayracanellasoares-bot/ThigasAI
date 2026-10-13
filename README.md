@@ -252,3 +252,15 @@ O uso exige `THIGAS_CLOUD_ENABLED=true` no serviço. O backend seleciona chaves 
 Fontes oficiais: https://console.groq.com/docs/rate-limits e https://console.groq.com/docs/errors.
 
 Testes sem consumir APIs externas: `python -m unittest discover -s server/tests -v`.
+
+## NVIDIA NIM — duas chaves novas e modo independente
+
+A interface oferece **NVIDIA · padrão** e **NVIDIA · esforço alto** (este último apenas para `openai/gpt-oss-20b`/`openai/gpt-oss-120b`). Utiliza exclusivamente o endpoint oficial `https://integrate.api.nvidia.com/v1/chat/completions` e só executa solicitações quando o usuário seleciona NVIDIA e envia uma mensagem. Maritaca/Groq permanecem em seus modos anteriores.
+
+As credenciais NVIDIA são lidas no Render pelas variáveis `NVIDIA_API_KEY`, `NVIDIA_API_KEY_2`, `NVIDIA_API_KEY_3` ou aliases `THIGAS_NVIDIA_API_KEY`, `THIGAS_NVIDIA_API_KEY_2`, `THIGAS_NVIDIA_API_KEY_3`. **Uma ou duas chaves bastam**; não é necessário cadastrar a primária quando apenas `_2` e `_3` estiverem preenchidas. O servidor evita repetição de chaves e distribui chamadas entre as disponíveis. Em 401/403/429/5xx HTTP, efetua failover limitado, sem repetir automaticamente após timeout. O pool NVIDIA é independente do pool Groq; nunca troca credenciais entre provedores.
+
+Configure `THIGAS_NVIDIA_MODEL` com um ID existente em `https://docs.api.nvidia.com/nim/reference/llm-apis` (padrão `openai/gpt-oss-20b`); `THIGAS_NVIDIA_ENABLED` controla o acesso (padrão `true`, mas o botão fica desativado se não houver chave). A NVIDIA pode impor limites por conta e modelo; chaves adicionais não garantem aumento de quota. Uma resposta de produção só pode ser considerada verificada após uma consulta real autorizada.
+
+As novas variáveis em `render.yaml` usam `sync: false`; no Render já existente, os valores precisam ser configurados no painel do serviço. **Não insira as chaves no GitHub ou chat**. O contador de credenciais em `/api` inclui apenas números, não conteúdo das chaves.
+
+Fontes: https://docs.api.nvidia.com/nim/reference/openai-gpt-oss-20b-infer e https://docs.api.nvidia.com/nim/reference/llm-apis.
