@@ -838,18 +838,6 @@
       const response = await fetch("/api", { cache: "no-store" });
       if (!response.ok) return;
       const capabilities = await response.json();
-      const poolCount = Number.isInteger(capabilities?.cloud_key_count) && capabilities.cloud_key_count >= 0
-        ? Math.min(3, capabilities.cloud_key_count) : null;
-      const status = byId("cloud-key-status");
-      if (status) status.textContent = poolCount === null ? "Groq: configuração não verificada"
-        : poolCount === 0 ? "Groq: modo nuvem desativado"
-        : "Groq: " + poolCount + (poolCount === 1 ? " chave configurada" : " chaves configuradas");
-      const nvidiaCount = Number.isInteger(capabilities?.nvidia_key_count) && capabilities.nvidia_key_count >= 0
-        ? Math.min(3, capabilities.nvidia_key_count) : null;
-      const nvidiaStatus = byId("nvidia-key-status");
-      if (nvidiaStatus) nvidiaStatus.textContent = nvidiaCount === null ? "NVIDIA: configuração não verificada"
-        : nvidiaCount === 0 ? "NVIDIA: indisponível"
-        : "NVIDIA: " + nvidiaCount + (nvidiaCount === 1 ? " chave configurada" : " chaves configuradas");
       const nvidia = modeSelector.querySelector('option[value="nvidia"]');
       const nvidiaThinking = modeSelector.querySelector('option[value="nvidia_thinking"]');
       if (nvidia) {
@@ -860,12 +848,6 @@
         nvidiaThinking.disabled = capabilities?.nvidia_thinking_enabled !== true;
         nvidiaThinking.textContent = nvidiaThinking.disabled ? "NVIDIA · alto (indisponível)" : "NVIDIA · esforço alto";
       }
-      const aionCount = Number.isInteger(capabilities?.aion_key_count) && capabilities.aion_key_count >= 0
-        ? Math.min(3, capabilities.aion_key_count) : null;
-      const aionStatus = byId("aion-key-status");
-      if (aionStatus) aionStatus.textContent = aionCount === null ? "Aion: configuração não verificada"
-        : aionCount === 0 ? "Aion: indisponível"
-        : "Aion: " + aionCount + (aionCount === 1 ? " chave configurada" : " chaves configuradas");
       const aion = modeSelector.querySelector('option[value="aion"]');
       const aionThinking = modeSelector.querySelector('option[value="aion_thinking"]');
       if (aion) {
