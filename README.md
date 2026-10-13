@@ -233,3 +233,22 @@ node --test server/tests/*.test.cjs
 ```
 
 A pesquisa por trecho e resultado de busca não equivale a conferência de fatos por múltiplas fontes independentes. A Wikipédia pode estar desatualizada, e a Brave pode incorrer em custos se explicitamente ativada pelo proprietário.
+
+
+## Três chaves Groq com alternância e failover (13/10/2026)
+
+O THIGAS AI utiliza agora **até três credenciais privadas**, sem enviar ou registrar os valores no navegador. As chaves são lidas exclusivamente do ambiente Render:
+
+- Primária: `THIGAS_CLOUD_API_KEY` (compatível com `GROQ_API_KEY`).
+- Segunda: `THIGAS_CLOUD_API_KEY_2` (compatível com `GROQ_API_KEY_2` ou `GROQ_API_KEY2`).
+- Terceira: `THIGAS_CLOUD_API_KEY_3` (compatível com `GROQ_API_KEY_3` ou `GROQ_API_KEY3`).
+
+O uso exige `THIGAS_CLOUD_ENABLED=true` no serviço. O backend seleciona chaves distintas em rodízio, alternando para outras elegíveis em caso de HTTP 401, 403, 429, 498 ou erros 500/502/503/504 retornados **pela Groq**. Chaves recusadas entram em cooldown temporário (429 respeita Retry-After, limitado a 60 segundos por processo; credenciais 401/403 permanecem em cooldown por cinco minutos). Não repete automaticamente uma solicitação após timeout ou erro de conexão que possa ter consumido tokens; não altera contratos da Maritaca nem compartilha reservas de chaves com provedores externos.
+
+`/api` autenticado divulga **somente o número de chaves configuradas**, não quais são; o painel exibe o total. Colocar segredos em `render.yaml` ou no repositório é proibido: as variáveis estão declaradas apenas com `sync: false`. Para serviços Render existentes, novas variáveis devem ser preenchidas manualmente no Dashboard, pois o `sync: false` em atualizações do Blueprint não solicita novamente os valores. Ao atualizar variáveis, é necessário aplicar a alteração e implantar a nova versão do código.
+
+**Atenção:** a Groq aplica limites no âmbito da organização e projetos, não concede três vezes a quota por haver três chaves. A recuperação é best-effort e pode não funcionar quando todas as credenciais compartilham o mesmo limite. O algoritmo usa cooldown **local a cada processo**, não sincronizado entre vários serviços. A ativação de APIs pagas depende das configurações e limites da conta da Groq. Não foram realizadas chamadas remuneradas para testar essas três chaves.
+
+Fontes oficiais: https://console.groq.com/docs/rate-limits e https://console.groq.com/docs/errors.
+
+Testes sem consumir APIs externas: `python -m unittest discover -s server/tests -v`.
