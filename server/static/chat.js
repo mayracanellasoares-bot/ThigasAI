@@ -773,12 +773,13 @@
       const thinking = modeSelector.querySelector('option[value="thinking"]');
       thinking.disabled = !allowThinking;
       const activeThinkingModel = typeof capabilities?.models?.thinking === "string" ? capabilities.models.thinking : "";
-      const supportsHighEffort = /^openai\\/gpt-oss-(?:20b|120b)$/.test(activeThinkingModel);
+      const supportsHighEffort = capabilities?.thinking_effort_high === true;
       thinking.textContent = !allowThinking ? "Avançado (indisponível)" :
         supportsHighEffort ? "Esforço: alto (GPT-OSS)" : "Modelo avançado";
       thinking.title = activeThinkingModel ? "Modelo: " + activeThinkingModel : "Modelo avançado não configurado";
       if (modeSelector.selectedOptions[0]?.disabled) modeSelector.value = "fast";
-      byId("mode-hint").textContent = allowThinking ? "Esforço alto disponível." : "Esforço alto indisponível.";
+      byId("mode-hint").textContent = !allowThinking ? "Modo avançado indisponível." :
+        supportsHighEffort ? "Esforço alto realmente configurado no modelo GPT-OSS." : "Modelo avançado ativo; esforço alto numérico não está disponível neste provedor.";
     } catch (_) {
       // Fail closed: existing fast mode works, advanced modes stay disabled.
     }
