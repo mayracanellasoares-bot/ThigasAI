@@ -157,7 +157,7 @@ class AionLabsTests(unittest.TestCase):
                 client.post("/auth/login", data={"password": "teste-senha-unica-123456789"})
                 data = client.get("/api").get_json()
             self.assertFalse(data["aion_enabled"])
-            self.assertEqual(data["aion_key_count"], 0)
+            self.assertNotIn("aion_key_count", data)
 
     def test_aion_explicitly_disabled_ignores_configured_key(self):
         with patch.dict(gateway.os.environ, {"AION_API_KEY": "private"}, clear=True), \
