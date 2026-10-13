@@ -123,10 +123,11 @@
     if (typeof raw !== "string" || raw.length > 1800 || /[\u0000-\u001f\u007f]/.test(raw)) return null;
     try {
       const url = new URL(raw);
-      if (url.protocol !== "https:" || !url.hostname || url.username || url.password ||
+      const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+      if (url.protocol !== "https:" || !host || url.username || url.password ||
           (url.port && url.port !== "443") ||
-          ["localhost", "127.0.0.1", "::1"].includes(url.hostname.toLowerCase()) ||
-          /\.(?:local|localhost|internal)$/i.test(url.hostname)) return null;
+          ["localhost", "127.0.0.1", "::1"].includes(host) ||
+          /\.(?:local|localhost|internal)$/i.test(host)) return null;
       return url.href;
     } catch (_) {
       return null;
