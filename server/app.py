@@ -468,6 +468,11 @@ def api_info():
             "telegram_webhook": "/telegram/webhook",
             "thinking_enabled": bool((THIGAS_ENABLE_THINKING and MARITACA_API_KEY) or (THIGAS_CLOUD_ENABLED and THIGAS_CLOUD_API_KEY)),
             "cloud_enabled": THIGAS_CLOUD_ENABLED and bool(THIGAS_CLOUD_API_KEY),
+            "thinking_effort_high": bool(
+                not (THIGAS_ENABLE_THINKING and MARITACA_API_KEY)
+                and THIGAS_CLOUD_ENABLED and THIGAS_CLOUD_API_KEY
+                and is_groq_gpt_oss(THIGAS_CLOUD_URL, THIGAS_CLOUD_MODEL)
+            ),
             "models": {
                 "fast": MARITACA_MODEL,
                 "thinking": (MARITACA_THINKING_MODEL if THIGAS_ENABLE_THINKING and MARITACA_API_KEY else THIGAS_CLOUD_MODEL if THIGAS_CLOUD_ENABLED and THIGAS_CLOUD_API_KEY else None),
