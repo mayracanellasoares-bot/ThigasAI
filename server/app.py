@@ -54,20 +54,20 @@ if not TELEGRAM_WEBHOOK_URL and RENDER_EXTERNAL_URL:
     TELEGRAM_WEBHOOK_URL = f"{RENDER_EXTERNAL_URL}/telegram/webhook"
 
 CODING_TASK_RE = re.compile(
-    r"(?i)\\b(?:c[oó]digo|programa(?:[çc][aã]o|r|ndo)?|"
-    r"python|javascript|typescript|node\\.?js|react|html|css|"
+    r"(?i)\b(?:c[oó]digo|programa(?:[çc][aã]o|r|ndo)?|"
+    r"python|javascript|typescript|node\.?js|react|html|css|"
     r"sql|pwa|bug|depur(?:ar|a[çc][aã]o)|script|"
-    r"fun[çc][aã]o|erro de sintaxe|github)\\b"
+    r"fun[çc][aã]o|erro de sintaxe|github)\b"
 )
 CODE_REVIEW_INSTRUCTIONS = (
-    "\\n\\nCRITÉRIOS DE ENTREGA DE CÓDIGO:\\n"
-    "- Identifique linguagem, versão, requisitos, entradas, saídas e ambiente mencionados.\\n"
-    "- Faça uma checagem interna de sintaxe, imports, nomes, tipos, casos-limite e fluxo dos eventos antes de responder.\\n"
-    "- Ao corrigir um bug, preserve as partes funcionais e explique a causa identificável.\\n"
-    "- Entregue código executável e completo no escopo solicitado; não invente APIs, testes executados ou dependências.\\n"
-    "- Se não conseguir conferir uma dependência externa, indique explicitamente o que precisa ser validado.\\n"
-    "- Não substitua implementação por reticências ou placeholders disfarçados.\\n"
-    "- Se o código for extenso e houver risco de corte, priorize uma implementação mínima funcional e indique limites.\\n"
+    "\n\nCRITÉRIOS DE ENTREGA DE CÓDIGO:\n"
+    "- Identifique linguagem, versão, requisitos, entradas, saídas e ambiente mencionados.\n"
+    "- Faça uma checagem interna de sintaxe, imports, nomes, tipos, casos-limite e fluxo dos eventos antes de responder.\n"
+    "- Ao corrigir um bug, preserve as partes funcionais e explique a causa identificável.\n"
+    "- Entregue código executável e completo no escopo solicitado; não invente APIs, testes executados ou dependências.\n"
+    "- Se não conseguir conferir uma dependência externa, indique explicitamente o que precisa ser validado.\n"
+    "- Não substitua implementação por reticências ou placeholders disfarçados.\n"
+    "- Se o código for extenso e houver risco de corte, priorize uma implementação mínima funcional e indique limites.\n"
     "- Não confunda checagem mental com compilação ou testes reais."
 )
 
