@@ -7,6 +7,7 @@ Nenhum URL fornecido pelo usuário é solicitado diretamente por este módulo.
 from __future__ import annotations
 
 import html
+import ipaddress
 import json
 import re
 from urllib.parse import urlsplit
@@ -63,8 +64,15 @@ def _safe_link(value: object) -> str | None:
     except ValueError:
         return None
     if (parsed.scheme != "https" or not host or parsed.username or parsed.password
-            or port not in (None, 443) or not host.endswith((".com", ".org", ".net", ".gov", ".edu", ".br", ".io", ".dev", ".app", ".ai", ".uk", ".de", ".fr", ".jp"))):
+            or port not in (None, 443) or host == "localhost"
+            or host.endswith((".localhost", ".local", ".internal"))):
         return None
+    try:
+        if not ipaddress.ip_address(host).is_global:
+            return None
+    except ValueError:
+        if "." not in host:
+            return None
     return value
 
 
