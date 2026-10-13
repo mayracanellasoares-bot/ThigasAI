@@ -148,7 +148,7 @@
       finish_reason: typeof data.finish_reason === "string" ? data.finish_reason : null,
       reasoning_effort: data.reasoning_effort === "high" || data.reasoning_effort === "medium" ? data.reasoning_effort : null,
       quality_flags: Array.isArray(data.quality_flags)
-        ? data.quality_flags.filter(flag => ["output_limit", "possible_repetition", "unclosed_code_block", "possible_python_syntax_error"].includes(flag))
+        ? data.quality_flags.filter(flag => ["output_limit", "possible_repetition", "unclosed_code_block", "possible_python_syntax_error", "possible_json_syntax_error"].includes(flag))
         : [],
     };
   }
@@ -671,6 +671,7 @@
         possible_repetition: "Possível loop de repetição detectado; confira o conteúdo antes de utilizá-lo.",
         unclosed_code_block: "Um bloco de código não foi fechado; a resposta pode estar incompleta.",
         possible_python_syntax_error: "O código Python gerado pode conter erro de sintaxe. Confira e teste antes de executar.",
+        possible_json_syntax_error: "O JSON gerado não é válido. Use Revisar Código para pedir uma correção.",
       };
       const flags = result.quality_flags.slice();
       if (result.finish_reason === "length" && !flags.includes("output_limit")) flags.push("output_limit");
@@ -771,7 +772,11 @@
       const allowThinking = capabilities?.thinking_enabled === true;
       const thinking = modeSelector.querySelector('option[value="thinking"]');
       thinking.disabled = !allowThinking;
-      thinking.textContent = allowThinking ? "Esforço: alto" : "Esforço: alto (indisponível)";
+      const activeThinkingModel = typeof capabilities?.models?.thinking === "string" ? capabilities.models.thinking : "";
+      const supportsHighEffort = /^openai\\/gpt-oss-(?:20b|120b)$/.test(activeThinkingModel);
+      thinking.textContent = !allowThinking ? "Avançado (indisponível)" :
+        supportsHighEffort ? "Esforço: alto (GPT-OSS)" : "Modelo avançado";
+      thinking.title = activeThinkingModel ? "Modelo: " + activeThinkingModel : "Modelo avançado não configurado";
       if (modeSelector.selectedOptions[0]?.disabled) modeSelector.value = "fast";
       byId("mode-hint").textContent = allowThinking ? "Esforço alto disponível." : "Esforço alto indisponível.";
     } catch (_) {
