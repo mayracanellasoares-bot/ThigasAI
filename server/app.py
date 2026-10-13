@@ -53,6 +53,24 @@ TELEGRAM_WEBHOOK_URL = os.getenv("TELEGRAM_WEBHOOK_URL", "").strip().rstrip("/")
 if not TELEGRAM_WEBHOOK_URL and RENDER_EXTERNAL_URL:
     TELEGRAM_WEBHOOK_URL = f"{RENDER_EXTERNAL_URL}/telegram/webhook"
 
+CODING_TASK_RE = re.compile(
+    r"(?i)\\b(?:c[oó]digo|programa(?:[çc][aã]o|r|ndo)?|"
+    r"python|javascript|typescript|node\\.?js|react|html|css|"
+    r"sql|pwa|bug|depur(?:ar|a[çc][aã]o)|script|"
+    r"fun[çc][aã]o|erro de sintaxe|github)\\b"
+)
+CODE_REVIEW_INSTRUCTIONS = (
+    "\\n\\nCRITÉRIOS DE ENTREGA DE CÓDIGO:\\n"
+    "- Identifique linguagem, versão, requisitos, entradas, saídas e ambiente mencionados.\\n"
+    "- Faça uma checagem interna de sintaxe, imports, nomes, tipos, casos-limite e fluxo dos eventos antes de responder.\\n"
+    "- Ao corrigir um bug, preserve as partes funcionais e explique a causa identificável.\\n"
+    "- Entregue código executável e completo no escopo solicitado; não invente APIs, testes executados ou dependências.\\n"
+    "- Se não conseguir conferir uma dependência externa, indique explicitamente o que precisa ser validado.\\n"
+    "- Não substitua implementação por reticências ou placeholders disfarçados.\\n"
+    "- Se o código for extenso e houver risco de corte, priorize uma implementação mínima funcional e indique limites.\\n"
+    "- Não confunda checagem mental com compilação ou testes reais."
+)
+
 SYSTEM_PROMPT = """
 Você é THIGAS AI, assistente digital da Brittech inc., desenvolvido para ajudar com conhecimento geral, programação, estudo, análise e produção de documentos.
 
@@ -133,6 +151,8 @@ def text_content(value: Any) -> str:
 
 def build_messages(question: str, history: Any, model: str | None = None) -> list[dict[str, str]]:
     prompt = SYSTEM_PROMPT
+    if CODING_TASK_RE.search(question):
+        prompt += CODE_REVIEW_INSTRUCTIONS
     active_model = model or MARITACA_MODEL
     prompt += f"\n\nCONFIGURAÇÃO INTERNA: Modelo ativo nesta solicitação: {active_model}. Responda com esta informação verdadeira apenas se o usuário perguntar expressamente pelo modelo ou provedor."
     messages = [{"role": "system", "content": prompt}]
@@ -188,6 +208,17 @@ def choose_model(mode: Any) -> str:
     raise GatewayError("Modo de resposta inválido.", 400)
 
 
+def is_groq_gpt_oss(url: str, model: str) -> bool:
+    """Avoid sending Groq-specific parameters to unrelated providers/models."""
+    from urllib.parse import urlsplit
+    parsed = urlsplit(url)
+    return (
+        parsed.scheme == "https"
+        and parsed.hostname == "api.groq.com"
+        and model in {"openai/gpt-oss-20b", "openai/gpt-oss-120b"}
+    )
+
+
 def ask_maritaca_result(question: str, history: Any, *, mode: str = "fast") -> dict[str, Any]:
     selected_model = choose_model(mode)
     use_cloud = mode == "cloud" or (mode == "thinking" and not (THIGAS_ENABLE_THINKING and MARITACA_API_KEY))
@@ -203,6 +234,17 @@ def ask_maritaca_result(question: str, history: Any, *, mode: str = "fast") -> d
         "max_tokens": MARITACA_MAX_TOKENS,
         "stream": False,
     }
+    reasoning_effort = None
+    if use_cloud and is_groq_gpt_oss(api_url, selected_model):
+        # Groq GPT-OSS defaults to MEDIUM, so the former "Esforço: alto"
+        # label did not actually request HIGH. Do not send these provider-
+        # specific fields for Maritaca or arbitrary OpenAI-compatible APIs.
+        reasoning_effort = "high" if mode == "thinking" else "medium"
+        payload["reasoning_effort"] = reasoning_effort
+        payload["include_reasoning"] = False
+        payload["max_completion_tokens"] = payload.pop("max_tokens")
+        payload["temperature"] = 0.6
+        payload["top_p"] = 0.95
 
     try:
         upstream = requests.post(
@@ -275,6 +317,7 @@ def ask_maritaca_result(question: str, history: Any, *, mode: str = "fast") -> d
         "model": selected_model,
         "usage": _maritaca_usage(data),
         "finish_reason": choice.get("finish_reason") if isinstance(choice.get("finish_reason"), str) else None,
+        "reasoning_effort": reasoning_effort,
     }
 
 
@@ -603,6 +646,7 @@ def chat():
                 "max_output_tokens": MARITACA_MAX_TOKENS,
                 "finish_reason": "verified",
                 "quality_flags": [],
+                "reasoning_effort": None,
             })
         enriched_question = attach_public_web_context(question)
         # Keep the original two-argument contract for current clients and Telegram.
@@ -621,6 +665,7 @@ def chat():
         "max_output_tokens": MARITACA_MAX_TOKENS,
         "finish_reason": result["finish_reason"],
         "quality_flags": inspect_generation(result["answer"], result.get("finish_reason")),
+        "reasoning_effort": result.get("reasoning_effort"),
     })
 
 
