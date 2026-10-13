@@ -1,7 +1,7 @@
 "use strict";
 
-// Apenas os recursos PÚBLICOS são armazenados offline.
-// Nunca armazene HTML do chat, API, workspace, anexos ou histórico no CacheStorage.
+// Apenas o shell PÚBLICO estático do chat é armazenado offline.
+// Nunca armazene respostas de API, documentos, anexos ou histórico no CacheStorage.
 const CACHE_PREFIX = "thigas-pwa-";
 const CACHE_NAME = CACHE_PREFIX + "v19-public";
 const APP_SHELL = [
