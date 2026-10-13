@@ -136,7 +136,7 @@
 
   async function requestChat(fetcher, message, history, signal, mode = "fast", webSearch = false) {
     const payload = { message, history: apiHistory(history, message) };
-    if (["thinking", "cloud", "nvidia", "nvidia_thinking"].includes(mode)) payload.mode = mode;
+    if (["thinking", "cloud", "nvidia", "nvidia_thinking", "aion", "aion_thinking"].includes(mode)) payload.mode = mode;
     if (webSearch === true) payload.web_search = true;
     const response = await fetcher("/chat", {
       method: "POST",
@@ -162,7 +162,7 @@
         total_tokens: measured(usage.total_tokens),
       },
       finish_reason: typeof data.finish_reason === "string" ? data.finish_reason : null,
-      reasoning_effort: data.reasoning_effort === "high" || data.reasoning_effort === "medium" ? data.reasoning_effort : null,
+      reasoning_effort: ["low", "medium", "high", "max"].includes(data.reasoning_effort) ? data.reasoning_effort : null,
       provider_attempt_count: Number.isSafeInteger(data.provider_attempt_count) &&
         data.provider_attempt_count >= 0 && data.provider_attempt_count <= 3 ? data.provider_attempt_count : 0,
       provider_failover_used: data.provider_failover_used === true,
@@ -859,6 +859,23 @@
       if (nvidiaThinking) {
         nvidiaThinking.disabled = capabilities?.nvidia_thinking_enabled !== true;
         nvidiaThinking.textContent = nvidiaThinking.disabled ? "NVIDIA · alto (indisponível)" : "NVIDIA · esforço alto";
+      }
+      const aionCount = Number.isInteger(capabilities?.aion_key_count) && capabilities.aion_key_count >= 0
+        ? Math.min(3, capabilities.aion_key_count) : null;
+      const aionStatus = byId("aion-key-status");
+      if (aionStatus) aionStatus.textContent = aionCount === null ? "Aion: configuração não verificada"
+        : aionCount === 0 ? "Aion: indisponível"
+        : "Aion: " + aionCount + (aionCount === 1 ? " chave configurada" : " chaves configuradas");
+      const aion = modeSelector.querySelector('option[value="aion"]');
+      const aionThinking = modeSelector.querySelector('option[value="aion_thinking"]');
+      if (aion) {
+        aion.disabled = capabilities?.aion_enabled !== true;
+        aion.textContent = aion.disabled ? "Aion Labs (indisponível)" : "Aion Labs · padrão";
+        aion.title = capabilities?.models?.aion ? "Modelo: " + capabilities.models.aion : "Aion não configurado";
+      }
+      if (aionThinking) {
+        aionThinking.disabled = capabilities?.aion_thinking_enabled !== true;
+        aionThinking.textContent = aionThinking.disabled ? "Aion Labs · alto (indisponível)" : "Aion Labs · esforço alto";
       }
       searchProviderName = capabilities?.web_search_provider === "brave" ? "Web (Brave)" : "Wikipédia";
       setWebSearch(webSearchActive);
