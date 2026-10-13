@@ -361,66 +361,94 @@ if __name__ == "__main__":
     unittest.main()
 
 
-class AccessControlTests(unittest.TestCase):
+class PublicAccessTests(unittest.TestCase):
     def setUp(self):
         gateway.app.config["TESTING"] = True
         self.client = gateway.app.test_client()
 
-    def test_public_install_screen_and_private_chat(self):
-        self.assertEqual(self.client.get("/entrar").status_code, 200)
-        self.assertIn('id="btn-install-login"', self.client.get("/entrar").get_data(as_text=True))
+    def test_public_site_and_workspace_do_not_require_password(self):
+        self.assertEqual(self.client.get("/", headers={"Accept": "text/html"}).status_code, 200)
+        self.assertEqual(self.client.get("/workspace", headers={"Accept": "text/html"}).status_code, 200)
+        self.assertEqual(self.client.get("/static/chat.js").status_code, 200)
+        self.assertEqual(self.client.get("/api").status_code, 200)
         self.assertEqual(self.client.get("/manifest.webmanifest").status_code, 200)
-        self.assertEqual(self.client.get("/static/login.js").status_code, 200)
-        self.assertEqual(self.client.get("/static/chat.js").status_code, 401)
-        self.assertEqual(self.client.get("/", headers={"Accept": "text/html"}).status_code, 303)
-        self.assertEqual(self.client.get("/workspace", headers={"Accept": "text/html"}).status_code, 303)
-        self.assertEqual(self.client.post("/chat", json={"message": "teste"}).status_code, 401)
-        self.assertEqual(self.client.post("/document/extract").status_code, 401)
-        self.assertEqual(self.client.post("/image/describe").status_code, 401)
-        self.assertEqual(self.client.get("/workspace/api/session").status_code, 401)
-        self.assertEqual(self.client.get("/api").status_code, 401)
+        self.assertEqual(self.client.get("/workspace/api/session").status_code, 200)
+        with patch.object(gateway, "ask_maritaca_result", return_value={
+            "answer": "Olá", "model": gateway.MARITACA_MODEL, "usage": {},
+            "finish_reason": "stop",
+        }) as ask:
+            result = self.client.post("/chat", json={"message": "Olá, THIGAS"})
+        self.assertEqual(result.status_code, 200)
+        ask.assert_called_once()
 
-    def test_correct_password_unlocks_site_and_logout_relocks(self):
-        bad = self.client.post("/auth/login", data={"password": "senha-incorreta"})
-        self.assertEqual(bad.status_code, 303)
-        self.assertIn("erro=senha", bad.headers["Location"])
-        ok = self.client.post("/auth/login", data={"password": "teste-senha-unica-123456789"})
-        self.assertEqual(ok.status_code, 303)
-        home = self.client.get("/")
-        self.assertEqual(home.status_code, 200)
-        self.assertEqual(home.headers["Cache-Control"], "no-store")
-        self.assertEqual(self.client.get("/workspace").status_code, 200)
+    def test_old_login_and_logout_routes_redirect_to_public_home(self):
+        self.assertEqual(self.client.get("/entrar").status_code, 303)
+        self.assertEqual(self.client.get("/entrar").headers["Location"], "/")
+        self.assertEqual(self.client.post("/auth/login", data={"password": "wrong"}).status_code, 303)
         self.assertEqual(self.client.post("/auth/logout").status_code, 303)
-        self.assertEqual(self.client.post("/chat", json={"message": "teste"}).status_code, 401)
+        self.assertEqual(self.client.get("/").status_code, 200)
+        self.assertNotIn("senha", self.client.get("/").get_data(as_text=True).lower())
 
-    def test_missing_server_password_fails_closed(self):
+    def test_missing_password_does_not_block_public_site(self):
         from flask import Flask
         from access_control import install as install_access_control
         with patch.dict(os.environ, {"THIGAS_ACCESS_PASSWORD": "",
                                       "THIGAS_SESSION_SECRET": "x" * 48}):
-            isolated = Flask("isolated_access")
-            isolated.secret_key = "x" * 48
+            isolated = Flask("isolated_public")
             install_access_control(isolated)
 
             @isolated.post("/chat")
-            def private_chat():
-                return {"answer": "não deve abrir"}
+            def public_chat():
+                return {"answer": "acesso público"}
 
-            response = isolated.test_client().post("/chat", json={"message": "teste"})
-            self.assertEqual(response.status_code, 503)
-        page = self.client.get("/entrar").get_data(as_text=True)
-        self.assertNotIn("teste-senha-unica-123456789", page)
-        self.assertNotIn("sessao-segura-para-testes", page)
+            @isolated.get("/")
+            def index():
+                return "THIGAS público"
 
-    def test_login_origin_and_throttling(self):
-        forbidden = self.client.post("/auth/login", data={"password": "teste-senha-unica-123456789"},
-                                     headers={"Origin": "https://other.example"})
+            with isolated.test_client() as client:
+                self.assertEqual(client.get("/").status_code, 200)
+                self.assertEqual(client.post("/chat", json={"message": "teste"}).status_code, 200)
+
+    def test_same_origin_public_posts_and_origin_protection(self):
+        with patch.object(gateway, "ask_maritaca_result") as ask:
+            forbidden = self.client.post("/chat", json={"message": "Teste"},
+                                         headers={"Origin": "https://other.example"})
+            cross_site = self.client.post("/chat", json={"message": "Teste"},
+                                          headers={"Sec-Fetch-Site": "cross-site"})
         self.assertEqual(forbidden.status_code, 403)
-        for attempt in range(10):
-            result = self.client.post("/auth/login", data={"password": "incorreta"},
-                                      environ_overrides={"REMOTE_ADDR": "192.0.2.55"})
-            self.assertEqual(result.status_code, 303)
-        blocked = self.client.post("/auth/login", data={"password": "teste-senha-unica-123456789"},
-                                   environ_overrides={"REMOTE_ADDR": "192.0.2.55"})
-        self.assertIn("erro=limite", blocked.headers["Location"])
+        self.assertEqual(cross_site.status_code, 403)
+        ask.assert_not_called()
+        with patch.object(gateway, "ask_maritaca_result", return_value={
+            "answer": "Oi", "model": gateway.MARITACA_MODEL, "usage": {},
+            "finish_reason": "stop",
+        }) as ask:
+            allowed = self.client.post("/chat", json={"message": "Oi"},
+                                       headers={"Origin": "http://localhost"})
+        self.assertEqual(allowed.status_code, 200)
+        ask.assert_called_once()
 
+    def test_public_rate_limiter_blocks_spam_without_breaking_site(self):
+        from flask import Flask
+        from access_control import install as install_access_control
+        with patch.dict(os.environ, {"THIGAS_PUBLIC_RATE_LIMIT_PER_MINUTE": "3"}):
+            isolated = Flask("isolated_limits")
+            install_access_control(isolated)
+
+            @isolated.post("/chat")
+            def public_chat():
+                return {"answer": "ok"}
+
+            @isolated.get("/")
+            def index():
+                return "site público"
+
+            isolated.config["TESTING"] = False
+            with isolated.test_client() as client:
+                self.assertEqual(client.post("/chat", json={}).status_code, 200)
+                self.assertEqual(client.post("/chat", json={}).status_code, 200)
+                self.assertEqual(client.post("/chat", json={}).status_code, 200)
+                over = client.post("/chat", json={})
+                self.assertEqual(over.status_code, 429)
+                self.assertEqual(over.headers["Retry-After"], "60")
+                self.assertEqual(client.get("/").status_code, 200)
+                self.assertEqual(client.get("/api").status_code, 404)
