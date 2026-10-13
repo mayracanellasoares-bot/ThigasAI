@@ -111,6 +111,13 @@
     return { name: safeFilename(data.filename || file.name), text: data.text.trim(), truncated: data.truncated === true };
   }
 
+  function codeRevisionPrompt() {
+    return "Revise rigorosamente o código da sua última resposta. Identifique erros de sintaxe, " +
+      "lógica, dependências, nomes, DOM, eventos e compatibilidade. Corrija apenas o que for " +
+      "necessário, mas entregue a implementação completa e coerente, sem omitir trechos. " +
+      "Não afirme que executou testes sem evidência e indique o comando de validação.";
+  }
+
   async function requestChat(fetcher, message, history, signal, mode = "fast") {
     const payload = { message, history: apiHistory(history, message) };
     if (mode === "thinking" || mode === "cloud") payload.mode = mode;
@@ -138,6 +145,7 @@
         total_tokens: measured(usage.total_tokens),
       },
       finish_reason: typeof data.finish_reason === "string" ? data.finish_reason : null,
+      reasoning_effort: data.reasoning_effort === "high" || data.reasoning_effort === "medium" ? data.reasoning_effort : null,
       quality_flags: Array.isArray(data.quality_flags)
         ? data.quality_flags.filter(flag => ["output_limit", "possible_repetition", "unclosed_code_block", "possible_python_syntax_error"].includes(flag))
         : [],
@@ -146,7 +154,7 @@
 
   // Exportações puras permitem testar o contrato sem DOM, API externa ou saldo.
   if (typeof module !== "undefined" && module.exports) {
-    module.exports = { MAX_MESSAGE, MAX_FILE_BYTES, MAX_TEXT_FILE_BYTES, safeFilename, validateFile, composeMessage, sanitizeHistory, apiHistory, splitCodeBlocks, codeFilename, extractDocument, requestChat, redactAttachmentFromHistory, classifyConversationDate };
+    module.exports = { MAX_MESSAGE, MAX_FILE_BYTES, MAX_TEXT_FILE_BYTES, safeFilename, validateFile, composeMessage, sanitizeHistory, apiHistory, splitCodeBlocks, codeFilename, extractDocument, requestChat, redactAttachmentFromHistory, classifyConversationDate, codeRevisionPrompt };
   }
   if (typeof document === "undefined") return;
 
@@ -642,7 +650,9 @@
       const answer = result.answer;
       renderMessage("assistant", answer);
       showUsage(result.usage);
-      byId("model-used").textContent = modeSelector.value === "thinking" ? "Alto" : "Padrão";
+      byId("model-used").textContent = result.model
+        ? (result.reasoning_effort === "high" ? "Alto · " : "") + result.model
+        : "Modelo não informado";
       const qualityMessages = {
         output_limit: "A resposta atingiu o limite de saída; pode estar incompleta.",
         possible_repetition: "Possível loop de repetição detectado; confira o conteúdo antes de utilizá-lo.",
