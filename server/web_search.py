@@ -7,6 +7,7 @@ Nenhum URL fornecido pelo usuário é solicitado diretamente por este módulo.
 from __future__ import annotations
 
 import html
+import ipaddress
 import json
 import re
 from urllib.parse import urlsplit
@@ -46,15 +47,33 @@ def _get_json(url: str, *, params: dict, headers: dict) -> dict:
 
 
 def _clean_text(value: object, limit: int) -> str:
-    return html.unescape(re.sub(r"<[^>]*>", " ", str(value or ""))).replace("\x00", "").strip()[:limit]
+    # Remove markup and control characters to prevent forged multi-line
+    # "instructions" in search titles/snippets. These remain untrusted sources.
+    plain = html.unescape(re.sub(r"<[^>]*>", " ", str(value or "")))
+    printable = "".join(char if char.isprintable() else " " for char in plain)
+    return " ".join(printable.split())[:limit]
 
 
 def _safe_link(value: object) -> str | None:
-    if not isinstance(value, str) or len(value) > 1800:
+    if (not isinstance(value, str) or len(value) > 1800
+            or any(ord(char) < 32 or ord(char) == 127 for char in value)):
         return None
-    parsed = urlsplit(value)
-    if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
+    try:
+        parsed = urlsplit(value)
+        host = parsed.hostname
+        port = parsed.port
+    except ValueError:
         return None
+    if (parsed.scheme != "https" or not host or parsed.username or parsed.password
+            or port not in (None, 443) or host == "localhost"
+            or host.endswith((".localhost", ".local", ".internal"))):
+        return None
+    try:
+        if not ipaddress.ip_address(host).is_global:
+            return None
+    except ValueError:
+        if "." not in host:
+            return None
     return value
 
 
@@ -74,7 +93,10 @@ def search_web(question: str, *, brave_key: str = "", brave_enabled: bool = Fals
                                   "Accept-Encoding": "identity",
                                   "User-Agent": USER_AGENT,
                                   "X-Subscription-Token": brave_key})
-        raw = (data.get("web") or {}).get("results", [])
+        web = data.get("web")
+        if not isinstance(web, dict):
+            raise WebSearchError("O mecanismo de pesquisa retornou dados inválidos.")
+        raw = web.get("results", [])
         source = "brave"
         items = []
         for row in raw if isinstance(raw, list) else []:
@@ -94,7 +116,10 @@ def search_web(question: str, *, brave_key: str = "", brave_enabled: bool = Fals
                          headers={"Accept": "application/json",
                                   "Accept-Encoding": "identity",
                                   "User-Agent": USER_AGENT})
-        raw = (data.get("query") or {}).get("search", [])
+        wikipedia = data.get("query")
+        if not isinstance(wikipedia, dict):
+            raise WebSearchError("A pesquisa na Wikipédia retornou dados inválidos.")
+        raw = wikipedia.get("search", [])
         source = "wikipedia"
         items = []
         for row in raw if isinstance(raw, list) else []:

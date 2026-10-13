@@ -265,3 +265,39 @@ test("links inválidos não são expostos pela UI", async () => {
   }), "Busca", [], undefined, "fast", true);
   assert.deepEqual(result.sources.map(x => x.title), ["Boa"]);
 });
+
+test("atalho /limpar é implementado e mantém /clear como alias", () => {
+  const source = fs.readFileSync(path.join(__dirname, "../static/chat.js"), "utf8");
+  const html = fs.readFileSync(path.join(__dirname, "../static/index.html"), "utf8");
+  assert.match(html, /data-insert="\/limpar"/);
+  assert.match(source, /case "\/clear": case "\/limpar": clearConversation\(\)/);
+});
+
+test("medidor de modelo e tokens deixa de ser ocultado pelos dois temas", () => {
+  const css = fs.readFileSync(path.join(__dirname, "../static/chat.css"), "utf8");
+  const theme = fs.readFileSync(path.join(__dirname, "../static/mini-nano-theme.css"), "utf8");
+  assert.doesNotMatch(css, /\.token-meter,\.composer-footer,\.site-footer\{display:none!important\}/);
+  assert.doesNotMatch(theme, /\.token-meter\{display:none!important\}/);
+  assert.match(css, /\.token-meter\{display:flex!important/);
+  assert.match(theme, /\.token-meter\{display:flex!important/);
+  assert.match(css, /\.composer-footer\{display:flex!important/);
+});
+
+test("fontes externas rejeitam javascript, URLs com credenciais e destinos locais", async () => {
+  const invalid = [
+    "javascript:alert(1)", "http://example.org", "https://user:pass@example.org",
+    "https://localhost/", "https://127.0.0.1/", "https://router.local/",
+    "https://[::1]/", "https://example.org:1234/", "https://example.org/\nattack",
+  ];
+  for (const url of invalid) assert.equal(chat.safeSourceUrl(url), null, url);
+  assert.equal(chat.safeSourceUrl("https://example.org/docs"), "https://example.org/docs");
+  const response = await chat.requestChat(async () => ({
+    ok: true, json: async () => ({
+      answer: "resposta", sources: [
+        ...invalid.map(url => ({title:"inseguro",url})),
+        {title:"Manual público",url:"https://example.org/docs"},
+      ],
+    }),
+  }), "Pesquisar", [], undefined, "fast", true);
+  assert.deepEqual(response.sources.map(source => source.title), ["Manual público"]);
+});

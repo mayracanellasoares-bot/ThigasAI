@@ -160,10 +160,10 @@ class GatewayTests(unittest.TestCase):
         self.assertEqual(data["endpoint"], "/chat")
         self.assertEqual(data["telegram_webhook"], "/telegram/webhook")
 
-    def test_health_and_cors_preserved(self):
+    def test_health_and_security_headers_preserved(self):
         response = self.get("/health")
         self.assertEqual(response.get_json()["status"], "ok")
-        self.assertEqual(response.headers["Access-Control-Allow-Origin"], "*")
+        self.assertEqual(response.headers["X-Content-Type-Options"], "nosniff")
         self.assertEqual(self.client.options("/chat").status_code, 204)
 
     def test_authenticated_post_refuses_cross_origin_before_using_provider(self):
