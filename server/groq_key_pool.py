@@ -1,7 +1,7 @@
 """Chaves Groq privadas: até três credenciais, alternância e failover limitado.
 
 Sem URLs ou chaves no cliente; sem repetição automática após timeout,
-falhas de rede ou respostas de sucesso com conteúdo inválido.
+erros de leitura de rede ou respostas de sucesso com conteúdo inválido.
 """
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ import time
 from urllib.parse import urlsplit
 from typing import Mapping
 
-from requests import Response
+from requests import Response, ConnectTimeout
 
 # Nomes compatíveis com configuração antiga e novas variáveis no Render.
 KEY_GROUPS = (
@@ -73,11 +73,14 @@ class KeyPool:
             candidates = keys[order:] + keys[:order]
             return tuple(key for key in candidates if self._cooldown_until.get(key, 0) <= now)
 
-    def cooldown(self, key: str, response: Response) -> None:
-        code = response.status_code
-        if code in (401, 403):
+    def cooldown(self, key: str, response: Response | None) -> None:
+        if response is None:
+            # ConnectTimeout acontece antes de criar uma conexão HTTP.
+            # Pausa temporária apenas essa chave sem penalizar as demais.
+            delay = 10.0
+        elif response.status_code in (401, 403):
             delay = 300.0
-        elif code == 429:
+        elif response.status_code == 429:
             # Groq documenta Retry-After em segundos no 429.
             try:
                 delay = float(response.headers.get("Retry-After", "20"))
@@ -94,13 +97,16 @@ groq_keys = KeyPool()
 
 
 def post_with_failover(post, url: str, payload: dict, keys: tuple[str, ...], *,
-                       timeout: tuple[int, int] = (10, 300), pool: KeyPool | None = None) -> Response | None:
+                       timeout: tuple[int, int] = (10, 300), pool: KeyPool | None = None,
+                       attempts: list[str] | None = None) -> Response | None:
     """No máximo uma solicitação por chave elegível, sem revelar credenciais.
 
     Retorna a última resposta HTTP se todas as chaves forem recusadas.
     Retorna None quando todas as chaves estiverem em cooldown.
-    Propaga timeout/erro de transporte: repetir uma requisição de estado
-    desconhecido poderia gerar cobranças ou respostas duplicadas.
+    Alterna após ConnectTimeout (falha antes de estabelecer conexão).
+    Propaga ReadTimeout, Timeout genérico e demais erros de transporte:
+    repetir uma requisição já recebida pelo provedor poderia gerar custo
+    ou respostas duplicadas. Nunca retorna valores de credenciais.
     """
     active_pool = pool if pool is not None else groq_keys
     candidate_keys = active_pool.select(keys)
@@ -108,18 +114,35 @@ def post_with_failover(post, url: str, payload: dict, keys: tuple[str, ...], *,
         return None
 
     last_response = None
+    last_connect_error = None
     for key in candidate_keys:
-        response = post(
-            url,
-            headers={
-                "Authorization": "Bearer " + key,
-                "Content-Type": "application/json",
-            },
-            json=payload,
-            timeout=timeout,
-        )
+        try:
+            response = post(
+                url,
+                headers={
+                    "Authorization": "Bearer " + key,
+                    "Content-Type": "application/json",
+                },
+                json=payload,
+                timeout=timeout,
+            )
+        except ConnectTimeout as exc:
+            # A tentativa falhou ao conectar; é seguro usar outra chave.
+            if attempts is not None:
+                attempts.append("connect_timeout")
+            active_pool.cooldown(key, None)
+            last_connect_error = exc
+            continue
+
         last_response = response
+        if attempts is not None:
+            attempts.append(str(response.status_code))
         if response.status_code not in RETRYABLE_STATUSES:
             return response
         active_pool.cooldown(key, response)
-    return last_response
+
+    if last_response is not None:
+        return last_response
+    if last_connect_error is not None:
+        raise last_connect_error
+    return None
