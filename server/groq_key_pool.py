@@ -94,7 +94,7 @@ groq_keys = KeyPool()
 
 
 def post_with_failover(post, url: str, payload: dict, keys: tuple[str, ...], *,
-                       timeout: tuple[int, int] = (10, 300)) -> Response | None:
+                       timeout: tuple[int, int] = (10, 300), pool: KeyPool | None = None) -> Response | None:
     """No máximo uma solicitação por chave elegível, sem revelar credenciais.
 
     Retorna a última resposta HTTP se todas as chaves forem recusadas.
@@ -102,7 +102,8 @@ def post_with_failover(post, url: str, payload: dict, keys: tuple[str, ...], *,
     Propaga timeout/erro de transporte: repetir uma requisição de estado
     desconhecido poderia gerar cobranças ou respostas duplicadas.
     """
-    candidate_keys = groq_keys.select(keys)
+    active_pool = pool if pool is not None else groq_keys
+    candidate_keys = active_pool.select(keys)
     if not candidate_keys:
         return None
 
@@ -120,5 +121,5 @@ def post_with_failover(post, url: str, payload: dict, keys: tuple[str, ...], *,
         last_response = response
         if response.status_code not in RETRYABLE_STATUSES:
             return response
-        groq_keys.cooldown(key, response)
+        active_pool.cooldown(key, response)
     return last_response
