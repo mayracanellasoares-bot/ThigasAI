@@ -97,25 +97,25 @@ test("instalação salva interface completa e ativação mantém caches alheios 
   assert.equal(harness.buckets.has(worker.CACHE_NAME), true);
 });
 
-test("offline abre somente o login público, nunca histórico ou chat", async () => {
+test("offline abre o shell público do chat sem senha ou chamadas à API", async () => {
   let online = true, calls = 0;
   const harness = workerHarness(async request => {
     calls++;
     if (!online) throw new TypeError("offline");
-    return new Response(new URL(request.url).pathname === "/entrar" ? "LOGIN HTML" : "asset");
+    return new Response(new URL(request.url).pathname === "/" ? "PUBLIC CHAT HTML" : "asset");
   });
   await harness.lifecycle("install");
   online = false;
   const page = await harness.request("/", "GET", "navigate");
-  assert.equal(await page.text(), "LOGIN HTML");
+  assert.equal(await page.text(), "PUBLIC CHAT HTML");
   const beforeAsset = calls;
-  const loginJS = await harness.request(worker.APP_SHELL.find(path => path.startsWith("/static/login.js?")));
-  assert.equal(await loginJS.text(), "asset");
+  const publicJS = await harness.request(worker.APP_SHELL.find(path => path.startsWith("/static/chat.js?")));
+  assert.equal(await publicJS.text(), "asset");
   assert.equal(calls, beforeAsset);
   assert.equal(await harness.request("/chat", "POST"), undefined);
 });
 
-test("navegação online nunca salva HTML autenticado no cache", async () => {
+test("navegação online busca HTML novo e preserva shell offline no cache", async () => {
   let version = "v1";
   const harness = workerHarness(async () => new Response(version));
   await harness.lifecycle("install");
@@ -123,8 +123,8 @@ test("navegação online nunca salva HTML autenticado no cache", async () => {
   const response = await harness.request("/", "GET", "navigate");
   assert.equal(await response.text(), "v2");
   const cache = await harness.cacheStorage.open(worker.CACHE_NAME);
-  assert.equal(await cache.match("/"), undefined);
-  assert.equal(await (await cache.match("/entrar")).text(), "v1");
+  assert.equal(await (await cache.match("/")).text(), "v1");
+  assert.equal(await cache.match("/entrar"), undefined);
   assert.equal(await harness.request("/health"), undefined);
 });
 
@@ -132,7 +132,7 @@ test("primeiro acesso offline sem cache informa a necessidade de conexão", asyn
   const harness = workerHarness(async () => { throw new TypeError("offline"); });
   const response = await harness.request("/", "GET", "navigate");
   assert.equal(response.status, 503);
-  assert.match(await response.text(), /primeira vez/);
+  assert.match(await response.text(), /Conecte-se à internet/);
 });
 
 test("nova versão só ativa imediatamente após comando explícito", async () => {
@@ -143,12 +143,15 @@ test("nova versão só ativa imediatamente após comando explícito", async () =
   assert.equal(harness.skipped(), true);
 });
 
-test("somente os arquivos de login e ícones fazem parte do precache", () => {
-  const html = fs.readFileSync(path.join(__dirname, "../static/login.html"), "utf8");
-  for (const match of html.matchAll(/(?:src|href)="(\/static\/[^\"]+)"/g)) assert.ok(worker.APP_SHELL.includes(match[1]), match[1]);
-  assert.ok(worker.APP_SHELL.includes("/entrar"));
-  assert.ok(!worker.APP_SHELL.includes("/"));
-  assert.ok(!worker.APP_SHELL.some(name => name.includes("chat.js")));
+test("precache inclui somente o shell público e seus assets, nunca login ou API", () => {
+  const html = fs.readFileSync(path.join(__dirname, "../static/index.html"), "utf8");
+  for (const match of html.matchAll(/(?:src|href)="(\/static\/[^\"]+)"/g))
+    assert.ok(worker.APP_SHELL.includes(match[1]), match[1]);
+  assert.ok(worker.APP_SHELL.includes("/"));
+  assert.ok(worker.APP_SHELL.some(name => name.startsWith("/static/chat.js?")));
+  assert.ok(!worker.APP_SHELL.includes("/entrar"));
+  assert.ok(!worker.APP_SHELL.some(name => name.includes("login.js")));
+  assert.ok(!worker.APP_SHELL.includes("/api"));
 });
 
 test("elementos do instalador e aviso de atualização existem e são seguros", () => {

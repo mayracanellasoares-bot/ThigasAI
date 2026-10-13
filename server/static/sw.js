@@ -1,13 +1,17 @@
 "use strict";
 
-// Apenas os recursos PÚBLICOS são armazenados offline.
-// Nunca armazene HTML do chat, API, workspace, anexos ou histórico no CacheStorage.
+// Apenas o shell PÚBLICO estático do chat é armazenado offline.
+// Nunca armazene respostas de API, documentos, anexos ou histórico no CacheStorage.
 const CACHE_PREFIX = "thigas-pwa-";
-const CACHE_NAME = CACHE_PREFIX + "v18-auth";
+const CACHE_NAME = CACHE_PREFIX + "v19-public";
 const APP_SHELL = [
-  "/entrar",
+  "/",
   "/manifest.webmanifest",
-  "/static/login.js?v=access1",
+  "/static/chat.css?v=audit3",
+  "/static/mini-nano-theme.css?v=audit3",
+  "/static/history-sidebar.css?v=drawer2",
+  "/static/chat.js?v=public6",
+  "/static/pwa.js?v=llama2",
   "/static/icons/icon.svg",
   "/static/icons/icon-192.png",
   "/static/icons/icon-512.png",
@@ -44,14 +48,14 @@ if (typeof self !== "undefined" && self.addEventListener) {
 
   async function navigate(request) {
     try {
-      // Nunca persistir páginas autenticadas, mesmo após login ou redirecionamentos.
+      // O site é público. Não armazenar respostas dinâmicas nem histórico.
       return await fetch(request);
     } catch (_) {
       const cache = await caches.open(CACHE_NAME);
-      const login = await cache.match("/entrar");
-      if (login) return login;
+      const home = await cache.match("/");
+      if (home) return home;
       return new Response(
-        "<!doctype html><html lang='pt-BR'><meta name='viewport' content='width=device-width'><title>THIGAS offline</title><p>Conecte-se à internet para abrir o THIGAS pela primeira vez e informar a senha.</p></html>",
+        "<!doctype html><html lang='pt-BR'><meta name='viewport' content='width=device-width'><title>THIGAS offline</title><p>Conecte-se à internet para conversar com o THIGAS AI.</p></html>",
         { status: 503, headers: { "Content-Type": "text/html; charset=utf-8" } }
       );
     }
