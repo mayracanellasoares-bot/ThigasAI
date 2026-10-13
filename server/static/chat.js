@@ -119,6 +119,20 @@
       "RESPOSTA A REVISAR:\n" + String(answer || "").slice(0, 12000);
   }
 
+  function safeSourceUrl(raw) {
+    if (typeof raw !== "string" || raw.length > 1800 || /[\u0000-\u001f\u007f]/.test(raw)) return null;
+    try {
+      const url = new URL(raw);
+      if (url.protocol !== "https:" || !url.hostname || url.username || url.password ||
+          (url.port && url.port !== "443") ||
+          ["localhost", "127.0.0.1", "::1"].includes(url.hostname.toLowerCase()) ||
+          /\.(?:local|localhost|internal)$/i.test(url.hostname)) return null;
+      return url.href;
+    } catch (_) {
+      return null;
+    }
+  }
+
   async function requestChat(fetcher, message, history, signal, mode = "fast", webSearch = false) {
     const payload = { message, history: apiHistory(history, message) };
     if (mode === "thinking" || mode === "cloud") payload.mode = mode;
@@ -151,7 +165,10 @@
       search_provider: ["brave", "wikipedia"].includes(data.search_provider) ? data.search_provider : null,
       sources: Array.isArray(data.sources)
         ? data.sources.filter(source => source && typeof source.title === "string" &&
-          typeof source.url === "string" && /^https:\/\//.test(source.url)).slice(0, 5)
+          safeSourceUrl(source.url) !== null).map(source => ({
+            title: source.title.slice(0, 200), url: safeSourceUrl(source.url),
+            snippet: typeof source.snippet === "string" ? source.snippet.slice(0, 480) : "",
+          })).slice(0, 5)
         : [],
       quality_flags: Array.isArray(data.quality_flags)
         ? data.quality_flags.filter(flag => ["output_limit", "possible_repetition", "unclosed_code_block", "possible_python_syntax_error", "possible_json_syntax_error"].includes(flag))
@@ -161,7 +178,7 @@
 
   // Exportações puras permitem testar o contrato sem DOM, API externa ou saldo.
   if (typeof module !== "undefined" && module.exports) {
-    module.exports = { MAX_MESSAGE, MAX_FILE_BYTES, MAX_TEXT_FILE_BYTES, safeFilename, validateFile, composeMessage, sanitizeHistory, apiHistory, splitCodeBlocks, codeFilename, extractDocument, requestChat, redactAttachmentFromHistory, classifyConversationDate, codeRevisionPrompt };
+    module.exports = { MAX_MESSAGE, MAX_FILE_BYTES, MAX_TEXT_FILE_BYTES, safeFilename, validateFile, composeMessage, sanitizeHistory, apiHistory, splitCodeBlocks, codeFilename, extractDocument, requestChat, redactAttachmentFromHistory, classifyConversationDate, codeRevisionPrompt, safeSourceUrl };
   }
   if (typeof document === "undefined") return;
 
@@ -628,7 +645,7 @@
     switch (command.toLowerCase()) {
       case "/help": case "/ajuda": modal.showModal(); break;
       case "/novo": startNewConversation(); break;
-      case "/clear": clearConversation(); break;
+      case "/clear": case "/limpar": clearConversation(); break;
       case "/sound": settings.sound = !settings.sound; applySettings(); beep(); break;
       case "/theme":
         if (!THEMES.includes(args[0])) info("Use /theme green, amber, cyan ou pink.", true);
