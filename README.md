@@ -278,3 +278,22 @@ Ao enviar uma pergunta no modo **Groq ou NVIDIA**, o THIGAS AI escolhe uma chave
 - A rotação/pausa ocorre localmente em cada processo do Gunicorn. Não é monitoramento independente nem garante continuidade se o provedor inteiro estiver indisponível ou todas as chaves compartilharem o limite da organização.
 
 Os cenários são validados por testes locais simulados, sem chamar os serviços pagos. A aplicação continua exigindo `THIGAS_CLOUD_ENABLED=true` para ativar Groq no chat, e `THIGAS_NVIDIA_ENABLED=true` para NVIDIA.
+
+## Aion Labs no THIGAS AI
+
+O chat oferece agora **Aion Labs · padrão** e **Aion Labs · esforço alto** com integração server-side independente da Maritaca, Groq e NVIDIA. Nenhuma chave Aion é transmitida ao navegador. As consultas só são enviadas quando o usuário seleciona um dos modos Aion e envia a pergunta, evitando consumir créditos involuntariamente.
+
+**Variáveis no Render:** a chave principal pode estar configurada como `AION_API_KEY`, `AION_LABS_API_KEY`, `AIONLABS_API_KEY`, `THIGAS_AION_API_KEY` ou `AION_KEY`. São aceitas outras duas chaves (opcionais) com os nomes `AION_API_KEY_2` e `AION_API_KEY_3`, inclusive as variantes `THIGAS_AION_API_KEY_2/_3` ou `AION_LABS_API_KEY_2/_3`. Todas ficam privadas. Com várias chaves, o servidor faz rodízio e failover limitado após erros HTTP recuperáveis ou `ConnectTimeout`; nunca muda de provedor sozinho.
+
+- `THIGAS_AION_MODEL`: modelo selecionado, padrão `aion-labs/aion-3.5-mini`. Se não estiver definida, a variável `AION_MODEL` também é aceita.
+- `THIGAS_AION_ENABLED`: chave de ativação, padrão `true`; `AION_ENABLED` é aceito como alternativa. Sem uma chave, ambos os modos permanecem desabilitados.
+- **Endpoint oficial e fixo:** `https://api.aionlabs.ai/v1/chat/completions`. Não aceita redirecionar tokens para URLs arbitrárias.
+- **Padrão:** modelos Aion 2.0/3.0/3.5 conhecidos enviam `reasoning_effort=low`; **alto:** envia `reasoning_effort=high`. O modelo roleplay 8B não oferece modo alto. Não inclui parâmetros exclusivos da Groq ou NVIDIA.
+- **Tokens:** a UI exibe somente números de uso recebidos na resposta da Aion, sem estimativas. O limite de saída do servidor permanece até 16384 tokens, mas o provedor pode impor limites próprios.
+- **Timeout:** a documentação Aion informa limite de 120 segundos para respostas não streaming; respostas extensas podem expirar. Este gateway continua não streaming.
+- **Preço e limites:** a disponibilidade de chaves, créditos e cobrança segue sua conta Aion Labs. Múltiplas chaves não garantem cotas independentes.
+
+Para serviços Render que já existem, declarar `sync: false` em `render.yaml` **não cria nem lê a chave do painel**. Se você já cadastrou `AION_API_KEY`, basta garantir que o nome corresponde e que a alteração foi aplicada. Caso contrário, cadastre-a em **Render → thigas-coder-gateway → Environment** sem publicá-la no GitHub. A tela `/api` autenticada divulga apenas disponibilidade, modelo e quantidade de chaves; nunca o segredo.
+
+Documentação oficial: https://api.aionlabs.ai/docs/api-reference/ e https://www.aionlabs.ai/docs/quickstart/.
+Testes isolados sem consumir créditos: `python -m unittest discover -s server/tests -v` e `node --test server/tests/chat.test.cjs`.
