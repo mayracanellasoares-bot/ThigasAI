@@ -30,6 +30,9 @@ jobs:
           node --check server/static/chat.js
           node --check server/static/pwa.js
           node --check server/static/sw.js
+      - name: Smoke test público do Render (sem senha e sem inferência)
+        continue-on-error: true
+        run: python scripts/smoke_site.py
       - name: Impedir retorno do build Android
         run: |
           test ! -d app
