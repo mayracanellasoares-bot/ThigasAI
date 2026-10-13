@@ -334,3 +334,29 @@ test("modo NVIDIA usa endpoint do chat do site, sem expor chaves", async () => {
   assert.equal(reply.reasoning_effort, "high");
   assert.equal(reply.usage.total_tokens, null);
 });
+
+test("alternância de chaves é informada sem dados secretos", async () => {
+  const result = await chat.requestChat(async (path, options) => {
+    assert.equal(path, "/chat");
+    assert.equal(JSON.parse(options.body).mode, "nvidia");
+    return {ok: true, json: async () => ({
+      answer: "Recuperado pela segunda chave",
+      model: "openai/gpt-oss-20b",
+      provider_attempt_count: 2,
+      provider_failover_used: true,
+    })};
+  }, "Teste do fallback", [], undefined, "nvidia", false);
+  assert.equal(result.provider_attempt_count, 2);
+  assert.equal(result.provider_failover_used, true);
+  assert.equal(result.usage.total_tokens, null);
+  const source = fs.readFileSync(path.join(__dirname, "../static/chat.js"), "utf8");
+  assert.match(source, /Alternância automática realizada/);
+});
+
+test("telemetria de failover inválida não é exibida", async () => {
+  const result = await chat.requestChat(async () => ({ok: true, json: async () => ({
+    answer: "Ok", provider_attempt_count: "many", provider_failover_used: "true",
+  })}), "Teste", [], undefined, "fast", false);
+  assert.equal(result.provider_attempt_count, 0);
+  assert.equal(result.provider_failover_used, false);
+});
