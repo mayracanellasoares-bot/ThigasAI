@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Verificação pública, sem login e sem consumo de tokens, do site THIGAS AI.
+"""Verificação do THIGAS AI público sem senha e sem consumo de tokens.
 
-Não envia mensagem ao modelo; nunca solicita nem imprime senhas. Um resultado
-bem-sucedido comprova somente endpoints públicos e restrição de acesso.
+Não envia mensagens aos modelos nem usa credenciais; verifica que o site,
+metadados e assets são navegáveis sem autenticação.
 """
 from __future__ import annotations
 
@@ -22,10 +22,10 @@ def check(base: str) -> int:
     session = requests.Session()
     checks = [
         ("/health", 200, {"Accept": "application/json"}),
-        ("/entrar", 200, {"Accept": "text/html"}),
-        ("/static/login.js", 200, {"Accept": "text/javascript"}),
-        ("/api", 401, {"Accept": "application/json"}),
-        ("/", 303, {"Accept": "text/html"}),
+        ("/", 200, {"Accept": "text/html"}),
+        ("/static/chat.js", 200, {"Accept": "text/javascript"}),
+        ("/api", 200, {"Accept": "application/json"}),
+        ("/entrar", 303, {"Accept": "text/html"}),
     ]
 
     good = True
