@@ -139,7 +139,7 @@ class AionLabsTests(unittest.TestCase):
         self.assertEqual(post.call_args.kwargs["headers"]["Authorization"], "Bearer aion-secret")
         self.assertTrue(public_config["aion_enabled"])
         self.assertTrue(public_config["aion_thinking_enabled"])
-        self.assertEqual(public_config["aion_key_count"], 1)
+        self.assertNotIn("aion_key_count", public_config)
         self.assertEqual(public_config["models"]["aion"], "aion-labs/aion-3.5-mini")
         for secret in ("aion-secret", "nvidia-secret", "groq-secret"):
             self.assertNotIn(secret, str(public_config))
