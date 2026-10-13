@@ -111,6 +111,14 @@
     return { name: safeFilename(data.filename || file.name), text: data.text.trim(), truncated: data.truncated === true };
   }
 
+  function codeRevisionPrompt(answer) {
+    return "Revise rigorosamente o código abaixo, que veio de uma resposta anterior. " +
+      "Identifique erros de sintaxe, lógica, dependências, nomes, DOM, eventos e compatibilidade. " +
+      "Corrija apenas o necessário e entregue a implementação completa sem omitir trechos. " +
+      "Não afirme que executou testes sem evidência e indique como validar.\n\n" +
+      "RESPOSTA A REVISAR:\n" + String(answer || "").slice(0, 12000);
+  }
+
   async function requestChat(fetcher, message, history, signal, mode = "fast") {
     const payload = { message, history: apiHistory(history, message) };
     if (mode === "thinking" || mode === "cloud") payload.mode = mode;
@@ -138,15 +146,16 @@
         total_tokens: measured(usage.total_tokens),
       },
       finish_reason: typeof data.finish_reason === "string" ? data.finish_reason : null,
+      reasoning_effort: data.reasoning_effort === "high" || data.reasoning_effort === "medium" ? data.reasoning_effort : null,
       quality_flags: Array.isArray(data.quality_flags)
-        ? data.quality_flags.filter(flag => ["output_limit", "possible_repetition", "unclosed_code_block", "possible_python_syntax_error"].includes(flag))
+        ? data.quality_flags.filter(flag => ["output_limit", "possible_repetition", "unclosed_code_block", "possible_python_syntax_error", "possible_json_syntax_error"].includes(flag))
         : [],
     };
   }
 
   // Exportações puras permitem testar o contrato sem DOM, API externa ou saldo.
   if (typeof module !== "undefined" && module.exports) {
-    module.exports = { MAX_MESSAGE, MAX_FILE_BYTES, MAX_TEXT_FILE_BYTES, safeFilename, validateFile, composeMessage, sanitizeHistory, apiHistory, splitCodeBlocks, codeFilename, extractDocument, requestChat, redactAttachmentFromHistory, classifyConversationDate };
+    module.exports = { MAX_MESSAGE, MAX_FILE_BYTES, MAX_TEXT_FILE_BYTES, safeFilename, validateFile, composeMessage, sanitizeHistory, apiHistory, splitCodeBlocks, codeFilename, extractDocument, requestChat, redactAttachmentFromHistory, classifyConversationDate, codeRevisionPrompt };
   }
   if (typeof document === "undefined") return;
 
@@ -504,6 +513,18 @@
     copyButton.type = "button";
     copyButton.addEventListener("click", () => copy(text, copyButton));
     actions.append(copyButton);
+    if (role === "assistant" && codeIndex > 0) {
+      const reviewButton = make("button", "text-btn", "REVISAR CÓDIGO");
+      reviewButton.type = "button";
+      reviewButton.addEventListener("click", () => {
+        if (requestActive || readingFile) return;
+        input.value = codeRevisionPrompt(text);
+        resizeInput();
+        input.focus();
+        info("Pedido de revisão preparado. Confira antes de enviar; nova consulta pode consumir créditos.");
+      });
+      actions.append(reviewButton);
+    }
     entry.append(actions);
     logs.append(entry);
     scrollBottom();
@@ -642,12 +663,15 @@
       const answer = result.answer;
       renderMessage("assistant", answer);
       showUsage(result.usage);
-      byId("model-used").textContent = modeSelector.value === "thinking" ? "Alto" : "Padrão";
+      byId("model-used").textContent = result.model
+        ? (result.reasoning_effort === "high" ? "Alto · " : "") + result.model
+        : "Modelo não informado";
       const qualityMessages = {
         output_limit: "A resposta atingiu o limite de saída; pode estar incompleta.",
         possible_repetition: "Possível loop de repetição detectado; confira o conteúdo antes de utilizá-lo.",
         unclosed_code_block: "Um bloco de código não foi fechado; a resposta pode estar incompleta.",
         possible_python_syntax_error: "O código Python gerado pode conter erro de sintaxe. Confira e teste antes de executar.",
+        possible_json_syntax_error: "O JSON gerado não é válido. Use Revisar Código para pedir uma correção.",
       };
       const flags = result.quality_flags.slice();
       if (result.finish_reason === "length" && !flags.includes("output_limit")) flags.push("output_limit");
@@ -748,9 +772,14 @@
       const allowThinking = capabilities?.thinking_enabled === true;
       const thinking = modeSelector.querySelector('option[value="thinking"]');
       thinking.disabled = !allowThinking;
-      thinking.textContent = allowThinking ? "Esforço: alto" : "Esforço: alto (indisponível)";
+      const activeThinkingModel = typeof capabilities?.models?.thinking === "string" ? capabilities.models.thinking : "";
+      const supportsHighEffort = capabilities?.thinking_effort_high === true;
+      thinking.textContent = !allowThinking ? "Avançado (indisponível)" :
+        supportsHighEffort ? "Esforço: alto (GPT-OSS)" : "Modelo avançado";
+      thinking.title = activeThinkingModel ? "Modelo: " + activeThinkingModel : "Modelo avançado não configurado";
       if (modeSelector.selectedOptions[0]?.disabled) modeSelector.value = "fast";
-      byId("mode-hint").textContent = allowThinking ? "Esforço alto disponível." : "Esforço alto indisponível.";
+      byId("mode-hint").textContent = !allowThinking ? "Modo avançado indisponível." :
+        supportsHighEffort ? "Esforço alto realmente configurado no modelo GPT-OSS." : "Modelo avançado ativo; esforço alto numérico não está disponível neste provedor.";
     } catch (_) {
       // Fail closed: existing fast mode works, advanced modes stay disabled.
     }

@@ -201,3 +201,26 @@ test("alertas de qualidade só aceitam indicadores reconhecidos pelo cliente", a
   }), "Faça um teste", []);
   assert.deepEqual(response.quality_flags, ["possible_repetition", "possible_python_syntax_error"]);
 });
+
+test("modelo e esforço informados pelo backend são exibíveis sem métricas inventadas", async () => {
+  const result = await chat.requestChat(async () => ({
+    ok: true,
+    json: async () => ({
+      answer: "Código revisado", model: "openai/gpt-oss-20b",
+      reasoning_effort: "high", quality_flags: ["possible_json_syntax_error"],
+    }),
+  }), "Crie um código Python", []);
+  assert.equal(result.model, "openai/gpt-oss-20b");
+  assert.equal(result.reasoning_effort, "high");
+  assert.deepEqual(result.quality_flags, ["possible_json_syntax_error"]);
+  assert.equal(result.usage.total_tokens, null);
+});
+
+test("revisão de código prepara mensagem sem fazer outra chamada automática", () => {
+  const review = chat.codeRevisionPrompt("```python\nprint('teste')\n```");
+  assert.match(review, /Revise rigorosamente/);
+  assert.match(review, /print\('teste'\)/);
+  assert.match(review, /Não afirme que executou testes/);
+  assert.ok(review.length < 15000);
+  assert.match(chat.codeRevisionPrompt("x".repeat(20000)), /x{50}/);
+});

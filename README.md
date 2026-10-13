@@ -203,3 +203,12 @@ python scripts/bench_context_retention.py
 ```
 
 Para avaliar a acurácia **real** nas duas versões, é necessário autenticação e autorização de custos do provedor. Há um comparador para resultados JSONL: `scripts/compare_cognition.py --before baseline_test.jsonl --after candidato_test.jsonl`. Consulte [o relatório de contexto e confiabilidade](docs/EVOLUCAO_COGNITIVA_V2.md).
+
+
+## Esforço alto: configuração real para programação
+
+O modo avançado utiliza o provedor configurado no servidor. Quando o modelo ativo for GPT-OSS 20B/120B **na Groq**, o modo `thinking` agora envia `reasoning_effort=high`; o modo `cloud` usa `medium`. Com Sabiá Thinking o parâmetro exclusivo da Groq não é enviado. O chat mostra o modelo efetivamente selecionado e não afirma que um modelo externo compilou ou executou código.
+
+Pedidos de programação recebem critérios adicionais de qualidade. O verificador estático avisa sobre sintaxe Python e JSON potencialmente inválida, mas não valida a lógica do programa. O botão **REVISAR CÓDIGO** prepara um pedido de correção para revisão e envio pelo usuário; ele não consome créditos até que o usuário envie.
+
+Consulte [o diagnóstico e a implementação](docs/ESFORCO_ALTO_CODIGO.md).

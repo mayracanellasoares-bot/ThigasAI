@@ -6,6 +6,7 @@ Não executa trechos de código, não consome tokens de um segundo modelo.
 from __future__ import annotations
 
 import ast
+import json
 import re
 
 
@@ -58,11 +59,18 @@ def inspect_generation(answer: str, finish_reason: str | None) -> list[str]:
 
     for match in matches[:4]:
         language = match.group(1).strip().casefold()
-        if language not in ("python", "py") or len(match.group(2)) > 16000:
+        if len(match.group(2)) > 16000:
             continue
-        try:
-            ast.parse(match.group(2))
-        except (SyntaxError, ValueError, RecursionError, MemoryError):
-            flags.append("possible_python_syntax_error")
-            break
+        if language in ("python", "py"):
+            try:
+                ast.parse(match.group(2))
+            except (SyntaxError, ValueError, RecursionError, MemoryError):
+                if "possible_python_syntax_error" not in flags:
+                    flags.append("possible_python_syntax_error")
+        elif language == "json":
+            try:
+                json.loads(match.group(2))
+            except (ValueError, TypeError, RecursionError):
+                if "possible_json_syntax_error" not in flags:
+                    flags.append("possible_json_syntax_error")
     return flags
