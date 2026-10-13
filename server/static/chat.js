@@ -111,11 +111,12 @@
     return { name: safeFilename(data.filename || file.name), text: data.text.trim(), truncated: data.truncated === true };
   }
 
-  function codeRevisionPrompt() {
-    return "Revise rigorosamente o código da sua última resposta. Identifique erros de sintaxe, " +
-      "lógica, dependências, nomes, DOM, eventos e compatibilidade. Corrija apenas o que for " +
-      "necessário, mas entregue a implementação completa e coerente, sem omitir trechos. " +
-      "Não afirme que executou testes sem evidência e indique o comando de validação.";
+  function codeRevisionPrompt(answer) {
+    return "Revise rigorosamente o código abaixo, que veio de uma resposta anterior. " +
+      "Identifique erros de sintaxe, lógica, dependências, nomes, DOM, eventos e compatibilidade. " +
+      "Corrija apenas o necessário e entregue a implementação completa sem omitir trechos. " +
+      "Não afirme que executou testes sem evidência e indique como validar.\n\n" +
+      "RESPOSTA A REVISAR:\n" + String(answer || "").slice(0, 12000);
   }
 
   async function requestChat(fetcher, message, history, signal, mode = "fast") {
@@ -512,6 +513,18 @@
     copyButton.type = "button";
     copyButton.addEventListener("click", () => copy(text, copyButton));
     actions.append(copyButton);
+    if (role === "assistant" && codeIndex > 0) {
+      const reviewButton = make("button", "text-btn", "REVISAR CÓDIGO");
+      reviewButton.type = "button";
+      reviewButton.addEventListener("click", () => {
+        if (requestActive || readingFile) return;
+        input.value = codeRevisionPrompt(text);
+        resizeInput();
+        input.focus();
+        info("Pedido de revisão preparado. Confira antes de enviar; nova consulta pode consumir créditos.");
+      });
+      actions.append(reviewButton);
+    }
     entry.append(actions);
     logs.append(entry);
     scrollBottom();
