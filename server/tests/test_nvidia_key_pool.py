@@ -95,7 +95,7 @@ class NvidiaKeyTests(unittest.TestCase):
                 info = client.get("/api").get_json()
             self.assertTrue(info["nvidia_enabled"])
             self.assertTrue(info["nvidia_thinking_enabled"])
-            self.assertEqual(info["nvidia_key_count"], 2)
+            self.assertNotIn("nvidia_key_count", info)
             self.assertNotIn("SECRET-TWO", str(info))
             self.assertNotIn("SECRET-THREE", str(info))
 
