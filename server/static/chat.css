@@ -1111,3 +1111,16 @@ body.light-mode .composer{background:white}
 #chat-logs{padding:0 12px 8px}
 }
 @media(max-width:440px){.header-new-chat{font-size:0}.header-new-chat::after{content:"＋";font-size:20px}.mobile-brand-copy small{max-width:150px}}
+
+/* Pesquisa online opt-in: planeta ao lado do microfone em mobile/desktop. */
+.web-search-btn{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:12px;font-size:22px;color:#4c523a;transition:background .15s ease,color .15s ease,box-shadow .15s ease}
+.web-search-btn:hover:not(:disabled){background:#f1f0ea}
+.web-search-btn.is-active{background:#e5efdf!important;color:#295a2c!important;box-shadow:inset 0 0 0 1px #80a479!important}
+.web-search-btn.is-active::after{content:"";width:6px;height:6px;border-radius:50%;background:#3c9252;position:absolute;margin:30px 0 0 30px}
+.web-search-btn:focus-visible{outline:2px solid #4c523a;outline-offset:2px}
+.web-search-btn:disabled{opacity:.5}
+.web-source-list{max-width:100%;margin:4px 0 16px 42px;padding:11px 14px;background:#f1f4ec;border:1px solid #dce3d6;border-radius:14px;display:flex;flex-direction:column;gap:7px}
+.web-source-title{font-size:12px;font-weight:700;color:#43523e}
+.web-source-link{display:block;font-size:13px;color:#335e48;text-decoration:underline;text-underline-offset:2px;overflow-wrap:anywhere}
+.web-source-link:hover{color:#1e4330}
+@media(max-width:500px){.composer-send-actions{gap:4px}.web-search-btn{width:36px;height:36px;font-size:20px}.web-source-list{margin-left:6px;padding:10px 12px}}
