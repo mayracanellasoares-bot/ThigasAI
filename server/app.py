@@ -6,6 +6,7 @@ import document_agent
 import link_inspector
 import web_search
 from groq_key_pool import configured_keys, is_groq_endpoint, post_with_failover
+from nvidia_key_pool import NVIDIA_URL, configured_nvidia_keys, post_nvidia
 from cognitive_math import solve_simple_arithmetic
 from context_selector import select_relevant_history
 from generation_quality import inspect_generation
@@ -39,6 +40,9 @@ THIGAS_ENABLE_THINKING = os.getenv("THIGAS_ENABLE_THINKING", "false").strip().lo
 THIGAS_CLOUD_API_KEY = (os.getenv("THIGAS_CLOUD_API_KEY") or os.getenv("GROQ_API_KEY") or "").strip()
 THIGAS_CLOUD_URL = os.getenv("THIGAS_CLOUD_URL", "https://api.groq.com/openai/v1/chat/completions").strip()
 THIGAS_CLOUD_MODEL = os.getenv("THIGAS_CLOUD_MODEL", "openai/gpt-oss-20b").strip() or "openai/gpt-oss-20b"
+THIGAS_NVIDIA_MODEL = os.getenv("THIGAS_NVIDIA_MODEL", "openai/gpt-oss-20b").strip() or "openai/gpt-oss-20b"
+# NVIDIA is only queried following an explicit selection in the chat UI.
+THIGAS_NVIDIA_ENABLED = os.getenv("THIGAS_NVIDIA_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}
 # No public cloud spending without an explicit opt-in from the server owner.
 THIGAS_CLOUD_ENABLED = os.getenv("THIGAS_CLOUD_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
 THIGAS_BRAVE_SEARCH_KEY = os.getenv("THIGAS_BRAVE_SEARCH_KEY", "").strip()
@@ -214,6 +218,12 @@ def choose_model(mode: Any) -> str:
         return MARITACA_MODEL
     if mode == "thinking" and THIGAS_ENABLE_THINKING and MARITACA_API_KEY:
         return MARITACA_THINKING_MODEL
+    if mode in ("nvidia", "nvidia_thinking"):
+        if not (THIGAS_NVIDIA_ENABLED and configured_nvidia_keys()):
+            raise GatewayError("Modo NVIDIA indisponível. Configure chaves NVIDIA no Render.", 403)
+        if mode == "nvidia_thinking" and THIGAS_NVIDIA_MODEL not in {"openai/gpt-oss-20b", "openai/gpt-oss-120b"}:
+            raise GatewayError("Esforço alto NVIDIA disponível somente no modelo GPT-OSS compatível.", 403)
+        return THIGAS_NVIDIA_MODEL
     if mode in ("thinking", "cloud"):
         if not (THIGAS_CLOUD_ENABLED and cloud_api_keys()):
             raise GatewayError("Modo Pensamento indisponível. Configure o acesso no servidor.", 403)
@@ -234,10 +244,11 @@ def is_groq_gpt_oss(url: str, model: str) -> bool:
 
 def ask_maritaca_result(question: str, history: Any, *, mode: str = "fast") -> dict[str, Any]:
     selected_model = choose_model(mode)
+    use_nvidia = mode in ("nvidia", "nvidia_thinking")
     use_cloud = mode == "cloud" or (mode == "thinking" and not (THIGAS_ENABLE_THINKING and MARITACA_API_KEY))
-    api_url = THIGAS_CLOUD_URL if use_cloud else MARITACA_URL
-    keys = cloud_api_keys() if use_cloud else ()
-    api_key = keys[0] if use_cloud and keys else MARITACA_API_KEY if not use_cloud else ""
+    api_url = NVIDIA_URL if use_nvidia else THIGAS_CLOUD_URL if use_cloud else MARITACA_URL
+    keys = configured_nvidia_keys() if use_nvidia else cloud_api_keys() if use_cloud else ()
+    api_key = keys[0] if (use_nvidia or use_cloud) and keys else MARITACA_API_KEY if not (use_nvidia or use_cloud) else ""
     if not api_key:
         raise GatewayError("Chave de acesso do provedor não configurada no servidor.", 503)
 
@@ -249,6 +260,11 @@ def ask_maritaca_result(question: str, history: Any, *, mode: str = "fast") -> d
         "stream": False,
     }
     reasoning_effort = None
+    if use_nvidia and selected_model in {"openai/gpt-oss-20b", "openai/gpt-oss-120b"}:
+        reasoning_effort = "high" if mode == "nvidia_thinking" else "medium"
+        payload["reasoning_effort"] = reasoning_effort
+        payload["temperature"] = 0.6
+        payload["top_p"] = 0.7
     if use_cloud and is_groq_gpt_oss(api_url, selected_model):
         # Groq GPT-OSS defaults to MEDIUM, so the former "Esforço: alto"
         # label did not actually request HIGH. Do not send these provider-
@@ -261,7 +277,11 @@ def ask_maritaca_result(question: str, history: Any, *, mode: str = "fast") -> d
         payload["top_p"] = 0.95
 
     try:
-        if use_cloud and is_groq_endpoint(api_url):
+        if use_nvidia:
+            upstream = post_nvidia(requests.post, payload, keys, url=api_url)
+            if upstream is None:
+                raise GatewayError("Chaves NVIDIA temporariamente em limite de uso. Tente novamente mais tarde.", 429)
+        elif use_cloud and is_groq_endpoint(api_url):
             upstream = post_with_failover(requests.post, api_url, payload, keys)
             if upstream is None:
                 raise GatewayError("Chaves Groq temporariamente em limite de uso. Tente novamente mais tarde.", 429)
@@ -494,6 +514,9 @@ def api_info():
             "thinking_enabled": bool((THIGAS_ENABLE_THINKING and MARITACA_API_KEY) or (THIGAS_CLOUD_ENABLED and cloud_api_keys())),
             "cloud_enabled": THIGAS_CLOUD_ENABLED and bool(cloud_api_keys()),
             "cloud_key_count": len(cloud_api_keys()) if THIGAS_CLOUD_ENABLED else 0,
+            "nvidia_enabled": THIGAS_NVIDIA_ENABLED and bool(configured_nvidia_keys()),
+            "nvidia_key_count": len(configured_nvidia_keys()) if THIGAS_NVIDIA_ENABLED else 0,
+            "nvidia_thinking_enabled": bool(THIGAS_NVIDIA_ENABLED and configured_nvidia_keys() and THIGAS_NVIDIA_MODEL in {"openai/gpt-oss-20b", "openai/gpt-oss-120b"}),
             "web_search_enabled": True,
             "web_search_provider": "brave" if THIGAS_BRAVE_SEARCH_ENABLED and THIGAS_BRAVE_SEARCH_KEY else "wikipedia",
             "thinking_effort_high": bool(
@@ -503,6 +526,7 @@ def api_info():
             ),
             "models": {
                 "fast": MARITACA_MODEL,
+                "nvidia": THIGAS_NVIDIA_MODEL if THIGAS_NVIDIA_ENABLED and configured_nvidia_keys() else None,
                 "thinking": (MARITACA_THINKING_MODEL if THIGAS_ENABLE_THINKING and MARITACA_API_KEY else THIGAS_CLOUD_MODEL if THIGAS_CLOUD_ENABLED and cloud_api_keys() else None),
                 "cloud": THIGAS_CLOUD_MODEL if (THIGAS_CLOUD_ENABLED and cloud_api_keys()) else None,
             },
