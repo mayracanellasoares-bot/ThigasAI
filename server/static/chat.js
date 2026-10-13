@@ -119,9 +119,10 @@
       "RESPOSTA A REVISAR:\n" + String(answer || "").slice(0, 12000);
   }
 
-  async function requestChat(fetcher, message, history, signal, mode = "fast") {
+  async function requestChat(fetcher, message, history, signal, mode = "fast", webSearch = false) {
     const payload = { message, history: apiHistory(history, message) };
     if (mode === "thinking" || mode === "cloud") payload.mode = mode;
+    if (webSearch === true) payload.web_search = true;
     const response = await fetcher("/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -147,6 +148,11 @@
       },
       finish_reason: typeof data.finish_reason === "string" ? data.finish_reason : null,
       reasoning_effort: data.reasoning_effort === "high" || data.reasoning_effort === "medium" ? data.reasoning_effort : null,
+      search_provider: ["brave", "wikipedia"].includes(data.search_provider) ? data.search_provider : null,
+      sources: Array.isArray(data.sources)
+        ? data.sources.filter(source => source && typeof source.title === "string" &&
+          typeof source.url === "string" && /^https:\/\//.test(source.url)).slice(0, 5)
+        : [],
       quality_flags: Array.isArray(data.quality_flags)
         ? data.quality_flags.filter(flag => ["output_limit", "possible_repetition", "unclosed_code_block", "possible_python_syntax_error", "possible_json_syntax_error"].includes(flag))
         : [],
@@ -168,6 +174,9 @@
   const usageTotal = byId("tokens-total");
   const usageStatus = byId("tokens-status");
   const modeSelector = byId("reasoning-mode");
+  const searchButton = byId("btn-web-search");
+  let webSearchActive = false;
+  let searchProviderName = "Wikipédia";
   const ptNumber = new Intl.NumberFormat("pt-BR");
   function showUsage(usage) {
     const show = value => Number.isSafeInteger(value) && value >= 0 ? ptNumber.format(value) : "—";
@@ -583,6 +592,7 @@
 
   function setBusy() {
     const busy = requestActive || readingFile;
+    searchButton.disabled = busy;
     byId("btn-send").disabled = busy;
     byId("btn-attach").disabled = busy;
     byId("btn-remove-file").disabled = requestActive;
@@ -630,6 +640,40 @@
     return { handled: true };
   }
 
+  function renderSources(sources, provider) {
+    if (!Array.isArray(sources) || sources.length === 0) return;
+    const entry = make("div", "web-source-list");
+    entry.append(make("div", "web-source-title",
+      provider === "brave" ? "🌐 Fontes da pesquisa web" : "🌐 Fontes da Wikipédia"));
+    for (const [index, source] of sources.entries()) {
+      const item = make("a", "web-source-link", "[" + (index + 1) + "] " + source.title);
+      item.href = source.url;
+      item.target = "_blank";
+      item.rel = "noopener noreferrer";
+      item.title = source.url;
+      entry.append(item);
+    }
+    logs.append(entry);
+    scrollBottom();
+  }
+
+  function setWebSearch(enabled) {
+    webSearchActive = enabled === true;
+    searchButton.setAttribute("aria-pressed", String(webSearchActive));
+    searchButton.classList.toggle("is-active", webSearchActive);
+    searchButton.title = webSearchActive
+      ? "Pesquisa online ativada (" + searchProviderName + ") — toque para desativar"
+      : "Ativar pesquisa online — " + searchProviderName;
+    searchButton.setAttribute("aria-label", webSearchActive ? "Desativar pesquisa online" : "Ativar pesquisa online");
+  }
+
+  searchButton.addEventListener("click", () => {
+    if (requestActive || readingFile) return;
+    setWebSearch(!webSearchActive);
+    info(webSearchActive ? "Pesquisa online ativada (" + searchProviderName +
+      "). O THIGAS consultará fontes ao enviar sua próxima pergunta." : "Pesquisa online desativada.");
+  });
+
   async function send(event) {
     event.preventDefault();
     if (requestActive || readingFile) return;
@@ -657,11 +701,12 @@
     beep("send");
     const timeout = setTimeout(() => controller.abort(), 325000);
     try {
-      const result = await requestChat(window.fetch.bind(window), message, history, controller.signal, modeSelector.value);
+      const result = await requestChat(window.fetch.bind(window), message, history, controller.signal, modeSelector.value, webSearchActive);
       if (epoch !== conversationEpoch) return;
       pending.remove();
       const answer = result.answer;
       renderMessage("assistant", answer);
+      renderSources(result.sources, result.search_provider);
       showUsage(result.usage);
       byId("model-used").textContent = result.model
         ? (result.reasoning_effort === "high" ? "Alto · " : "") + result.model
@@ -769,6 +814,8 @@
       const response = await fetch("/api", { cache: "no-store" });
       if (!response.ok) return;
       const capabilities = await response.json();
+      searchProviderName = capabilities?.web_search_provider === "brave" ? "Web (Brave)" : "Wikipédia";
+      setWebSearch(webSearchActive);
       const allowThinking = capabilities?.thinking_enabled === true;
       const thinking = modeSelector.querySelector('option[value="thinking"]');
       thinking.disabled = !allowThinking;

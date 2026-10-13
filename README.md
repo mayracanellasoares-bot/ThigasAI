@@ -212,3 +212,24 @@ O modo avançado utiliza o provedor configurado no servidor. Quando o modelo ati
 Pedidos de programação recebem critérios adicionais de qualidade. O verificador estático avisa sobre sintaxe Python e JSON potencialmente inválida, mas não valida a lógica do programa. O botão **REVISAR CÓDIGO** prepara um pedido de correção para revisão e envio pelo usuário; ele não consome créditos até que o usuário envie.
 
 Consulte [o diagnóstico e a implementação](docs/ESFORCO_ALTO_CODIGO.md).
+
+
+## Pesquisa online pelo botão 🌐
+
+O botão **🌐**, imediatamente ao lado do microfone, ativa/desativa a pesquisa online na próxima mensagem. Quando está ativo, fica destacado em verde. Não realiza consulta ao clicar: a busca só ocorre quando o usuário envia uma pergunta. O botão fica desabilitado durante uma requisição e volta a ficar disponível no fim.
+
+- **Funcionamento gratuito padrão:** pesquisa até 5 resultados na API pública da **Wikipédia em português**, sem chave adicional. É uma busca enciclopédica, **não** uma busca irrestrita na web. As fontes e links são exibidos junto da resposta.
+- **Pesquisa web geral opcional:** o proprietário pode configurar `THIGAS_BRAVE_SEARCH_KEY` e habilitar conscientemente `THIGAS_BRAVE_SEARCH_ENABLED=true` no Render. Isso habilita a API oficial Brave Search, sujeita às cotas e preços do provedor. Nenhuma chave fica no navegador e Brave permanece desligado por padrão.
+- O chat envia `web_search: true` apenas se o planeta estiver ativo; o backend encaminha os trechos encontrados ao modelo com rótulo de **conteúdo externo não confiável** e instrui o modelo a citar os itens por número. Fontes são exibidas como links clicáveis.
+- Se não houver resultados ou o provedor falhar, o sistema devolve uma mensagem de erro clara, sem deixar a IA inventar uma pesquisa. A limitação básica é 6 pesquisas por minuto e IP, por worker.
+- A consulta pode sair do servidor para Wikipédia ou Brave; conteúdos de arquivos identificados pelo delimitador `[ARQUIVO: ...]` são excluídos do termo de busca. A pergunta do usuário ainda segue para o provedor de IA usado normalmente pelo THIGAS.
+- Referências de desenvolvimento: https://www.mediawiki.org/wiki/API:Search e https://api-dashboard.search.brave.com/api-reference/web/search/get
+
+Teste local sem chamadas externas:
+
+```sh
+python -m unittest discover -s server/tests -v
+node --test server/tests/*.test.cjs
+```
+
+A pesquisa por trecho e resultado de busca não equivale a conferência de fatos por múltiplas fontes independentes. A Wikipédia pode estar desatualizada, e a Brave pode incorrer em custos se explicitamente ativada pelo proprietário.

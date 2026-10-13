@@ -28,6 +28,10 @@ services:
         value: https://api.groq.com/openai/v1/chat/completions
       - key: THIGAS_CLOUD_MODEL
         value: openai/gpt-oss-20b
+      - key: THIGAS_BRAVE_SEARCH_KEY
+        sync: false
+      - key: THIGAS_BRAVE_SEARCH_ENABLED
+        value: "false"
       - key: TELEGRAM_BOT_TOKEN
         sync: false
       - key: TELEGRAM_WEBHOOK_SECRET
