@@ -32,6 +32,16 @@ services:
         value: https://api.groq.com/openai/v1/chat/completions
       - key: THIGAS_CLOUD_MODEL
         value: openai/gpt-oss-20b
+      - key: NVIDIA_API_KEY
+        sync: false
+      - key: NVIDIA_API_KEY_2
+        sync: false
+      - key: NVIDIA_API_KEY_3
+        sync: false
+      - key: THIGAS_NVIDIA_MODEL
+        value: openai/gpt-oss-20b
+      - key: THIGAS_NVIDIA_ENABLED
+        value: "true"
       - key: THIGAS_BRAVE_SEARCH_KEY
         sync: false
       - key: THIGAS_BRAVE_SEARCH_ENABLED
