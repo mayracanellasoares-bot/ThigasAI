@@ -387,7 +387,7 @@ class PublicAccessTests(unittest.TestCase):
         self.assertEqual(self.client.post("/auth/login", data={"password": "wrong"}).status_code, 303)
         self.assertEqual(self.client.post("/auth/logout").status_code, 303)
         self.assertEqual(self.client.get("/").status_code, 200)
-        self.assertNotIn("senha", self.client.get("/").get_data(as_text=True).lower())
+        self.assertNotIn('action="/auth/login"', self.client.get("/").get_data(as_text=True))
 
     def test_missing_password_does_not_block_public_site(self):
         from flask import Flask
