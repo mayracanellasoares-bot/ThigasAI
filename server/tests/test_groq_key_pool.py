@@ -121,7 +121,8 @@ class GroqThreeKeyTests(unittest.TestCase):
             with gateway.app.test_client() as client:
                 client.post("/auth/login", data={"password": "teste-senha-unica-123456789"})
                 result = client.get("/api").get_json()
-            self.assertEqual(result["cloud_key_count"], 2)
+            self.assertNotIn("cloud_key_count", result)
+            self.assertTrue(result["cloud_enabled"])
             self.assertEqual(result["models"]["thinking"], gateway.THIGAS_CLOUD_MODEL)
             self.assertNotIn("secondary", str(result))
             self.assertNotIn("tertiary", str(result))
