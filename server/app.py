@@ -41,6 +41,9 @@ MARITACA_API_KEY = os.getenv("MARITACA_API_KEY", "").strip()
 MARITACA_THINKING_MODEL = os.getenv("MARITACA_THINKING_MODEL", "sabia-4-thinking").strip() or "sabia-4-thinking"
 # Expensive reasoning must be explicitly enabled by the owner on the server.
 THIGAS_ENABLE_THINKING = os.getenv("THIGAS_ENABLE_THINKING", "false").strip().lower() in {"1", "true", "yes", "on"}
+# Only three THIGAS AI product modes are callable in production.
+# Kept for test-only verification of retired adapters; not configurable via environment.
+THIGAS_LEGACY_PROVIDERS_ENABLED = False
 THIGAS_CLOUD_API_KEY = (os.getenv("THIGAS_CLOUD_API_KEY") or os.getenv("GROQ_API_KEY") or "").strip()
 THIGAS_CLOUD_URL = os.getenv("THIGAS_CLOUD_URL", "https://api.groq.com/openai/v1/chat/completions").strip()
 THIGAS_CLOUD_MODEL = os.getenv("THIGAS_CLOUD_MODEL", "openai/gpt-oss-20b").strip() or "openai/gpt-oss-20b"
@@ -222,6 +225,10 @@ def cloud_api_keys() -> tuple[str, ...]:
 
 
 def choose_model(mode: Any) -> str:
+    if not THIGAS_LEGACY_PROVIDERS_ENABLED and mode not in (None, "fast", "balanced", "thinking"):
+        raise GatewayError("Este modo foi desativado. Escolha Rápido, Equilibrado ou Avançado.", 400)
+    if mode == "thinking" and not THIGAS_LEGACY_PROVIDERS_ENABLED and not (THIGAS_ENABLE_THINKING and MARITACA_API_KEY):
+        raise GatewayError("Modo Avançado temporariamente indisponível.", 403)
     if mode in (None, "fast"):
         return MARITACA_FAST_MODEL
     if mode == "balanced":
@@ -540,39 +547,46 @@ def service_worker():
 
 @app.get("/api")
 def api_info():
-    return jsonify(
-        {
+    data = {
             "name": "THIGAS Coder Gateway",
             "status": "ok",
             "endpoint": "/chat",
             "telegram_webhook": "/telegram/webhook",
-            "thinking_enabled": bool((THIGAS_ENABLE_THINKING and MARITACA_API_KEY) or (THIGAS_CLOUD_ENABLED and cloud_api_keys())),
+            "thinking_enabled": bool(THIGAS_ENABLE_THINKING and MARITACA_API_KEY),
             "maritaca_fast_enabled": bool(MARITACA_API_KEY),
             "maritaca_balanced_enabled": bool(MARITACA_API_KEY),
             "maritaca_stream_enabled": bool(MARITACA_API_KEY),
             "maritaca_thinking_stream_enabled": bool(THIGAS_ENABLE_THINKING and MARITACA_API_KEY),
+            "web_search_enabled": True,
+            "web_search_provider": "brave" if THIGAS_BRAVE_SEARCH_ENABLED and THIGAS_BRAVE_SEARCH_KEY else "wikipedia",
+            "models": {
+                "fast": MARITACA_FAST_MODEL,
+                "balanced": MARITACA_MODEL,
+                "thinking": MARITACA_THINKING_MODEL if THIGAS_ENABLE_THINKING and MARITACA_API_KEY else None,
+            },
+        }
+    if THIGAS_LEGACY_PROVIDERS_ENABLED:
+        # Adapters are inactive in production. Internal regression tests can
+        # still verify their independent key handling without exposing them.
+        data.update({
             "cloud_enabled": THIGAS_CLOUD_ENABLED and bool(cloud_api_keys()),
             "nvidia_enabled": THIGAS_NVIDIA_ENABLED and bool(configured_nvidia_keys()),
             "nvidia_thinking_enabled": bool(THIGAS_NVIDIA_ENABLED and configured_nvidia_keys() and THIGAS_NVIDIA_MODEL in {"openai/gpt-oss-20b", "openai/gpt-oss-120b"}),
             "aion_enabled": bool(THIGAS_AION_ENABLED and configured_aion_keys()),
             "aion_thinking_enabled": bool(THIGAS_AION_ENABLED and configured_aion_keys() and THIGAS_AION_MODEL in REASONING_MODELS),
-            "web_search_enabled": True,
-            "web_search_provider": "brave" if THIGAS_BRAVE_SEARCH_ENABLED and THIGAS_BRAVE_SEARCH_KEY else "wikipedia",
             "thinking_effort_high": bool(
                 not (THIGAS_ENABLE_THINKING and MARITACA_API_KEY)
                 and THIGAS_CLOUD_ENABLED and cloud_api_keys()
                 and is_groq_gpt_oss(THIGAS_CLOUD_URL, THIGAS_CLOUD_MODEL)
             ),
-            "models": {
-                "fast": MARITACA_FAST_MODEL,
-                "balanced": MARITACA_MODEL,
-                "nvidia": THIGAS_NVIDIA_MODEL if THIGAS_NVIDIA_ENABLED and configured_nvidia_keys() else None,
-                "aion": THIGAS_AION_MODEL if THIGAS_AION_ENABLED and configured_aion_keys() else None,
-                "thinking": (MARITACA_THINKING_MODEL if THIGAS_ENABLE_THINKING and MARITACA_API_KEY else THIGAS_CLOUD_MODEL if THIGAS_CLOUD_ENABLED and cloud_api_keys() else None),
-                "cloud": THIGAS_CLOUD_MODEL if (THIGAS_CLOUD_ENABLED and cloud_api_keys()) else None,
-            },
-        }
-    )
+        })
+        data["models"].update({
+            "nvidia": THIGAS_NVIDIA_MODEL if THIGAS_NVIDIA_ENABLED and configured_nvidia_keys() else None,
+            "aion": THIGAS_AION_MODEL if THIGAS_AION_ENABLED and configured_aion_keys() else None,
+            "thinking": MARITACA_THINKING_MODEL if THIGAS_ENABLE_THINKING and MARITACA_API_KEY else THIGAS_CLOUD_MODEL if THIGAS_CLOUD_ENABLED and cloud_api_keys() else None,
+            "cloud": THIGAS_CLOUD_MODEL if THIGAS_CLOUD_ENABLED and cloud_api_keys() else None,
+        })
+    return jsonify(data)
 
 
 _link_check_hits = {}
@@ -674,8 +688,9 @@ def attach_public_web_context(question: str) -> str:
 def describe_uploaded_image():
     """Real visual interpretation only if a compatible vision model is configured."""
     model = os.getenv("THIGAS_VISION_MODEL", "").strip()
-    api_key = (os.getenv("THIGAS_VISION_API_KEY") or THIGAS_CLOUD_API_KEY).strip()
-    endpoint = (os.getenv("THIGAS_VISION_URL") or THIGAS_CLOUD_URL).strip()
+    # Retired cloud-provider keys must never serve as fallback credentials.
+    api_key = os.getenv("THIGAS_VISION_API_KEY", "").strip()
+    endpoint = os.getenv("THIGAS_VISION_URL", "").strip()
     if not model or not api_key:
         return jsonify(error="A análise de imagens ainda não foi ativada no servidor. Configure THIGAS_VISION_MODEL e THIGAS_VISION_API_KEY."), 503
     upload = request.files.get("image")
