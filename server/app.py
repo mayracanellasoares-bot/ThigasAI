@@ -1,4 +1,5 @@
 import os
+import json
 import base64
 import re
 import hmac
@@ -9,6 +10,7 @@ from groq_key_pool import configured_keys, is_groq_endpoint, post_with_failover
 from nvidia_key_pool import NVIDIA_URL, configured_nvidia_keys, post_nvidia
 from aion_provider import (AION_URL, AION_DEFAULT_MODEL, REASONING_MODELS,
                            configured_aion_keys, reasoning_effort_for_mode, post_aion)
+from maritaca_stream import relay_maritaca_stream, sse_event
 from cognitive_math import solve_simple_arithmetic
 from context_selector import select_relevant_history
 from generation_quality import inspect_generation
@@ -21,7 +23,7 @@ from typing import Any
 
 import requests
 from docx import Document
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, Response, stream_with_context
 from openpyxl import load_workbook
 from pypdf import PdfReader
 from pptx import Presentation
@@ -34,9 +36,10 @@ MARITACA_URL = os.getenv(
     "MARITACA_URL",
     "https://chat.maritaca.ai/api/chat/completions",
 ).strip()
-MARITACA_MODEL = os.getenv("MARITACA_MODEL", "sabia-4").strip()
+MARITACA_MODEL = os.getenv("MARITACA_MODEL", "sabia-4").strip() or "sabia-4"
+MARITACA_FAST_MODEL = os.getenv("MARITACA_FAST_MODEL", "sabiazinho-4").strip() or "sabiazinho-4"
 MARITACA_API_KEY = os.getenv("MARITACA_API_KEY", "").strip()
-MARITACA_THINKING_MODEL = os.getenv("MARITACA_THINKING_MODEL", "sabia-4-thinking-br-sp").strip() or "sabia-4-thinking-br-sp"
+MARITACA_THINKING_MODEL = os.getenv("MARITACA_THINKING_MODEL", "sabia-4-thinking").strip() or "sabia-4-thinking"
 # Expensive reasoning must be explicitly enabled by the owner on the server.
 THIGAS_ENABLE_THINKING = os.getenv("THIGAS_ENABLE_THINKING", "false").strip().lower() in {"1", "true", "yes", "on"}
 THIGAS_CLOUD_API_KEY = (os.getenv("THIGAS_CLOUD_API_KEY") or os.getenv("GROQ_API_KEY") or "").strip()
@@ -220,6 +223,10 @@ def cloud_api_keys() -> tuple[str, ...]:
 
 def choose_model(mode: Any) -> str:
     if mode in (None, "fast"):
+        return MARITACA_FAST_MODEL
+    if mode == "balanced":
+        if not MARITACA_API_KEY:
+            raise GatewayError("Modo Sabiá 4 indisponível: chave Maritaca não configurada.", 403)
         return MARITACA_MODEL
     if mode == "thinking" and THIGAS_ENABLE_THINKING and MARITACA_API_KEY:
         return MARITACA_THINKING_MODEL
@@ -236,6 +243,8 @@ def choose_model(mode: Any) -> str:
             raise GatewayError("Esforço alto NVIDIA disponível somente no modelo GPT-OSS compatível.", 403)
         return THIGAS_NVIDIA_MODEL
     if mode in ("thinking", "cloud"):
+        if mode == "thinking" and THIGAS_ENABLE_THINKING and MARITACA_API_KEY:
+            return MARITACA_THINKING_MODEL
         if not (THIGAS_CLOUD_ENABLED and cloud_api_keys()):
             raise GatewayError("Modo Pensamento indisponível. Configure o acesso no servidor.", 403)
         return THIGAS_CLOUD_MODEL
@@ -540,6 +549,9 @@ def api_info():
             "endpoint": "/chat",
             "telegram_webhook": "/telegram/webhook",
             "thinking_enabled": bool((THIGAS_ENABLE_THINKING and MARITACA_API_KEY) or (THIGAS_CLOUD_ENABLED and cloud_api_keys())),
+            "maritaca_fast_enabled": bool(MARITACA_API_KEY),
+            "maritaca_balanced_enabled": bool(MARITACA_API_KEY),
+            "maritaca_stream_enabled": bool(MARITACA_API_KEY),
             "cloud_enabled": THIGAS_CLOUD_ENABLED and bool(cloud_api_keys()),
             "nvidia_enabled": THIGAS_NVIDIA_ENABLED and bool(configured_nvidia_keys()),
             "nvidia_thinking_enabled": bool(THIGAS_NVIDIA_ENABLED and configured_nvidia_keys() and THIGAS_NVIDIA_MODEL in {"openai/gpt-oss-20b", "openai/gpt-oss-120b"}),
@@ -553,7 +565,8 @@ def api_info():
                 and is_groq_gpt_oss(THIGAS_CLOUD_URL, THIGAS_CLOUD_MODEL)
             ),
             "models": {
-                "fast": MARITACA_MODEL,
+                "fast": MARITACA_FAST_MODEL,
+                "balanced": MARITACA_MODEL,
                 "nvidia": THIGAS_NVIDIA_MODEL if THIGAS_NVIDIA_ENABLED and configured_nvidia_keys() else None,
                 "aion": THIGAS_AION_MODEL if THIGAS_AION_ENABLED and configured_aion_keys() else None,
                 "thinking": (MARITACA_THINKING_MODEL if THIGAS_ENABLE_THINKING and MARITACA_API_KEY else THIGAS_CLOUD_MODEL if THIGAS_CLOUD_ENABLED and cloud_api_keys() else None),
