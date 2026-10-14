@@ -21,6 +21,9 @@ def response(status, content="Resposta recuperada"):
 
 class AutomaticKeyFailoverTests(unittest.TestCase):
     def setUp(self):
+        legacy = patch.object(gateway, "THIGAS_LEGACY_PROVIDERS_ENABLED", True)
+        legacy.start()
+        self.addCleanup(legacy.stop)
         patch_groq = patch.object(groq_key_pool, "groq_keys", groq_key_pool.KeyPool())
         patch_nvidia = patch.object(nvidia_key_pool, "nvidia_keys", groq_key_pool.KeyPool())
         patch_groq.start()

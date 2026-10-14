@@ -180,7 +180,7 @@
 
   async function requestChat(fetcher, message, history, signal, mode = "fast", webSearch = false) {
     const payload = { message, history: apiHistory(history, message) };
-    if (["balanced", "thinking", "cloud", "nvidia", "nvidia_thinking", "aion", "aion_thinking"].includes(mode)) payload.mode = mode;
+    if (["balanced", "thinking"].includes(mode)) payload.mode = mode;
     if (webSearch === true) payload.web_search = true;
     const response = await fetcher("/chat", {
       method: "POST",
@@ -861,9 +861,9 @@
       renderMessage("assistant", answer);
       renderSources(result.sources, result.search_provider);
       showUsage(result.usage);
-      byId("model-used").textContent = result.model
-        ? (result.reasoning_effort === "high" ? "Alto · " : "") + result.model
-        : "Modelo não informado";
+      // THIGAS AI is the product identity; provider model IDs remain
+      // available to technical clients through the API, not displayed here.
+      byId("model-used").textContent = ({fast: "Rápido", balanced: "Equilibrado", thinking: "Avançado"})[selected] || "—";
       const qualityMessages = {
         output_limit: "A resposta atingiu o limite de saída; pode estar incompleta.",
         possible_repetition: "Possível loop de repetição detectado; confira o conteúdo antes de utilizá-lo.",
@@ -972,47 +972,32 @@
       const capabilities = await response.json();
       maritacaStreaming = capabilities?.maritaca_stream_enabled === true;
       maritacaThinkingStreaming = capabilities?.maritaca_thinking_stream_enabled === true;
-      const nvidia = modeSelector.querySelector('option[value="nvidia"]');
-      const nvidiaThinking = modeSelector.querySelector('option[value="nvidia_thinking"]');
-      if (nvidia) {
-        nvidia.disabled = capabilities?.nvidia_enabled !== true;
-        nvidia.textContent = nvidia.disabled ? "NVIDIA (indisponível)" : "NVIDIA · padrão";
-      }
-      if (nvidiaThinking) {
-        nvidiaThinking.disabled = capabilities?.nvidia_thinking_enabled !== true;
-        nvidiaThinking.textContent = nvidiaThinking.disabled ? "NVIDIA · alto (indisponível)" : "NVIDIA · esforço alto";
-      }
-      const aion = modeSelector.querySelector('option[value="aion"]');
-      const aionThinking = modeSelector.querySelector('option[value="aion_thinking"]');
-      if (aion) {
-        aion.disabled = capabilities?.aion_enabled !== true;
-        aion.textContent = aion.disabled ? "Aion Labs (indisponível)" : "Aion Labs · padrão";
-        aion.title = capabilities?.models?.aion ? "Modelo: " + capabilities.models.aion : "Aion não configurado";
-      }
-      if (aionThinking) {
-        aionThinking.disabled = capabilities?.aion_thinking_enabled !== true;
-        aionThinking.textContent = aionThinking.disabled ? "Aion Labs · alto (indisponível)" : "Aion Labs · esforço alto";
-      }
       searchProviderName = capabilities?.web_search_provider === "brave" ? "Web (Brave)" : "Wikipédia";
       setWebSearch(webSearchActive);
       const balanced = modeSelector.querySelector('option[value="balanced"]');
       if (balanced) {
         balanced.disabled = capabilities?.maritaca_balanced_enabled !== true;
-        balanced.textContent = balanced.disabled ? "Sabiá 4 (indisponível)" : "Sabiá 4 · equilibrado";
+        balanced.textContent = "Equilibrado";
+        balanced.title = balanced.disabled ? "Modo temporariamente indisponível." : "Respostas equilibradas do THIGAS AI.";
       }
-      const allowThinking = capabilities?.thinking_enabled === true;
       const thinking = modeSelector.querySelector('option[value="thinking"]');
-      thinking.disabled = !allowThinking;
-      const activeThinkingModel = typeof capabilities?.models?.thinking === "string" ? capabilities.models.thinking : "";
-      const supportsHighEffort = capabilities?.thinking_effort_high === true;
-      const isSabiaThinking = /^sabia-4-thinking(?:-br-sp)?$/.test(activeThinkingModel);
-      thinking.textContent = !allowThinking ? "Avançado (indisponível)" :
-        isSabiaThinking ? "Sabiá 4 Thinking · avançado" :
-        supportsHighEffort ? "Esforço: alto (GPT-OSS)" : "Modelo avançado";
-      thinking.title = activeThinkingModel ? "Modelo: " + activeThinkingModel : "Modelo avançado não configurado";
+      const allowThinking = capabilities?.thinking_enabled === true;
+      if (thinking) {
+        thinking.disabled = !allowThinking;
+        thinking.textContent = "Avançado";
+        thinking.title = allowThinking
+          ? "Respostas avançadas do THIGAS AI."
+          : "Modo temporariamente indisponível.";
+      }
+      const quick = modeSelector.querySelector('option[value="fast"]');
+      if (quick) {
+        quick.textContent = "Rápido";
+        quick.title = "Respostas rápidas do THIGAS AI.";
+      }
       if (modeSelector.selectedOptions[0]?.disabled) modeSelector.value = "fast";
-      byId("mode-hint").textContent = !allowThinking ? "Modo avançado indisponível." :
-        supportsHighEffort ? "Esforço alto realmente configurado no modelo GPT-OSS." : "Modelo avançado ativo; esforço alto numérico não está disponível neste provedor.";
+      byId("mode-hint").textContent = allowThinking
+        ? "Três níveis de resposta do THIGAS AI."
+        : "O modo Avançado está temporariamente indisponível.";
     } catch (_) {
       // Fail closed: existing fast mode works, advanced modes stay disabled.
     }

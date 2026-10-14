@@ -23,6 +23,9 @@ def fake_response(code: int, *, retry_after=None):
 
 class GroqThreeKeyTests(unittest.TestCase):
     def setUp(self):
+        legacy = patch.object(gateway, "THIGAS_LEGACY_PROVIDERS_ENABLED", True)
+        legacy.start()
+        self.addCleanup(legacy.stop)
         self.pool_patcher = patch.object(groq_key_pool, "groq_keys", groq_key_pool.KeyPool())
         self.pool_patcher.start()
         self.addCleanup(self.pool_patcher.stop)

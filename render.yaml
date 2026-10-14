@@ -22,39 +22,8 @@ services:
         value: sabia-4-thinking
       - key: THIGAS_ENABLE_THINKING
         value: "true"
-      - key: THIGAS_CLOUD_API_KEY
-        sync: false
-      - key: THIGAS_CLOUD_API_KEY_2
-        sync: false
-      - key: THIGAS_CLOUD_API_KEY_3
-        sync: false
-      - key: THIGAS_CLOUD_ENABLED
-        value: "false"
-      - key: THIGAS_CLOUD_URL
-        value: https://api.groq.com/openai/v1/chat/completions
-      - key: THIGAS_CLOUD_MODEL
-        value: openai/gpt-oss-20b
-      - key: NVIDIA_API_KEY
-        sync: false
-      - key: NVIDIA_API_KEY_2
-        sync: false
-      - key: NVIDIA_API_KEY_3
-        sync: false
-      - key: THIGAS_NVIDIA_MODEL
-        value: openai/gpt-oss-20b
-      - key: THIGAS_NVIDIA_ENABLED
-        value: "true"
-      # Aion Labs secrets are populated only in Render's Environment settings.
-      - key: AION_API_KEY
-        sync: false
-      - key: AION_API_KEY_2
-        sync: false
-      - key: AION_API_KEY_3
-        sync: false
-      - key: THIGAS_AION_MODEL
-        value: aion-labs/aion-3.5-mini
-      - key: THIGAS_AION_ENABLED
-        value: "true"
+      # THIGAS AI now exposes only Rápido, Equilibrado and Avançado.
+      # Retired providers are not configured by this blueprint.
       - key: THIGAS_BRAVE_SEARCH_KEY
         sync: false
       - key: THIGAS_BRAVE_SEARCH_ENABLED

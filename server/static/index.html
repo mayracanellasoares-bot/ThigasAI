@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#f8f6f0" id="theme-color-meta">
-  <meta name="description" content="THIGAS AI: assistente de IA e programação com interface inspirada na WebUI do llama.cpp/llamafile.">
+  <meta name="description" content="THIGAS AI: plataforma de inteligência artificial própria para conversar, estudar, programar e criar.">
   <meta name="application-name" content="THIGAS AI">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -17,7 +17,7 @@
   <link rel="stylesheet" href="/static/chat.css?v=fluid8">
   <link rel="stylesheet" href="/static/mini-nano-theme.css?v=audit3">
   <link rel="stylesheet" href="/static/history-sidebar.css?v=drawer2">
-  <script src="/static/chat.js?v=fluid8" defer></script>
+  <script src="/static/chat.js?v=thigas9" defer></script>
   <script src="/static/pwa.js?v=llama2" defer></script>
 </head>
 <body class="theme-green">
@@ -165,13 +165,9 @@
                 <div class="effort-wrap">
                   <label class="sr-only" for="reasoning-mode">Nível de esforço</label>
                   <select id="reasoning-mode" aria-label="Nível de esforço">
-                    <option value="fast">Sabiazinho 4 · rápido</option>
-                    <option value="balanced">Sabiá 4 · equilibrado</option>
-                    <option value="thinking" disabled>Esforço: alto (indisponível)</option>
-                    <option value="nvidia" disabled>NVIDIA (indisponível)</option>
-                    <option value="nvidia_thinking" disabled>NVIDIA · esforço alto (indisponível)</option>
-                    <option value="aion" disabled>Aion Labs (indisponível)</option>
-                    <option value="aion_thinking" disabled>Aion Labs · esforço alto (indisponível)</option>
+                    <option value="fast">Rápido</option>
+                    <option value="balanced">Equilibrado</option>
+                    <option value="thinking" disabled>Avançado</option>
                   </select>
                 </div>
               </div>
@@ -188,7 +184,7 @@
           <input type="file" id="image-input" hidden accept="image/png,image/jpeg,image/webp">
           <small id="mode-hint" class="sr-only">O nível alto utiliza o modelo avançado somente quando habilitado no servidor.</small>
           <div class="token-meter" role="group" aria-label="Tokens medidos na última resposta">
-            <span>Última resposta · Modo <strong id="model-used">—</strong></span>
+            <span>Última resposta · THIGAS AI <strong id="model-used">—</strong></span>
             <span>Enviados <strong id="tokens-input">—</strong></span>
             <span>Recebidos <strong id="tokens-output">—</strong></span>
             <span>Total <strong id="tokens-total">—</strong></span>
