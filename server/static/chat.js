@@ -776,8 +776,10 @@
     const names = attachment.map(item => safeFilename(item.name));
     const prefix = attachment.length === 1 ? "1 arquivo" : attachment.length + " arquivos";
     const shortened = names.slice(0, 3).join(", ") + (names.length > 3 ? " e mais " + (names.length - 3) : "");
+    const partial = attachment.some(item => item.truncated) ||
+      composeMessage(input.value, attachment).includes("[CONTEÚDO PARCIAL]");
     byId("attachment-label").textContent = "📎 " + prefix + " · " + shortened +
-      (attachment.some(item => item.truncated) ? " · conteúdo parcial" : "") +
+      (partial ? " · trechos parciais" : "") +
       " (até " + MAX_ATTACHMENTS + " anexos)";
   }
 
