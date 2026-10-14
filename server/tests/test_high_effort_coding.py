@@ -6,6 +6,11 @@ from generation_quality import inspect_generation
 
 
 class HighEffortCodingTests(unittest.TestCase):
+    def setUp(self):
+        legacy = patch.object(gateway, "THIGAS_LEGACY_PROVIDERS_ENABLED", True)
+        legacy.start()
+        self.addCleanup(legacy.stop)
+
     def _upstream(self):
         response = Mock()
         response.status_code = 200
