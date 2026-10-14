@@ -180,7 +180,7 @@
 
   async function requestChat(fetcher, message, history, signal, mode = "fast", webSearch = false) {
     const payload = { message, history: apiHistory(history, message) };
-    if (["thinking", "cloud", "nvidia", "nvidia_thinking", "aion", "aion_thinking"].includes(mode)) payload.mode = mode;
+    if (["balanced", "thinking", "cloud", "nvidia", "nvidia_thinking", "aion", "aion_thinking"].includes(mode)) payload.mode = mode;
     if (webSearch === true) payload.web_search = true;
     const response = await fetcher("/chat", {
       method: "POST",
