@@ -1,5 +1,4 @@
 import os
-import json
 import base64
 import re
 import hmac
@@ -552,6 +551,7 @@ def api_info():
             "maritaca_fast_enabled": bool(MARITACA_API_KEY),
             "maritaca_balanced_enabled": bool(MARITACA_API_KEY),
             "maritaca_stream_enabled": bool(MARITACA_API_KEY),
+            "maritaca_thinking_stream_enabled": bool(THIGAS_ENABLE_THINKING and MARITACA_API_KEY),
             "cloud_enabled": THIGAS_CLOUD_ENABLED and bool(cloud_api_keys()),
             "nvidia_enabled": THIGAS_NVIDIA_ENABLED and bool(configured_nvidia_keys()),
             "nvidia_thinking_enabled": bool(THIGAS_NVIDIA_ENABLED and configured_nvidia_keys() and THIGAS_NVIDIA_MODEL in {"openai/gpt-oss-20b", "openai/gpt-oss-120b"}),
@@ -733,6 +733,76 @@ def _enforce_web_search_rate_limit() -> None:
         _web_search_hits[visitor] = hits
         if len(_web_search_hits) > 1000:
             _web_search_hits.clear()
+
+
+@app.post("/chat/stream")
+def chat_stream():
+    """Progressive Maritaca text; only explicitly selected Maritaca models.
+
+    This endpoint does not retry on stream failure because the first request
+    may already have incurred model charges.
+    """
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        return jsonify(error="Envie um objeto JSON com a mensagem."), 400
+    question = text_content(body.get("message", body.get("question", ""))).strip()
+    if not question:
+        return jsonify(error="Envie uma pergunta no campo message."), 400
+    if len(question) > 60000:
+        return jsonify(error="A mensagem excede 60000 caracteres."), 413
+    mode = body.get("mode", "fast")
+    if mode not in ("fast", "balanced", "thinking"):
+        return jsonify(error="Streaming disponível apenas para modelos Maritaca."), 400
+    if mode == "thinking" and not THIGAS_ENABLE_THINKING:
+        return jsonify(error="Streaming do Sabiá Thinking indisponível.", 403)
+    if body.get("web_search", False) is not False:
+        return jsonify(error="Pesquisa web requer a rota convencional."), 400
+    if not MARITACA_API_KEY:
+        return jsonify(error="Maritaca não configurada no servidor."), 503
+    model = choose_model(mode)
+    exact = solve_simple_arithmetic(question)
+    if exact is not None:
+        def exact_answer():
+            yield sse_event("delta", {"text": exact})
+            yield sse_event("done", {
+                "answer": exact, "model": "thigas-arithmetic-verifier-v1",
+                "usage": {"prompt_tokens": None, "completion_tokens": None, "total_tokens": None},
+                "max_output_tokens": MARITACA_MAX_TOKENS, "finish_reason": "verified",
+                "reasoning_effort": None, "sources": [], "search_provider": None,
+                "provider_attempt_count": 0, "provider_failover_used": False,
+            })
+        return Response(stream_with_context(exact_answer()), mimetype="text/event-stream",
+                        headers={"Cache-Control": "no-cache, no-transform",
+                                 "X-Accel-Buffering": "no"})
+
+    try:
+        enriched = attach_public_web_context(question)
+        upstream = requests.post(
+            MARITACA_URL,
+            headers={"Authorization": "Bearer " + MARITACA_API_KEY,
+                     "Content-Type": "application/json"},
+            json={"model": model, "messages": build_messages(enriched, body.get("history", []), model),
+                  "temperature": 0.2, "max_tokens": MARITACA_MAX_TOKENS,
+                  "stream": True, "stream_options": {"include_usage": True}},
+            timeout=(10, 300),
+            stream=True,
+        )
+    except requests.Timeout:
+        return jsonify(error="O provedor Maritaca demorou para responder."), 504
+    except requests.RequestException:
+        return jsonify(error="Não foi possível conectar ao provedor Maritaca."), 502
+    if upstream.status_code >= 400:
+        status = 429 if upstream.status_code == 429 else 502
+        upstream.close()
+        return jsonify(error="O provedor Maritaca recusou a consulta (HTTP %s)." % upstream.status_code), status
+
+    return Response(
+        stream_with_context(relay_maritaca_stream(
+            upstream, model=model, max_tokens=MARITACA_MAX_TOKENS)),
+        mimetype="text/event-stream",
+        headers={"Cache-Control": "no-cache, no-transform",
+                 "X-Accel-Buffering": "no", "Connection": "keep-alive"},
+    )
 
 
 @app.post("/chat")
