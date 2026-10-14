@@ -180,7 +180,7 @@
 
   async function requestChat(fetcher, message, history, signal, mode = "fast", webSearch = false) {
     const payload = { message, history: apiHistory(history, message) };
-    if (["balanced", "thinking", "cloud", "nvidia", "nvidia_thinking", "aion", "aion_thinking"].includes(mode)) payload.mode = mode;
+    if (["balanced", "thinking"].includes(mode)) payload.mode = mode;
     if (webSearch === true) payload.web_search = true;
     const response = await fetcher("/chat", {
       method: "POST",
@@ -861,9 +861,9 @@
       renderMessage("assistant", answer);
       renderSources(result.sources, result.search_provider);
       showUsage(result.usage);
-      byId("model-used").textContent = result.model
-        ? (result.reasoning_effort === "high" ? "Alto · " : "") + result.model
-        : "Modelo não informado";
+      // THIGAS AI is the product identity; provider model IDs remain
+      // available to technical clients through the API, not displayed here.
+      byId("model-used").textContent = ({fast: "Rápido", balanced: "Equilibrado", thinking: "Avançado"})[selected] || "—";
       const qualityMessages = {
         output_limit: "A resposta atingiu o limite de saída; pode estar incompleta.",
         possible_repetition: "Possível loop de repetição detectado; confira o conteúdo antes de utilizá-lo.",
