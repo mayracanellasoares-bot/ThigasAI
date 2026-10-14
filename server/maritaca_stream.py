@@ -8,6 +8,8 @@ from __future__ import annotations
 import json
 from typing import Any, Iterator
 
+from generation_quality import inspect_generation
+
 MAX_STREAM_CHARS = 500_000
 
 
@@ -92,6 +94,7 @@ def relay_maritaca_stream(upstream, *, model: str, max_tokens: int) -> Iterator[
             "max_output_tokens": max_tokens,
             "provider_attempt_count": 1,
             "provider_failover_used": False,
+            "quality_flags": inspect_generation(answer, finish_reason),
             "reasoning_effort": None,
             "search_provider": None, "sources": [],
         })
