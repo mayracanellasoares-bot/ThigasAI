@@ -95,6 +95,50 @@
     return parts;
   }
 
+  function readableSegments(input) {
+    // Render lightweight Markdown as safe text nodes, never HTML.
+    const source = String(input || "");
+    const segments = [];
+    const regex = /\*\*([^*\n]+)\*\*|__([^_\n]+)__|`([^`\n]+)`/g;
+    let last = 0, match;
+    while ((match = regex.exec(source)) !== null) {
+      if (match.index > last) segments.push({ kind: "plain", value: source.slice(last, match.index) });
+      segments.push({ kind: match[3] ? "inline-code" : "bold", value: match[1] || match[2] || match[3] });
+      last = regex.lastIndex;
+    }
+    if (last < source.length) segments.push({ kind: "plain", value: source.slice(last) });
+    return segments;
+  }
+
+  function readableLines(text) {
+    return String(text || "").split("\n").map(line => {
+      const heading = /^\s{0,3}#{1,6}\s+(.+)$/.exec(line);
+      const cleaned = (heading ? heading[1] : line)
+        .replace(/^(\s*)[-*]\s+(?=\S)/, "$1")
+        .replace(/^(\s*)\d{1,2}\.\s+(?=\S)/, "$1");
+      return { text: cleaned, heading: Boolean(heading) };
+    });
+  }
+
+  function renderReadableText(element, source) {
+    element.replaceChildren();
+    for (const [index, line] of readableLines(source).entries()) {
+      if (index) element.append(document.createTextNode("\n"));
+      const target = line.heading ? make("strong", "readable-heading") : element;
+      for (const segment of readableSegments(line.text)) {
+        if (segment.kind === "bold") target.append(make("strong", "", segment.value));
+        else if (segment.kind === "inline-code") target.append(make("code", "inline-code", segment.value));
+        else target.append(document.createTextNode(segment.value));
+      }
+      if (line.heading) element.append(target);
+    }
+  }
+
+  function streamingPreview(source) {
+    // Avoid displaying raw triple-backtick markers while code arrives.
+    return String(source || "").replace(/^\s*`{3}[^\n]*$/gm, "");
+  }
+
   function codeFilename(language, index) {
     const extensions = { python: "py", py: "py", javascript: "js", js: "js", typescript: "ts", ts: "ts", jsx: "jsx", tsx: "tsx", html: "html", css: "css", json: "json", java: "java", c: "c", cpp: "cpp", "c++": "cpp", "c#": "cs", csharp: "cs", cs: "cs", go: "go", rust: "rs", bash: "sh", shell: "sh", powershell: "ps1", sql: "sql", yaml: "yaml", php: "php" };
     return "thigas_codigo_" + index + "." + (extensions[String(language).toLowerCase()] || "txt");
@@ -136,7 +180,7 @@
 
   async function requestChat(fetcher, message, history, signal, mode = "fast", webSearch = false) {
     const payload = { message, history: apiHistory(history, message) };
-    if (["thinking", "cloud", "nvidia", "nvidia_thinking", "aion", "aion_thinking"].includes(mode)) payload.mode = mode;
+    if (["balanced", "thinking", "cloud", "nvidia", "nvidia_thinking", "aion", "aion_thinking"].includes(mode)) payload.mode = mode;
     if (webSearch === true) payload.web_search = true;
     const response = await fetcher("/chat", {
       method: "POST",
@@ -180,9 +224,69 @@
     };
   }
 
+  async function requestChatStream(fetcher, message, history, signal, mode = "fast", onDelta = () => {}) {
+    const body = { message, history: apiHistory(history, message), mode };
+    const response = await fetcher("/chat/stream", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body), signal,
+    });
+    if (!response.ok) {
+      let error = null;
+      try { error = await response.json(); } catch (_) {}
+      throw new Error(typeof error?.error === "string" ? error.error : "Streaming indisponível (HTTP " + response.status + ").");
+    }
+    if (!response.body || typeof response.body.getReader !== "function") throw new Error("Este navegador não suporta respostas progressivas.");
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+    let buffer = "", output = "", result = null;
+    const parseFrame = frame => {
+      let event = "", data = "";
+      for (const line of frame.split("\n")) {
+        if (line.startsWith("event:")) event = line.slice(6).trim();
+        if (line.startsWith("data:")) data += line.slice(5).trimStart();
+      }
+      if (!data) return;
+      let value;
+      try { value = JSON.parse(data); } catch (_) { throw new Error("Resposta progressiva inválida."); }
+      if (event === "error") throw new Error(typeof value.error === "string" ? value.error : "Geração interrompida.");
+      if (event === "delta" && typeof value.text === "string") {
+        output += value.text;
+        if (output.length > 500000) throw new Error("A resposta ultrapassou o limite seguro.");
+        onDelta(output);
+      }
+      if (event === "done") result = value;
+    };
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer = (buffer + decoder.decode(value, { stream: true })).replace(/\r\n/g, "\n");
+        if (buffer.length > 1024 * 1024) throw new Error("A transmissão excedeu o limite seguro.");
+        let boundary;
+        while ((boundary = buffer.indexOf("\n\n")) !== -1) {
+          parseFrame(buffer.slice(0, boundary));
+          buffer = buffer.slice(boundary + 2);
+        }
+      }
+      buffer += decoder.decode();
+      if (buffer.trim()) parseFrame(buffer);
+      if (!result || typeof result.answer !== "string" || !result.answer.trim()) throw new Error("A transmissão terminou sem resposta completa.");
+      const measured = value => Number.isSafeInteger(value) && value >= 0 ? value : null;
+      const usage = result.usage && typeof result.usage === "object" ? result.usage : {};
+      return {
+        answer: result.answer.trim(), model: typeof result.model === "string" ? result.model : null,
+        usage: { prompt_tokens: measured(usage.prompt_tokens), completion_tokens: measured(usage.completion_tokens), total_tokens: measured(usage.total_tokens) },
+        finish_reason: typeof result.finish_reason === "string" ? result.finish_reason : null,
+        quality_flags: [], reasoning_effort: null, provider_attempt_count: 0, provider_failover_used: false,
+        sources: [], search_provider: null,
+      };
+    } finally {
+      try { await reader.cancel(); } catch (_) {}
+    }
+  }
   // Exportações puras permitem testar o contrato sem DOM, API externa ou saldo.
   if (typeof module !== "undefined" && module.exports) {
-    module.exports = { MAX_MESSAGE, MAX_FILE_BYTES, MAX_TEXT_FILE_BYTES, safeFilename, validateFile, composeMessage, sanitizeHistory, apiHistory, splitCodeBlocks, codeFilename, extractDocument, requestChat, redactAttachmentFromHistory, classifyConversationDate, codeRevisionPrompt, safeSourceUrl };
+    module.exports = { MAX_MESSAGE, MAX_FILE_BYTES, MAX_TEXT_FILE_BYTES, safeFilename, validateFile, composeMessage, sanitizeHistory, apiHistory, splitCodeBlocks, codeFilename, extractDocument, requestChat, redactAttachmentFromHistory, classifyConversationDate, codeRevisionPrompt, safeSourceUrl, readableSegments, readableLines, streamingPreview, requestChatStream };
   }
   if (typeof document === "undefined") return;
 
@@ -198,6 +302,8 @@
   const searchButton = byId("btn-web-search");
   let webSearchActive = false;
   let searchProviderName = "Wikipédia";
+  let maritacaStreaming = false;
+  let maritacaThinkingStreaming = false;
   const ptNumber = new Intl.NumberFormat("pt-BR");
   function showUsage(usage) {
     const show = value => Number.isSafeInteger(value) && value >= 0 ? ptNumber.format(value) : "—";
@@ -518,7 +624,10 @@
     let codeIndex = 0;
     for (const part of parts) {
       if (part.type === "text") {
-        entry.append(make("div", "message-text", part.text));
+        const prose = make("div", "message-text");
+        if (role === "assistant") renderReadableText(prose, part.text);
+        else prose.textContent = part.text;
+        entry.append(prose);
         continue;
       }
       codeIndex++;
@@ -716,13 +825,36 @@
     requestActive = true;
     setBusy();
     renderMessage("user", message);
-    const pending = make("div", "log-entry pending", "[" + now() + "] THIGAS > Consultando a IA…");
+    const pending = make("div", "log-entry pending thinking-indicator");
+    const thoughtIcon = make("span", "thinking-icon", "🧠");
+    thoughtIcon.setAttribute("aria-hidden", "true");
+    const thoughtLabel = make("span", "thinking-label", "Pensando…");
+    const preview = make("div", "message-text stream-preview");
+    pending.append(thoughtIcon, thoughtLabel, preview);
+    pending.setAttribute("role", "status");
+    pending.setAttribute("aria-label", "Preparando a resposta");
     logs.append(pending);
     scrollBottom();
     beep("send");
     const timeout = setTimeout(() => controller.abort(), 325000);
     try {
-      const result = await requestChat(window.fetch.bind(window), message, history, controller.signal, modeSelector.value, webSearchActive);
+      const selected = modeSelector.value;
+      const canStream = !webSearchActive && maritacaStreaming &&
+        (selected === "fast" || selected === "balanced" || (selected === "thinking" && maritacaThinkingStreaming));
+      let lastDraw = 0;
+      const onDelta = text => {
+        if (epoch !== conversationEpoch) return;
+        thoughtLabel.textContent = "Respondendo…";
+        const time = Date.now();
+        if (time - lastDraw > 75) {
+          lastDraw = time;
+          renderReadableText(preview, streamingPreview(text));
+          scrollBottom();
+        }
+      };
+      const result = canStream
+        ? await requestChatStream(window.fetch.bind(window), message, history, controller.signal, selected, onDelta)
+        : await requestChat(window.fetch.bind(window), message, history, controller.signal, selected, webSearchActive);
       if (epoch !== conversationEpoch) return;
       pending.remove();
       const answer = result.answer;
@@ -838,6 +970,8 @@
       const response = await fetch("/api", { cache: "no-store" });
       if (!response.ok) return;
       const capabilities = await response.json();
+      maritacaStreaming = capabilities?.maritaca_stream_enabled === true;
+      maritacaThinkingStreaming = capabilities?.maritaca_thinking_stream_enabled === true;
       const nvidia = modeSelector.querySelector('option[value="nvidia"]');
       const nvidiaThinking = modeSelector.querySelector('option[value="nvidia_thinking"]');
       if (nvidia) {
@@ -861,12 +995,19 @@
       }
       searchProviderName = capabilities?.web_search_provider === "brave" ? "Web (Brave)" : "Wikipédia";
       setWebSearch(webSearchActive);
+      const balanced = modeSelector.querySelector('option[value="balanced"]');
+      if (balanced) {
+        balanced.disabled = capabilities?.maritaca_balanced_enabled !== true;
+        balanced.textContent = balanced.disabled ? "Sabiá 4 (indisponível)" : "Sabiá 4 · equilibrado";
+      }
       const allowThinking = capabilities?.thinking_enabled === true;
       const thinking = modeSelector.querySelector('option[value="thinking"]');
       thinking.disabled = !allowThinking;
       const activeThinkingModel = typeof capabilities?.models?.thinking === "string" ? capabilities.models.thinking : "";
       const supportsHighEffort = capabilities?.thinking_effort_high === true;
+      const isSabiaThinking = /^sabia-4-thinking(?:-br-sp)?$/.test(activeThinkingModel);
       thinking.textContent = !allowThinking ? "Avançado (indisponível)" :
+        isSabiaThinking ? "Sabiá 4 Thinking · avançado" :
         supportsHighEffort ? "Esforço: alto (GPT-OSS)" : "Modelo avançado";
       thinking.title = activeThinkingModel ? "Modelo: " + activeThinkingModel : "Modelo avançado não configurado";
       if (modeSelector.selectedOptions[0]?.disabled) modeSelector.value = "fast";

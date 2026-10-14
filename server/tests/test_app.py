@@ -285,7 +285,8 @@ class GatewayTests(unittest.TestCase):
 
 
     def test_mode_selection_uses_cloud_for_thinking(self):
-        self.assertEqual(gateway.choose_model("fast"), gateway.MARITACA_MODEL)
+        self.assertEqual(gateway.choose_model("fast"), gateway.MARITACA_FAST_MODEL)
+        self.assertEqual(gateway.choose_model("balanced"), gateway.MARITACA_MODEL)
         with patch.object(gateway, "THIGAS_CLOUD_ENABLED", False):
             response = self.client.post("/chat", json={"message": "Teste", "mode": "thinking"})
             self.assertEqual(response.status_code, 403)

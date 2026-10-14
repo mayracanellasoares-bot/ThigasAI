@@ -403,3 +403,51 @@ test("Aion sem medição mantém tokens não informados", async () => {
   assert.equal(result.usage.total_tokens, null);
   assert.equal(result.provider_attempt_count, 0);
 });
+
+test("Maritaca streaming lê SSE em blocos divididos e confirma resposta completa", async () => {
+  const encoder = new TextEncoder();
+  const full = [
+    'event: delta\ndata: {"text":"Olá **mundo**"}\n\n',
+    'event: delta\ndata: {"text":"!\\n```python\\nprint(1)\\n```"}\n\n',
+    'event: done\ndata: {"answer":"Olá **mundo**!\\n```python\\nprint(1)\\n```","model":"sabiazinho-4","usage":{"prompt_tokens":4,"completion_tokens":8,"total_tokens":12}}\n\n',
+  ].join("");
+  const chunks = [full.slice(0,19), full.slice(19,47), full.slice(47,63), full.slice(63)];
+  let n = 0, posted;
+  const stream = { getReader: () => ({ read: async () => n < chunks.length
+    ? {value:encoder.encode(chunks[n++]),done:false} : {done:true}, cancel: async () => {} }) };
+  const previews = [];
+  const result = await chat.requestChatStream(async (url, options) => {
+    assert.equal(url, "/chat/stream");
+    posted = JSON.parse(options.body);
+    return {ok:true,body:stream};
+  }, "Olá", [], undefined, "fast", value => previews.push(value));
+  assert.deepEqual(posted, {message:"Olá",history:[],mode:"fast"});
+  assert.equal(previews.length, 2);
+  assert.equal(result.answer, "Olá **mundo**!\n```python\nprint(1)\n```");
+  assert.equal(result.usage.total_tokens, 12);
+});
+
+test("streaming incompleto não confirma respostas; não gera consumo inventado", async () => {
+  let read = false;
+  const stream = {getReader:() => ({ read:async() => read ? {done:true} :
+    (read = true, {value:new TextEncoder().encode('event: delta\ndata: {"text":"incompleto"}\n\n'),done:false}), cancel:async()=>{} })};
+  await assert.rejects(chat.requestChatStream(async() => ({ok:true,body:stream}), "Oi", []), /sem resposta completa/);
+});
+
+test("markdown seguro apresenta negrito sem asteriscos nem tags HTML", () => {
+  assert.deepEqual(chat.readableSegments("Texto **forte** e `x=1`."), [
+    {kind:"plain", value:"Texto "}, {kind:"bold",value:"forte"},
+    {kind:"plain",value:" e "}, {kind:"inline-code",value:"x=1"}, {kind:"plain",value:"."},
+  ]);
+  assert.deepEqual(chat.readableLines("# Título\n- item"), [
+    {text:"Título",heading:true},{text:"item",heading:false},
+  ]);
+  assert.ok(chat.streamingPreview("```python\nprint(2)\n```").includes("print(2)"));
+  const html = require("node:fs").readFileSync(require("node:path").join(__dirname, "../static/index.html"), "utf8");
+  assert.match(html, /Sabiazinho 4/);
+  assert.match(html, /Sabiá 4/);
+  const source = require("node:fs").readFileSync(require("node:path").join(__dirname, "../static/chat.js"), "utf8");
+  assert.match(source, /Pensando…/);
+  assert.match(source, /COPIAR/);
+  assert.doesNotMatch(source, /\.innerHTML\s*=/);
+});

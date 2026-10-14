@@ -18,7 +18,7 @@ from flask import jsonify, redirect, request
 # Only these routes are counted against the public model/resource budget.
 # Telegram is authenticated separately via its webhook secret.
 METERED_PATHS = frozenset((
-    "/chat", "/image/describe", "/link/check",
+    "/chat", "/chat/stream", "/image/describe", "/link/check",
     "/document/extract", "/workspace/api/generate",
 ))
 

@@ -9,6 +9,7 @@ from groq_key_pool import configured_keys, is_groq_endpoint, post_with_failover
 from nvidia_key_pool import NVIDIA_URL, configured_nvidia_keys, post_nvidia
 from aion_provider import (AION_URL, AION_DEFAULT_MODEL, REASONING_MODELS,
                            configured_aion_keys, reasoning_effort_for_mode, post_aion)
+from maritaca_stream import relay_maritaca_stream, sse_event
 from cognitive_math import solve_simple_arithmetic
 from context_selector import select_relevant_history
 from generation_quality import inspect_generation
@@ -21,7 +22,7 @@ from typing import Any
 
 import requests
 from docx import Document
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, Response, stream_with_context
 from openpyxl import load_workbook
 from pypdf import PdfReader
 from pptx import Presentation
@@ -34,9 +35,10 @@ MARITACA_URL = os.getenv(
     "MARITACA_URL",
     "https://chat.maritaca.ai/api/chat/completions",
 ).strip()
-MARITACA_MODEL = os.getenv("MARITACA_MODEL", "sabia-4").strip()
+MARITACA_MODEL = os.getenv("MARITACA_MODEL", "sabia-4").strip() or "sabia-4"
+MARITACA_FAST_MODEL = os.getenv("MARITACA_FAST_MODEL", "sabiazinho-4").strip() or "sabiazinho-4"
 MARITACA_API_KEY = os.getenv("MARITACA_API_KEY", "").strip()
-MARITACA_THINKING_MODEL = os.getenv("MARITACA_THINKING_MODEL", "sabia-4-thinking-br-sp").strip() or "sabia-4-thinking-br-sp"
+MARITACA_THINKING_MODEL = os.getenv("MARITACA_THINKING_MODEL", "sabia-4-thinking").strip() or "sabia-4-thinking"
 # Expensive reasoning must be explicitly enabled by the owner on the server.
 THIGAS_ENABLE_THINKING = os.getenv("THIGAS_ENABLE_THINKING", "false").strip().lower() in {"1", "true", "yes", "on"}
 THIGAS_CLOUD_API_KEY = (os.getenv("THIGAS_CLOUD_API_KEY") or os.getenv("GROQ_API_KEY") or "").strip()
@@ -99,6 +101,7 @@ POSTURA:
 - Quando o usuário apontar um erro, revise a resposta e entregue a correção; não reinicie a apresentação nem repita a mesma resposta.
 - Conclua quando a tarefa estiver respondida; não prolongue a saída repetindo parágrafos.
 - Converse de forma natural, objetiva, educada e colaborativa, em português brasileiro por padrão; acompanhe o idioma solicitado.
+- FORMATO DA RESPOSTA: escreva em parágrafos claros, sem asteriscos soltos, hashtags, marcadores decorativos, emojis ou caracteres de formatação visíveis. Quando o usuário solicitar destaque, use somente pares **assim** para negrito. Para código, sempre use bloco delimitado por três crases com a linguagem (python, javascript, html etc.) para habilitar Copiar/Baixar. Não omita trechos de código solicitado.
 - Procure compreender a intenção e a tarefa concreta. Responda diretamente, sem rodeios ou elogios automáticos.
 - Para problemas complexos, organize a explicação em etapas verificáveis; preserve o contexto da conversa disponível.
 - Separe fatos confirmados, hipóteses e sugestões. Não invente dados, fontes, documentos, medições, testes, acesso a sites ou ações externas.
@@ -220,6 +223,8 @@ def cloud_api_keys() -> tuple[str, ...]:
 
 def choose_model(mode: Any) -> str:
     if mode in (None, "fast"):
+        return MARITACA_FAST_MODEL
+    if mode == "balanced":
         return MARITACA_MODEL
     if mode == "thinking" and THIGAS_ENABLE_THINKING and MARITACA_API_KEY:
         return MARITACA_THINKING_MODEL
@@ -236,6 +241,8 @@ def choose_model(mode: Any) -> str:
             raise GatewayError("Esforço alto NVIDIA disponível somente no modelo GPT-OSS compatível.", 403)
         return THIGAS_NVIDIA_MODEL
     if mode in ("thinking", "cloud"):
+        if mode == "thinking" and THIGAS_ENABLE_THINKING and MARITACA_API_KEY:
+            return MARITACA_THINKING_MODEL
         if not (THIGAS_CLOUD_ENABLED and cloud_api_keys()):
             raise GatewayError("Modo Pensamento indisponível. Configure o acesso no servidor.", 403)
         return THIGAS_CLOUD_MODEL
@@ -540,6 +547,10 @@ def api_info():
             "endpoint": "/chat",
             "telegram_webhook": "/telegram/webhook",
             "thinking_enabled": bool((THIGAS_ENABLE_THINKING and MARITACA_API_KEY) or (THIGAS_CLOUD_ENABLED and cloud_api_keys())),
+            "maritaca_fast_enabled": bool(MARITACA_API_KEY),
+            "maritaca_balanced_enabled": bool(MARITACA_API_KEY),
+            "maritaca_stream_enabled": bool(MARITACA_API_KEY),
+            "maritaca_thinking_stream_enabled": bool(THIGAS_ENABLE_THINKING and MARITACA_API_KEY),
             "cloud_enabled": THIGAS_CLOUD_ENABLED and bool(cloud_api_keys()),
             "nvidia_enabled": THIGAS_NVIDIA_ENABLED and bool(configured_nvidia_keys()),
             "nvidia_thinking_enabled": bool(THIGAS_NVIDIA_ENABLED and configured_nvidia_keys() and THIGAS_NVIDIA_MODEL in {"openai/gpt-oss-20b", "openai/gpt-oss-120b"}),
@@ -553,7 +564,8 @@ def api_info():
                 and is_groq_gpt_oss(THIGAS_CLOUD_URL, THIGAS_CLOUD_MODEL)
             ),
             "models": {
-                "fast": MARITACA_MODEL,
+                "fast": MARITACA_FAST_MODEL,
+                "balanced": MARITACA_MODEL,
                 "nvidia": THIGAS_NVIDIA_MODEL if THIGAS_NVIDIA_ENABLED and configured_nvidia_keys() else None,
                 "aion": THIGAS_AION_MODEL if THIGAS_AION_ENABLED and configured_aion_keys() else None,
                 "thinking": (MARITACA_THINKING_MODEL if THIGAS_ENABLE_THINKING and MARITACA_API_KEY else THIGAS_CLOUD_MODEL if THIGAS_CLOUD_ENABLED and cloud_api_keys() else None),
@@ -720,6 +732,76 @@ def _enforce_web_search_rate_limit() -> None:
         _web_search_hits[visitor] = hits
         if len(_web_search_hits) > 1000:
             _web_search_hits.clear()
+
+
+@app.post("/chat/stream")
+def chat_stream():
+    """Progressive Maritaca text; only explicitly selected Maritaca models.
+
+    This endpoint does not retry on stream failure because the first request
+    may already have incurred model charges.
+    """
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        return jsonify(error="Envie um objeto JSON com a mensagem."), 400
+    question = text_content(body.get("message", body.get("question", ""))).strip()
+    if not question:
+        return jsonify(error="Envie uma pergunta no campo message."), 400
+    if len(question) > 60000:
+        return jsonify(error="A mensagem excede 60000 caracteres."), 413
+    mode = body.get("mode", "fast")
+    if mode not in ("fast", "balanced", "thinking"):
+        return jsonify(error="Streaming disponível apenas para modelos Maritaca."), 400
+    if mode == "thinking" and not THIGAS_ENABLE_THINKING:
+        return jsonify(error="Streaming do Sabiá Thinking indisponível."), 403
+    if body.get("web_search", False) is not False:
+        return jsonify(error="Pesquisa web requer a rota convencional."), 400
+    if not MARITACA_API_KEY:
+        return jsonify(error="Maritaca não configurada no servidor."), 503
+    model = choose_model(mode)
+    exact = solve_simple_arithmetic(question)
+    if exact is not None:
+        def exact_answer():
+            yield sse_event("delta", {"text": exact})
+            yield sse_event("done", {
+                "answer": exact, "model": "thigas-arithmetic-verifier-v1",
+                "usage": {"prompt_tokens": None, "completion_tokens": None, "total_tokens": None},
+                "max_output_tokens": MARITACA_MAX_TOKENS, "finish_reason": "verified",
+                "reasoning_effort": None, "sources": [], "search_provider": None,
+                "provider_attempt_count": 0, "provider_failover_used": False,
+            })
+        return Response(stream_with_context(exact_answer()), mimetype="text/event-stream",
+                        headers={"Cache-Control": "no-cache, no-transform",
+                                 "X-Accel-Buffering": "no"})
+
+    try:
+        enriched = attach_public_web_context(question)
+        upstream = requests.post(
+            MARITACA_URL,
+            headers={"Authorization": "Bearer " + MARITACA_API_KEY,
+                     "Content-Type": "application/json"},
+            json={"model": model, "messages": build_messages(enriched, body.get("history", []), model),
+                  "temperature": 0.2, "max_tokens": MARITACA_MAX_TOKENS,
+                  "stream": True, "stream_options": {"include_usage": True}},
+            timeout=(10, 300),
+            stream=True,
+        )
+    except requests.Timeout:
+        return jsonify(error="O provedor Maritaca demorou para responder."), 504
+    except requests.RequestException:
+        return jsonify(error="Não foi possível conectar ao provedor Maritaca."), 502
+    if upstream.status_code >= 400:
+        status = 429 if upstream.status_code == 429 else 502
+        upstream.close()
+        return jsonify(error="O provedor Maritaca recusou a consulta (HTTP %s)." % upstream.status_code), status
+
+    return Response(
+        stream_with_context(relay_maritaca_stream(
+            upstream, model=model, max_tokens=MARITACA_MAX_TOKENS)),
+        mimetype="text/event-stream",
+        headers={"Cache-Control": "no-cache, no-transform",
+                 "X-Accel-Buffering": "no", "Connection": "keep-alive"},
+    )
 
 
 @app.post("/chat")
