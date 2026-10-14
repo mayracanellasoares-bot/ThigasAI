@@ -43,7 +43,7 @@ class MaritacaFluencyTests(unittest.TestCase):
             result = self.client.post("/chat/stream", json={"message": "Saudação", "mode": "fast"}, buffered=True)
         self.assertEqual(result.status_code, 200)
         self.assertTrue(result.mimetype.startswith("text/event-stream"))
-        events = [json.loads(piece[6:]) for piece in result.get_data(as_text=True).split("\n\n") if piece.startswith("event: delta\ndata: ")]
+        events = [json.loads(piece.split("data: ", 1)[1]) for piece in result.get_data(as_text=True).split("\n\n") if piece.startswith("event: delta\ndata: ")]
         self.assertEqual([e["text"] for e in events], ["Olá, ", "**mundo**!"])
         done = [json.loads(piece.split("data: ", 1)[1]) for piece in result.get_data(as_text=True).split("\n\n") if piece.startswith("event: done")]
         self.assertEqual(done[0]["answer"], "Olá, **mundo**!")
