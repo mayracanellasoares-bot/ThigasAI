@@ -34,7 +34,7 @@ body:not(.light-mode) .workspace,body:not(.light-mode) .chat-panel{background:va
 .composer-wrap{width:min(810px,calc(100% - 32px));margin:0 auto;padding:10px 0 max(13px,env(safe-area-inset-bottom))}
 .modern-composer,body:not(.light-mode) .composer{border:1px solid #c9c9bc;background:#fff!important;border-radius:23px;padding:13px 12px 9px;box-shadow:0 5px 22px #2b241f10}
 .modern-composer:focus-within{border-color:#899176;box-shadow:0 5px 25px #2b241f16}
-.modern-composer #chat-input{min-height:108px;max-height:min(380px,42dvh);padding:6px 9px;line-height:1.5;color:#292821;font-size:15px}
+.modern-composer #chat-input{min-height:56px;max-height:min(360px,40dvh);padding:6px 9px;line-height:1.5;color:#292821;font-size:15px}
 .modern-composer #chat-input::placeholder{color:#848578}
 .composer-actions{margin-top:5px}
 .attach-btn,.microphone-btn{height:38px;min-width:38px;border-radius:12px;font-size:21px;color:#4c523a}
@@ -66,3 +66,7 @@ body:not(.light-mode) .workspace,body:not(.light-mode) .chat-panel{background:va
  .modern-composer #chat-input{font-size:16px}
  .composer-footer span:first-child{display:none}
 }
+
+/* Preserve bottom alignment and a compact composer over inherited desktop/mobile rules. */
+.chat-panel > .composer-wrap{margin-top:auto;flex:0 0 auto}
+@media(max-width:580px){.modern-composer #chat-input{max-height:min(320px,40dvh)}}
