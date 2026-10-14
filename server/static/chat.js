@@ -719,11 +719,15 @@
   }
 
   function resizeInput() {
+    // Compact on an empty or short message; expand only as text is entered.
+    // Keep the composer near the bottom instead of reserving four blank lines.
     input.style.height = "auto";
-    // Four visible lines by default; expand to roughly sixteen lines as needed.
-    const maxHeight = Math.min(window.innerWidth <= 580 ? 340 : 380, Math.round(window.innerHeight * 0.42));
-    input.style.height = Math.min(Math.max(input.scrollHeight, 108), maxHeight) + "px";
-    input.style.overflowY = input.scrollHeight > maxHeight ? "auto" : "hidden";
+    const minHeight = 56;
+    const availableHeight = Math.round(window.innerHeight * 0.4);
+    const maxHeight = Math.max(minHeight, Math.min(window.innerWidth <= 580 ? 320 : 360, availableHeight));
+    const contentHeight = Math.max(minHeight, input.scrollHeight);
+    input.style.height = Math.min(contentHeight, maxHeight) + "px";
+    input.style.overflowY = contentHeight > maxHeight ? "auto" : "hidden";
   }
 
   function setBusy() {
@@ -1023,6 +1027,7 @@
   if (!history.length) info("THIGAS AI pronto. Pergunte normalmente ou use /help. Não envie senhas ou chaves de API.");
   byId("chat-form").addEventListener("submit", send);
   input.addEventListener("input", resizeInput);
+  window.addEventListener("resize", resizeInput);
   input.addEventListener("keydown", event => {
     if (event.key === "Enter" && !event.shiftKey && !event.isComposing) { event.preventDefault(); byId("chat-form").requestSubmit(); }
   });
