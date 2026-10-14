@@ -59,11 +59,12 @@ THIGAS_BRAVE_SEARCH_KEY = os.getenv("THIGAS_BRAVE_SEARCH_KEY", "").strip()
 # Explicit opt-in avoids unexpectedly consuming paid search API quota.
 THIGAS_BRAVE_SEARCH_ENABLED = os.getenv("THIGAS_BRAVE_SEARCH_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
 try:
-    MARITACA_MAX_TOKENS = int(os.getenv("MARITACA_MAX_TOKENS", "16384"))
+    MARITACA_MAX_TOKENS = int(os.getenv("MARITACA_MAX_TOKENS", "32768"))
 except ValueError:
-    MARITACA_MAX_TOKENS = 16384
-# Limit this application to the requested output budget even if the environment is higher.
-MARITACA_MAX_TOKENS = min(16384, max(1, MARITACA_MAX_TOKENS))
+    MARITACA_MAX_TOKENS = 32768
+# The current Maritaca models support up to 32K output tokens. The actual
+# account tier may impose smaller per-minute limits; larger replies cost more.
+MARITACA_MAX_TOKENS = min(32768, max(1, MARITACA_MAX_TOKENS))
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 TELEGRAM_WEBHOOK_SECRET = os.getenv("TELEGRAM_WEBHOOK_SECRET", "").strip()
