@@ -1,6 +1,6 @@
 /* Minimal chat: conversation first, secondary controls on demand. */
-body{--bg:#171717;--surface:#202020;--surface-2:#292929;--text:#ededed;--muted:#a3a3a3;--border:#3b3b3b;--accent:#ddd;background:var(--bg);color:var(--text);font:15px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif}
-body.light-mode{--bg:#fafafa;--surface:#fff;--surface-2:#f0f0f0;--text:#262626;--muted:#737373;--border:#ddd;--accent:#333}
+body{--bg:#ffffff;--surface:#ffffff;--surface-2:#f3f3f3;--text:#262626;--muted:#737373;--border:#ddd;--accent:#333;background:var(--bg);color:var(--text);font:15px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif}
+body.light-mode{--bg:#ffffff;--surface:#fff;--surface-2:#f0f0f0;--text:#262626;--muted:#737373;--border:#ddd;--accent:#333}
 .app-shell{height:100dvh;min-height:0;display:flex}.sidebar{display:none!important}.workspace{height:100dvh;background:var(--bg)}
 .chat-header,body.light-mode .chat-header{height:56px;min-height:56px;flex-basis:56px;padding:8px 20px;background:var(--bg);border:0;display:flex;align-items:center;justify-content:space-between}
 .mobile-brand{display:flex;align-items:center}.mobile-brand-icon,.mobile-brand-copy small,.model-chip{display:none!important}.mobile-brand-copy strong{color:var(--text);font-size:15px;font-weight:600;letter-spacing:0}
@@ -21,3 +21,5 @@ body.light-mode{--bg:#fafafa;--surface:#fff;--surface-2:#f0f0f0;--text:#262626;-
 .history-drawer{background:var(--surface);color:var(--text);border-color:var(--border);box-shadow:none}.drawer-brand img{width:32px;height:32px;background:transparent;padding:0}.drawer-brand strong,.drawer-open,.drawer-bottom-link{color:var(--text)!important}.drawer-brand small,.drawer-bottom small,.drawer-empty,.drawer-group{color:var(--muted)}.drawer-new{background:var(--surface-2);color:var(--text);border-radius:6px}.drawer-search-wrap,.drawer-icon-btn{background:var(--surface-2);color:var(--text);border-color:var(--border);border-radius:6px}.drawer-search-wrap input{color:var(--text)}.drawer-bottom{border-color:var(--border)}.drawer-conversation.selected,.drawer-conversation:hover,.drawer-bottom-link:hover{background:var(--surface-2);border-color:transparent}
 button:hover{filter:brightness(.94)}button:focus-visible,summary:focus-visible{outline:2px solid var(--muted);outline-offset:3px}
 @media(max-width:580px){.chat-header,body.light-mode .chat-header{padding:8px 12px}.composer-wrap{width:calc(100% - 20px)}#chat-scroll{padding:18px 14px}.composer-footer span:first-child{display:none}#chat-input{font-size:16px}.header-new-chat{font-size:12px}.welcome h1{font-size:24px}}
+
+#btn-color-mode-drawer{display:none}
