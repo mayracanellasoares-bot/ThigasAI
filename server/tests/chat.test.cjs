@@ -129,17 +129,24 @@ test("indicadores de tokens existem no layout", () => {
   }
 });
 
-test("modo nuvem só altera o provedor solicitado; credencial continua no servidor", async () => {
-  let received;
-  const reply = await chat.requestChat(async (url, options) => {
-    received = { url, options };
-    return { ok: true, json: async () => ({ answer: "20B online", model: "openai/gpt-oss-20b" }) };
-  }, "Teste", [], undefined, "cloud");
-  assert.equal(reply.answer, "20B online");
-  assert.equal(reply.model, "openai/gpt-oss-20b");
-  assert.equal(received.url, "/chat");
-  assert.deepEqual(JSON.parse(received.options.body), { message: "Teste", history: [], mode: "cloud" });
-  assert.equal(received.options.headers.Authorization, undefined);
+test("somente os três níveis THIGAS AI são enviados pelo navegador", async () => {
+  for (const mode of ["fast", "balanced", "thinking"]) {
+    let request;
+    await chat.requestChat(async (url, options) => {
+      assert.equal(url, "/chat");
+      request = JSON.parse(options.body);
+      return {ok: true, json: async () => ({answer: "Resposta do THIGAS AI", model: "modelo-interno"})};
+    }, "Teste", [], undefined, mode);
+    assert.equal(request.mode, mode === "fast" ? undefined : mode);
+  }
+  for (const removed of ["cloud", "nvidia", "nvidia_thinking", "aion", "aion_thinking"]) {
+    let payload;
+    await chat.requestChat(async (_, options) => {
+      payload = JSON.parse(options.body);
+      return {ok: true, json: async () => ({answer: "Ok"})};
+    }, "Teste", [], undefined, removed);
+    assert.equal(payload.mode, undefined);
+  }
 });
 
 test("seletor de modelos e campos necessários existem no HTML", () => {
@@ -317,91 +324,17 @@ test("interface limpa não mostra marcações ou contagem de chaves API", () => 
   assert.doesNotMatch(html, /gsk_[A-Za-z0-9_-]{10,}/);
 });
 
-test("modelos NVIDIA aparecem no seletor mas aguardam autorização do servidor", () => {
+test("THIGAS AI mostra somente Rápido, Equilibrado e Avançado", () => {
   const html = fs.readFileSync(path.join(__dirname, "../static/index.html"), "utf8");
-  assert.match(html, /<option value="nvidia" disabled>/);
-  assert.match(html, /<option value="nvidia_thinking" disabled>/);
-});
-
-test("modo NVIDIA usa endpoint do chat do site, sem expor chaves", async () => {
-  let body;
-  const reply = await chat.requestChat(async (url, options) => {
-    assert.equal(url, "/chat");
-    body = JSON.parse(options.body);
-    return { ok: true, json: async () => ({
-      answer: "NVIDIA respondeu", model: "openai/gpt-oss-20b",
-      reasoning_effort: "high",
-    }) };
-  }, "Revise este código", [], undefined, "nvidia_thinking", false);
-  assert.equal(body.mode, "nvidia_thinking");
-  assert.equal(body.web_search, undefined);
-  assert.equal(reply.reasoning_effort, "high");
-  assert.equal(reply.usage.total_tokens, null);
-});
-
-test("alternância de chaves é informada sem dados secretos", async () => {
-  const result = await chat.requestChat(async (path, options) => {
-    assert.equal(path, "/chat");
-    assert.equal(JSON.parse(options.body).mode, "nvidia");
-    return {ok: true, json: async () => ({
-      answer: "Recuperado pela segunda chave",
-      model: "openai/gpt-oss-20b",
-      provider_attempt_count: 2,
-      provider_failover_used: true,
-    })};
-  }, "Teste do fallback", [], undefined, "nvidia", false);
-  assert.equal(result.provider_attempt_count, 2);
-  assert.equal(result.provider_failover_used, true);
-  assert.equal(result.usage.total_tokens, null);
-  const source = fs.readFileSync(path.join(__dirname, "../static/chat.js"), "utf8");
-  assert.match(source, /Alternância automática realizada/);
-});
-
-test("telemetria de failover inválida não é exibida", async () => {
-  const result = await chat.requestChat(async () => ({ok: true, json: async () => ({
-    answer: "Ok", provider_attempt_count: "many", provider_failover_used: "true",
-  })}), "Teste", [], undefined, "fast", false);
-  assert.equal(result.provider_attempt_count, 0);
-  assert.equal(result.provider_failover_used, false);
-});
-
-test("Aion aparece no seletor, inicialmente bloqueado até confirmação do servidor", () => {
-  const html = fs.readFileSync(path.join(__dirname, "../static/index.html"), "utf8");
-  const frontend = fs.readFileSync(path.join(__dirname, "../static/chat.js"), "utf8");
-  assert.match(html, /<option value="aion" disabled>/);
-  assert.match(html, /<option value="aion_thinking" disabled>/);
-  assert.match(frontend, /capabilities\?\.aion_enabled/);
-  assert.match(frontend, /capabilities\?\.aion_thinking_enabled/);
-  assert.doesNotMatch(html, /sk-[A-Za-z0-9_-]{12,}/);
-});
-
-test("Aion usa o backend privado e preserva contagem real sem inventar tokens", async () => {
-  for (const mode of ["aion", "aion_thinking"]) {
-    const result = await chat.requestChat(async (url, options) => {
-      assert.equal(url, "/chat");
-      const body = JSON.parse(options.body);
-      assert.equal(body.mode, mode);
-      return { ok: true, json: async () => ({
-        answer: "Resposta Aion", model: "aion-labs/aion-3.5-mini",
-        reasoning_effort: mode === "aion" ? "low" : "high",
-        usage: { prompt_tokens: 9, completion_tokens: 11, total_tokens: 20 },
-        provider_attempt_count: 1, provider_failover_used: false,
-      }) };
-    }, "Explique um texto", [], undefined, mode, false);
-    assert.equal(result.answer, "Resposta Aion");
-    assert.equal(result.model, "aion-labs/aion-3.5-mini");
-    assert.equal(result.reasoning_effort, mode === "aion" ? "low" : "high");
-    assert.equal(result.usage.total_tokens, 20);
-    assert.equal(result.provider_failover_used, false);
-  }
-});
-
-test("Aion sem medição mantém tokens não informados", async () => {
-  const result = await chat.requestChat(async () => ({ ok: true, json: async () => ({
-    answer: "Ok", model: "aion-labs/aion-3.5-mini",
-  }) }), "Teste", [], undefined, "aion", false);
-  assert.equal(result.usage.total_tokens, null);
-  assert.equal(result.provider_attempt_count, 0);
+  const js = fs.readFileSync(path.join(__dirname, "../static/chat.js"), "utf8");
+  const options = [...html.matchAll(/<option value="([^"]+)"(?: disabled)?>([^<]+)<\/option>/g)]
+    .filter(match => ["fast", "balanced", "thinking", "nvidia", "aion", "cloud", "nvidia_thinking", "aion_thinking"].includes(match[1]));
+  assert.deepEqual(options.map(match => [match[1], match[2]]), [
+    ["fast", "Rápido"], ["balanced", "Equilibrado"], ["thinking", "Avançado"],
+  ]);
+  assert.doesNotMatch(html, /Sabiazinho|Sabiá|Maritaca|Groq|NVIDIA|Aion|GPT-OSS/);
+  assert.doesNotMatch(js, /Sabiá|Maritaca|Groq|NVIDIA|Aion|GPT-OSS/);
+  assert.match(js, /model-used"\)\.textContent = \(\{fast: "Rápido", balanced: "Equilibrado", thinking: "Avançado"\}\)/);
 });
 
 test("Maritaca streaming lê SSE em blocos divididos e confirma resposta completa", async () => {
