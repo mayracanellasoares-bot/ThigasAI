@@ -225,8 +225,6 @@ def choose_model(mode: Any) -> str:
     if mode in (None, "fast"):
         return MARITACA_FAST_MODEL
     if mode == "balanced":
-        if not MARITACA_API_KEY:
-            raise GatewayError("Modo Sabiá 4 indisponível: chave Maritaca não configurada.", 403)
         return MARITACA_MODEL
     if mode == "thinking" and THIGAS_ENABLE_THINKING and MARITACA_API_KEY:
         return MARITACA_THINKING_MODEL
