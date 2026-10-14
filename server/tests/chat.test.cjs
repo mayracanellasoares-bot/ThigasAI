@@ -377,8 +377,9 @@ test("markdown seguro apresenta negrito sem asteriscos nem tags HTML", () => {
   ]);
   assert.ok(chat.streamingPreview("```python\nprint(2)\n```").includes("print(2)"));
   const html = require("node:fs").readFileSync(require("node:path").join(__dirname, "../static/index.html"), "utf8");
-  assert.match(html, /Sabiazinho 4/);
-  assert.match(html, /Sabiá 4/);
+  assert.match(html, /<option value="fast">Rápido<\/option>/);
+  assert.match(html, /<option value="balanced">Equilibrado<\/option>/);
+  assert.doesNotMatch(html, /Sabiazinho|Sabiá|Maritaca/);
   const source = require("node:fs").readFileSync(require("node:path").join(__dirname, "../static/chat.js"), "utf8");
   assert.match(source, /Pensando…/);
   assert.match(source, /COPIAR/);
