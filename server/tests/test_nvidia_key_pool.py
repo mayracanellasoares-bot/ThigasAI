@@ -64,7 +64,7 @@ class NvidiaKeyTests(unittest.TestCase):
         sent = sender.call_args.kwargs["json"]
         self.assertEqual(sent["model"], "openai/gpt-oss-20b")
         self.assertEqual(sent["reasoning_effort"], "high")
-        self.assertEqual(sent["max_tokens"], 16384)
+        self.assertEqual(sent["max_tokens"], gateway.MARITACA_MAX_TOKENS)
         self.assertNotIn("max_completion_tokens", sent)
         self.assertNotIn("include_reasoning", sent)
         self.assertEqual(result["reasoning_effort"], "high")
