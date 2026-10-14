@@ -24,6 +24,11 @@ with patch.dict(os.environ, {
 
 class GatewayTests(unittest.TestCase):
     def setUp(self):
+        # Retired-provider compatibility checks run only under an explicit
+        # test patch. The production application does not expose them.
+        legacy = patch.object(gateway, "THIGAS_LEGACY_PROVIDERS_ENABLED", True)
+        legacy.start()
+        self.addCleanup(legacy.stop)
         gateway.app.config["TESTING"] = True
         self.client = gateway.app.test_client()
         login = self.client.post("/auth/login", data={"password": "teste-senha-unica-123456789"})
