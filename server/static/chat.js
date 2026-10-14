@@ -720,9 +720,12 @@
 
   function resizeInput() {
     input.style.height = "auto";
-    // Four visible lines by default; expand to roughly sixteen lines as needed.
-    const maxHeight = Math.min(window.innerWidth <= 580 ? 340 : 380, Math.round(window.innerHeight * 0.42));
-    input.style.height = Math.min(Math.max(input.scrollHeight, 108), maxHeight) + "px";
+    // Start compact next to the bottom edge; expand only for actual text.
+    // Long pasted code still gets a large scrollable editing area.
+    const minHeight = 52;
+    const maxHeight = Math.max(minHeight,
+      Math.min(window.innerWidth <= 580 ? 340 : 380, Math.round(window.innerHeight * 0.42)));
+    input.style.height = Math.min(Math.max(input.scrollHeight, minHeight), maxHeight) + "px";
     input.style.overflowY = input.scrollHeight > maxHeight ? "auto" : "hidden";
   }
 
