@@ -755,7 +755,7 @@ def chat_stream():
     if mode not in ("fast", "balanced", "thinking"):
         return jsonify(error="Streaming disponível apenas para modelos Maritaca."), 400
     if mode == "thinking" and not THIGAS_ENABLE_THINKING:
-        return jsonify(error="Streaming do Sabiá Thinking indisponível.", 403)
+        return jsonify(error="Streaming do Sabiá Thinking indisponível."), 403
     if body.get("web_search", False) is not False:
         return jsonify(error="Pesquisa web requer a rota convencional."), 400
     if not MARITACA_API_KEY:
