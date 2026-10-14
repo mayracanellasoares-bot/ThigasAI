@@ -289,3 +289,15 @@ Para serviços Render que já existem, declarar `sync: false` em `render.yaml` *
 
 Documentação oficial: https://api.aionlabs.ai/docs/api-reference/ e https://www.aionlabs.ai/docs/quickstart/.
 Testes isolados sem consumir créditos: `python -m unittest discover -s server/tests -v` e `node --test server/tests/chat.test.cjs`.
+
+## Maritaca com três níveis, respostas progressivas e formatação limpa
+
+O THIGAS AI oferece no seletor os modelos `sabiazinho-4` (rápido), `sabia-4` (equilibrado) e `sabia-4-thinking` (avançado). A seleção depende de `MARITACA_API_KEY`, e o modo Thinking requer também `THIGAS_ENABLE_THINKING=true`. A opção BR-SP de residência de dados fica disponível manualmente por `MARITACA_THINKING_MODEL=sabia-4-thinking-br-sp`, com custo adicional do provedor. A configuração recomendada de baixo custo utiliza o modelo padrão `sabia-4-thinking` somente em tarefas complexas.
+
+O backend mantém o `/chat` convencional para compatibilidade e adiciona `/chat/stream` para Sabiá/Sabiazinho via SSE. O streaming é selecionado automaticamente no chat quando a Maritaca está configurada, o usuário escolheu um dos três modos e a pesquisa web está desligada. A pesquisa web continua na rota convencional, pois ela depende de contexto externo. O endpoint progressivo usa `stream_options.include_usage=true`; nenhum número de tokens é inventado. A resposta é considerada concluída apenas após o marcador final oficial `[DONE]`. Erros durante a geração não promovem texto parcial ao histórico; não há reenvio automático de consulta possivelmente cobrada.
+
+Os textos de respostas são apresentados com parágrafos e negrito renderizados em DOM seguro, sem expor marcadores Markdown. Blocos de código delimitados por crases triplas continuam com botões **Copiar**, **Baixar** e **Revisar código**. Enquanto a IA ainda não produziu conteúdo, a interface exibe um ícone animado `🧠` com **Pensando…**; depois passa a mostrar **Respondendo…** e o texto progressivamente. O usuário pode desativar animações nas preferências de redução de movimento do dispositivo.
+
+Variáveis no Render: `MARITACA_FAST_MODEL=sabiazinho-4`, `MARITACA_MODEL=sabia-4`, `MARITACA_THINKING_MODEL=sabia-4-thinking`, `THIGAS_ENABLE_THINKING=true`. **A chave existente `MARITACA_API_KEY` é preservada; não é enviada ao navegador.** Para trocar o modelo, use o Playground e teste instruções com casos reais antes de alterar os modelos do serviço. O Playground não treina os pesos; serve para comparar saídas e calibrar temperatura, custo e instruções.
+
+Documentação oficial: https://docs.maritaca.ai/pt/modelos e https://docs.maritaca.ai/api/pt/completion. A API remunera o consumo por tokens em reais: consulte sua conta e configure créditos e alertas antes de liberar modos avançados a um site público. Testes simulados: `python -m unittest discover -s server/tests -v` e `node --test server/tests/*.test.cjs`.
