@@ -386,14 +386,20 @@ test("markdown seguro apresenta negrito sem asteriscos nem tags HTML", () => {
   assert.doesNotMatch(source, /\.innerHTML\s*=/);
 });
 
-test("área de escrita começa com quatro linhas e expande no celular", () => {
+test("barra de mensagem inicia compacta embaixo e expande para texto longo", () => {
   const html = fs.readFileSync(path.join(__dirname, "../static/index.html"), "utf8");
   const css = fs.readFileSync(path.join(__dirname, "../static/chat.css"), "utf8");
+  const theme = fs.readFileSync(path.join(__dirname, "../static/mini-nano-theme.css"), "utf8");
   const script = fs.readFileSync(path.join(__dirname, "../static/chat.js"), "utf8");
-  assert.match(html, /id="chat-input" rows="4"/);
+  assert.match(html, /id="chat-input" rows="2"/);
+  assert.match(css, /min-height: 52px;/);
+  assert.match(theme, /#chat-input\{min-height:52px;max-height:min\(380px,42dvh\)/);
   assert.match(css, /max-height: min\(380px, 42dvh\)/);
+  assert.match(script, /const minHeight = 52;/);
+  assert.match(script, /input\.scrollHeight, minHeight/);
   assert.match(script, /Math\.min\(window\.innerWidth <= 580 \? 340 : 380/);
   assert.match(script, /input\.style\.overflowY = /);
+  assert.doesNotMatch(css.slice(css.indexOf("/* Compact composer")), /min-height: 108px/);
 });
 
 test("resposta SSE conserva alerta de código incorreto sem inventar medição", async () => {
