@@ -12,14 +12,16 @@ services:
         sync: false
       - key: MARITACA_MODEL
         value: sabia-4
+      - key: MARITACA_FAST_MODEL
+        value: sabiazinho-4
       - key: MARITACA_MAX_TOKENS
         value: "16384"
       - key: MARITACA_URL
         value: https://chat.maritaca.ai/api/chat/completions
       - key: MARITACA_THINKING_MODEL
-        value: sabia-4-thinking-br-sp
+        value: sabia-4-thinking
       - key: THIGAS_ENABLE_THINKING
-        value: "false"
+        value: "true"
       - key: THIGAS_CLOUD_API_KEY
         sync: false
       - key: THIGAS_CLOUD_API_KEY_2
