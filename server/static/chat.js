@@ -721,7 +721,7 @@
   function resizeInput() {
     input.style.height = "auto";
     // Four visible lines by default; expand to roughly sixteen lines as needed.
-    const maxHeight = Math.min(380, Math.round(window.innerHeight * 0.42));
+    const maxHeight = Math.min(window.innerWidth <= 580 ? 340 : 380, Math.round(window.innerHeight * 0.42));
     input.style.height = Math.min(Math.max(input.scrollHeight, 108), maxHeight) + "px";
     input.style.overflowY = input.scrollHeight > maxHeight ? "auto" : "hidden";
   }
