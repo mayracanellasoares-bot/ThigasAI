@@ -1143,6 +1143,12 @@ body.light-mode .composer{background:white}
 @keyframes thigas-think{0%,100%{transform:rotate(-8deg) scale(.95);opacity:.65}50%{transform:rotate(8deg) scale(1.12);opacity:1}}
 @media(prefers-reduced-motion:reduce){.thinking-icon{animation:none}}
 
+/* Token summary stays visible ABOVE the composer, not between chat and bottom. */
+.composer-wrap > .token-meter {
+  margin-top: 0;
+  margin-bottom: 6px;
+}
+
 /* Compact composer sits near the bottom with room for conversation.
    Expands automatically when the user types/pastes code or multiple lines. */
 .modern-composer #chat-input,
