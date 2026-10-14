@@ -72,7 +72,7 @@ class MultiAttachmentArchiveTests(unittest.TestCase):
         upstream.json.return_value = {"choices": [{"message": {"content": "Uma foto azul."}}]}
         with patch.dict(os.environ, {"THIGAS_VISION_MODEL": "vision-model-test",
                                      "THIGAS_VISION_API_KEY": "private-test",
-                                     "THIGAS_VISION_URL": "https://provider.example/v1/chat/completions"}),
+                                     "THIGAS_VISION_URL": "https://provider.example/v1/chat/completions"}), \
              patch.object(gateway.requests, "post", return_value=upstream) as post:
             for filename, mime, fmt in (("a.png", "image/png", "PNG"),
                                         ("a.gif", "image/gif", "GIF"),
