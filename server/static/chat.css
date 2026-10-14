@@ -1131,3 +1131,14 @@ body.light-mode .composer{background:white}
 .web-source-link{display:block;font-size:13px;color:#335e48;text-decoration:underline;text-underline-offset:2px;overflow-wrap:anywhere}
 .web-source-link:hover{color:#1e4330}
 @media(max-width:500px){.composer-send-actions{gap:4px}.web-search-btn{width:36px;height:36px;font-size:20px}.web-source-list{margin-left:6px;padding:10px 12px}}
+
+
+/* Fluxo progressivo acessível; ícone de pensamento discreto. */
+.thinking-indicator{display:flex;align-items:center;flex-wrap:wrap;column-gap:8px;row-gap:6px;max-width:100%;padding:12px 14px;border-radius:14px}
+.thinking-icon{display:inline-block;font-size:22px;line-height:1.25;transform-origin:center;animation:thigas-think 1.9s ease-in-out infinite}
+.thinking-label{font-size:13px;font-weight:600;opacity:.77}
+.thinking-indicator .stream-preview{width:100%;flex-basis:100%;max-width:800px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px;line-height:1.55}
+.readable-heading{font-weight:750}
+.inline-code{padding:1px 5px;border-radius:5px;background:rgba(128,128,128,.11);font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:.92em}
+@keyframes thigas-think{0%,100%{transform:rotate(-8deg) scale(.95);opacity:.65}50%{transform:rotate(8deg) scale(1.12);opacity:1}}
+@media(prefers-reduced-motion:reduce){.thinking-icon{animation:none}}
