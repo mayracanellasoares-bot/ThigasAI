@@ -95,6 +95,50 @@
     return parts;
   }
 
+  function readableSegments(input) {
+    // Render lightweight Markdown as safe text nodes, never HTML.
+    const source = String(input || "");
+    const segments = [];
+    const regex = /\*\*([^*\n]+)\*\*|__([^_\n]+)__|`([^`\n]+)`/g;
+    let last = 0, match;
+    while ((match = regex.exec(source)) !== null) {
+      if (match.index > last) segments.push({ kind: "plain", value: source.slice(last, match.index) });
+      segments.push({ kind: match[3] ? "inline-code" : "bold", value: match[1] || match[2] || match[3] });
+      last = regex.lastIndex;
+    }
+    if (last < source.length) segments.push({ kind: "plain", value: source.slice(last) });
+    return segments;
+  }
+
+  function readableLines(text) {
+    return String(text || "").split("\n").map(line => {
+      const heading = /^\s{0,3}#{1,6}\s+(.+)$/.exec(line);
+      const cleaned = (heading ? heading[1] : line)
+        .replace(/^(\s*)[-*]\s+(?=\S)/, "$1")
+        .replace(/^(\s*)\d{1,2}\.\s+(?=\S)/, "$1");
+      return { text: cleaned, heading: Boolean(heading) };
+    });
+  }
+
+  function renderReadableText(element, source) {
+    element.replaceChildren();
+    for (const [index, line] of readableLines(source).entries()) {
+      if (index) element.append(document.createTextNode("\n"));
+      const target = line.heading ? make("strong", "readable-heading") : element;
+      for (const segment of readableSegments(line.text)) {
+        if (segment.kind === "bold") target.append(make("strong", "", segment.value));
+        else if (segment.kind === "inline-code") target.append(make("code", "inline-code", segment.value));
+        else target.append(document.createTextNode(segment.value));
+      }
+      if (line.heading) element.append(target);
+    }
+  }
+
+  function streamingPreview(source) {
+    // Avoid displaying raw triple-backtick markers while code arrives.
+    return String(source || "").replace(/^\s*`{3}[^\n]*$/gm, "");
+  }
+
   function codeFilename(language, index) {
     const extensions = { python: "py", py: "py", javascript: "js", js: "js", typescript: "ts", ts: "ts", jsx: "jsx", tsx: "tsx", html: "html", css: "css", json: "json", java: "java", c: "c", cpp: "cpp", "c++": "cpp", "c#": "cs", csharp: "cs", cs: "cs", go: "go", rust: "rs", bash: "sh", shell: "sh", powershell: "ps1", sql: "sql", yaml: "yaml", php: "php" };
     return "thigas_codigo_" + index + "." + (extensions[String(language).toLowerCase()] || "txt");
@@ -182,7 +226,7 @@
 
   // Exportações puras permitem testar o contrato sem DOM, API externa ou saldo.
   if (typeof module !== "undefined" && module.exports) {
-    module.exports = { MAX_MESSAGE, MAX_FILE_BYTES, MAX_TEXT_FILE_BYTES, safeFilename, validateFile, composeMessage, sanitizeHistory, apiHistory, splitCodeBlocks, codeFilename, extractDocument, requestChat, redactAttachmentFromHistory, classifyConversationDate, codeRevisionPrompt, safeSourceUrl };
+    module.exports = { MAX_MESSAGE, MAX_FILE_BYTES, MAX_TEXT_FILE_BYTES, safeFilename, validateFile, composeMessage, sanitizeHistory, apiHistory, splitCodeBlocks, codeFilename, extractDocument, requestChat, redactAttachmentFromHistory, classifyConversationDate, codeRevisionPrompt, safeSourceUrl, readableSegments, readableLines, streamingPreview, requestChatStream };
   }
   if (typeof document === "undefined") return;
 
@@ -518,7 +562,10 @@
     let codeIndex = 0;
     for (const part of parts) {
       if (part.type === "text") {
-        entry.append(make("div", "message-text", part.text));
+        const prose = make("div", "message-text");
+        if (role === "assistant") renderReadableText(prose, part.text);
+        else prose.textContent = part.text;
+        entry.append(prose);
         continue;
       }
       codeIndex++;
