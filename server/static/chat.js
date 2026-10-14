@@ -260,7 +260,7 @@
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
-        buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
+        buffer = (buffer + decoder.decode(value, { stream: true })).replace(/\r\n/g, "\n");
         if (buffer.length > 1024 * 1024) throw new Error("A transmissão excedeu o limite seguro.");
         let boundary;
         while ((boundary = buffer.indexOf("\n\n")) !== -1) {
@@ -1005,7 +1005,9 @@
       thinking.disabled = !allowThinking;
       const activeThinkingModel = typeof capabilities?.models?.thinking === "string" ? capabilities.models.thinking : "";
       const supportsHighEffort = capabilities?.thinking_effort_high === true;
+      const isSabiaThinking = /^sabia-4-thinking(?:-br-sp)?$/.test(activeThinkingModel);
       thinking.textContent = !allowThinking ? "Avançado (indisponível)" :
+        isSabiaThinking ? "Sabiá 4 Thinking · avançado" :
         supportsHighEffort ? "Esforço: alto (GPT-OSS)" : "Modelo avançado";
       thinking.title = activeThinkingModel ? "Modelo: " + activeThinkingModel : "Modelo avançado não configurado";
       if (modeSelector.selectedOptions[0]?.disabled) modeSelector.value = "fast";
