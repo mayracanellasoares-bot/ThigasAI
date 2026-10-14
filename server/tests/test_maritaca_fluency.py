@@ -131,5 +131,43 @@ class MaritacaFluencyTests(unittest.TestCase):
             self.assertEqual(exc.exception.status_code, 403)
 
 
+    def test_code_generation_prompt_includes_app_and_game_requirements(self):
+        for request in ("Crie um jogo 2D em HTML", "Faça um aplicativo responsivo",
+                        "Desenvolva um site completo", "Corrija esta interface"):
+            with self.subTest(request=request):
+                system = gateway.build_messages(request, [])[0]["content"]
+                self.assertIn("REQUISITOS DE ENTREGA DE CÓDIGO", system)
+                self.assertIn("cercas Markdown", system)
+        self.assertNotIn("REQUISITOS DE ENTREGA DE CÓDIGO",
+                         gateway.build_messages("Como está o tempo?", [])[0]["content"])
+
+    def test_stream_syntax_and_unfinished_fence_are_flagged_for_review(self):
+        from generation_quality import inspect_generation
+        provider = upstream_chunks([
+            'data: {"choices":[{"delta":{"content":"```python\\nif True print(1)\\n```"},"finish_reason":"stop"}]}',
+            "data: [DONE]",
+        ])
+        events = "".join(relay_maritaca_stream(provider, model="sabia-4", max_tokens=32768))
+        frames = [json.loads(frame.split("data: ", 1)[1])
+                  for frame in events.split("\n\n") if frame.startswith("event: done")]
+        self.assertEqual(len(frames), 1)
+        self.assertIn("possible_python_syntax_error", frames[0]["quality_flags"])
+        self.assertNotIn("output_limit", frames[0]["quality_flags"])
+
+        cutoff = upstream_chunks([
+            'data: {"choices":[{"delta":{"content":"```python\\nprint(2)"},"finish_reason":"length"}]}',
+            "data: [DONE]",
+        ])
+        cut_events = "".join(relay_maritaca_stream(cutoff, model="sabia-4", max_tokens=32768))
+        cut_frames = [json.loads(frame.split("data: ", 1)[1])
+                      for frame in cut_events.split("\n\n") if frame.startswith("event: done")]
+        self.assertEqual(cut_frames[0]["quality_flags"], inspect_generation("```python\nprint(2)", "length"))
+        self.assertIn("output_limit", cut_frames[0]["quality_flags"])
+        self.assertIn("unclosed_code_block", cut_frames[0]["quality_flags"])
+
+    def test_longer_output_budget_is_within_provider_documented_maximum(self):
+        self.assertEqual(gateway.MARITACA_MAX_TOKENS, 32768)
+
+
 if __name__ == "__main__":
     unittest.main()
