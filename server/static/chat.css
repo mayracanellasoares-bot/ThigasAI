@@ -1161,3 +1161,6 @@ body:not(.light-mode) #chat-input {
     max-height: min(320px, 40dvh);
   }
 }
+
+/* Token indicators remain visible above the message field, keeping chat near bottom. */
+.composer-wrap > .token-meter { margin-top: 0; margin-bottom: 6px; }
