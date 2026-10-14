@@ -24,6 +24,9 @@ def upstream(status=200, answer="Aion respondeu"):
 
 class AionLabsTests(unittest.TestCase):
     def setUp(self):
+        legacy = patch.object(gateway, "THIGAS_LEGACY_PROVIDERS_ENABLED", True)
+        legacy.start()
+        self.addCleanup(legacy.stop)
         patch_pool = patch.object(aion_provider, "aion_keys", aion_provider.KeyPool())
         patch_pool.start()
         self.addCleanup(patch_pool.stop)
