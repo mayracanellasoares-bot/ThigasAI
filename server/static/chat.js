@@ -443,7 +443,7 @@
     document.body.classList.toggle("history-drawer-collapsed", !mobile && !open);
     drawerBackdrop.hidden = !(mobile && open);
     byId("btn-history-top").setAttribute("aria-expanded", String(mobile ? open : open));
-    drawer.setAttribute("aria-hidden", String(mobile && !open));
+    drawer.setAttribute("aria-hidden", String(!open));
     if (mobile && open) drawerSearch.focus();
   }
 
@@ -1092,14 +1092,16 @@
   byId("btn-clear").addEventListener("click", startNewConversation);
   byId("btn-new-top").addEventListener("click", startNewConversation);
   byId("btn-history-top").addEventListener("click", () => setDrawerOpen(!isDrawerOpen()));
+  byId("btn-color-mode-drawer").addEventListener("click", () => byId("btn-color-mode").click());
+  byId("btn-install-drawer").addEventListener("click", () => byId("btn-install").click());
   byId("btn-close-drawer").addEventListener("click", () => setDrawerOpen(false));
   drawerBackdrop.addEventListener("click", () => setDrawerOpen(false));
   byId("btn-drawer-new").addEventListener("click", startNewConversation);
   drawerSearch.addEventListener("input", renderSidebarHistory);
   byId("btn-drawer-settings").addEventListener("click", () => { dismissMobileDrawer(); modal.showModal(); });
   document.addEventListener("keydown", event => { if (event.key === "Escape" && isDrawerOpen() && mobileHistory.matches) setDrawerOpen(false); });
-  if (mobileHistory.addEventListener) mobileHistory.addEventListener("change", () => setDrawerOpen(!mobileHistory.matches));
-  setDrawerOpen(!mobileHistory.matches);
+  if (mobileHistory.addEventListener) mobileHistory.addEventListener("change", () => setDrawerOpen(false));
+  setDrawerOpen(false);
   byId("btn-history").addEventListener("click", () => { renderConversationList(); historyModal.showModal(); });
   byId("btn-close-history").addEventListener("click", () => historyModal.close());
   byId("btn-help").addEventListener("click", () => modal.showModal());

@@ -1,4 +1,4 @@
-<!DOCTYPEhtml>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
@@ -15,12 +15,12 @@
   <link rel="icon" href="/static/icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
   <link rel="stylesheet" href="/static/chat.css?v=bottom12">
-  <link rel="stylesheet" href="/static/mini-nano-theme.css?v=compact11">
   <link rel="stylesheet" href="/static/history-sidebar.css?v=drawer2">
-  <script src="/static/chat.js?v=files13" defer></script>
+  <link rel="stylesheet" href="/static/mini-nano-theme.css?v=minimal14">
+  <script src="/static/chat.js?v=minimal14" defer></script>
   <script src="/static/pwa.js?v=llama2" defer></script>
 </head>
-<body class="theme-green">
+<body class="theme-green history-drawer-collapsed">
   <div class="app-shell">
     <aside id="history-drawer" class="history-drawer" aria-label="Histórico de conversas">
       <div class="drawer-header">
@@ -36,6 +36,8 @@
       <nav id="drawer-conversations" class="drawer-conversations" aria-label="Conversas salvas"></nav>
       <div class="drawer-bottom">
         <a href="/workspace" class="drawer-bottom-link">▤ <span>Documentos</span></a>
+        <button id="btn-color-mode-drawer" class="drawer-bottom-link" type="button">◐ <span>Alternar tema</span></button>
+        <button id="btn-install-drawer" class="drawer-bottom-link" type="button">↓ <span>Instalar aplicativo</span></button>
         <button id="btn-drawer-settings" class="drawer-bottom-link" type="button">⚙ <span>Configurações e ajuda</span></button>
         <small>Histórico local deste navegador. Anexos não são armazenados.</small>
       </div>
@@ -100,7 +102,7 @@
       <header class="chat-header">
         <div class="mobile-brand">
           <img src="/static/icons/icon.svg" alt="" class="mobile-brand-icon">
-          <span class="mobile-brand-copy"><strong>THIGAS AI</strong><small>Assistente de pesquisa e criação</small></span>
+          <span class="mobile-brand-copy"><strong>THIGAS AI</strong></span>
         </div>
         <div class="model-chip" title="Assistente ativo">
           <span class="model-dot"></span>
@@ -109,7 +111,7 @@
         </div>
         <div class="header-actions">
           <button type="button" id="btn-new-top" class="header-new-chat">＋ Nova conversa</button>
-          <button type="button" id="btn-history-top" class="header-history" aria-label="Abrir ou recolher o histórico de conversas" aria-expanded="true" aria-controls="history-drawer">☰</button>
+          <button type="button" id="btn-history-top" class="header-history" aria-label="Abrir ou recolher o histórico de conversas" aria-expanded="false" aria-controls="history-drawer">☰</button>
         </div>
       </header>
 
@@ -121,17 +123,8 @@
 
         <div id="chat-scroll" tabindex="0" aria-label="Conversa">
           <section class="welcome" aria-label="Boas-vindas">
-            <div class="welcome-mark">
-              <img src="/static/icons/icon.svg" alt="">
-            </div>
-            <span class="welcome-eyebrow">SEU ASSISTENTE INTELIGENTE</span>
-            <h1>Olá! Eu sou o THIGAS AI</h1>
-            <p>Uma aplicação desenvolvida pela <strong>Brittech inc.</strong> Estou aqui para ajudar com dúvidas, criar, explicar, revisar e corrigir códigos. Como posso ajudar você hoje?</p>
-            <div class="starter-actions" aria-label="Sugestões">
-              <button type="button" class="starter-chip" data-prompt="Analise este documento e faça um resumo objetivo.">Resumir documento</button>
-              <button type="button" class="starter-chip" data-prompt="Revise este código, encontre bugs e proponha correções.">Revisar código</button>
-              <button type="button" class="starter-chip" data-prompt="Explique este conteúdo de forma simples e passo a passo.">Explicar conteúdo</button>
-            </div>
+            <h1>THIGAS AI</h1>
+            <p>O que vamos fazer hoje?</p>
           </section>
           <div id="chat-logs" role="log" aria-live="polite" aria-relevant="additions" aria-label="Mensagens"></div>
         </div>
@@ -149,13 +142,14 @@
             <button type="button" data-insert="@site ">@site — colar e analisar um link</button>
             <button type="button" data-insert="@codigo ">@codigo — revisar programação</button>
           </div>
-           <div class="token-meter" role="group" aria-label="Tokens medidos na última resposta">
+           <details class="usage-details"><summary>Uso de tokens</summary><div class="token-meter" role="group" aria-label="Tokens medidos na última resposta">
             <span>Última resposta · THIGAS AI <strong id="model-used">—</strong></span>
             <span>Enviados <strong id="tokens-input">—</strong></span>
             <span>Recebidos <strong id="tokens-output">—</strong></span>
             <span>Total <strong id="tokens-total">—</strong></span>
             <small id="tokens-status">Aguardando dados reais da API</small>
           </div>
+          </details>
           <form id="chat-form" class="composer modern-composer">
             <label class="sr-only" for="chat-input">Sua mensagem</label>
             <textarea id="chat-input" rows="2" maxlength="60000" placeholder="Pergunte qualquer coisa…" autocomplete="off" spellcheck="false"></textarea>
