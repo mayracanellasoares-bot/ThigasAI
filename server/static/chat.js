@@ -348,7 +348,7 @@
   let conversationEpoch = 0;
   let activeController = null;
   let audioContext = null;
-  let settings = { theme: "green", sound: false, crt: true, colorMode: "dark" };
+  let settings = { theme: "green", sound: false, crt: true, colorMode: "light" };
 
   function readSaved(key) {
     try { return JSON.parse(localStorage.getItem(key) || "null"); } catch (_) { return null; }
@@ -710,7 +710,7 @@
       colorModeButton.title = "Mudar para tema " + nextMode;
     }
     const themeMeta = byId("theme-color-meta");
-    if (themeMeta) themeMeta.setAttribute("content", settings.colorMode === "light" ? "#f7f7f8" : "#0b0b0b");
+    if (themeMeta) themeMeta.setAttribute("content", settings.colorMode === "light" ? "#ffffff" : "#0b0b0b");
     storeSaved(SETTINGS_KEY, settings);
   }
 
@@ -1069,7 +1069,7 @@
     if (THEMES.includes(savedSettings.theme)) settings.theme = savedSettings.theme;
     settings.sound = savedSettings.sound === true;
     settings.crt = savedSettings.crt !== false;
-    settings.colorMode = savedSettings.colorMode === "light" ? "light" : "dark";
+    settings.colorMode = "light";
   }
   applySettings();
   loadConversationStore();
