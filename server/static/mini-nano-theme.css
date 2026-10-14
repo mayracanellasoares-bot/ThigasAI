@@ -23,3 +23,16 @@ button:hover{filter:brightness(.94)}button:focus-visible,summary:focus-visible{o
 @media(max-width:580px){.chat-header,body.light-mode .chat-header{padding:8px 12px}.composer-wrap{width:calc(100% - 20px)}#chat-scroll{padding:18px 14px}.composer-footer span:first-child{display:none}#chat-input{font-size:16px}.header-new-chat{font-size:12px}.welcome h1{font-size:24px}}
 
 #btn-color-mode-drawer{display:none}
+
+/* Readable desktop and mobile conversation layout. */
+body{--surface-3:#f3f3f3;font-size:17px}
+#chat-scroll{padding:24px max(24px,calc((100% - 1040px)/2))}
+#chat-logs{width:100%;max-width:1040px;margin:0 auto;padding:0 0 20px}
+.welcome:has(+ #chat-logs:not(:empty)){min-height:0;height:0;padding:0;margin:0;gap:0;visibility:hidden}
+.log-entry{font-size:17px;line-height:1.7;color:var(--text)}
+.composer-wrap{width:min(1040px,calc(100% - 48px))}
+.modern-composer #chat-input{font-size:17px;line-height:1.55;padding:8px;min-height:56px}
+.icon-btn,.attach-btn,.microphone-btn,.web-search-btn{min-width:44px;height:44px}
+.effort-wrap select{font-size:14px;min-height:44px}
+.send-btn,body.light-mode .send-btn{width:44px;height:44px}
+@media(max-width:580px){#chat-scroll{padding:18px 16px}.composer-wrap{width:calc(100% - 24px)}.log-entry{font-size:16px}.modern-composer #chat-input{font-size:16px}.effort-wrap select{font-size:13px}.composer-tools,.composer-send-actions{gap:4px}}
