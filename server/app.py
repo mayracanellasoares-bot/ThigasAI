@@ -709,15 +709,28 @@ def describe_uploaded_image():
     data = upload.read(8 * 1024 * 1024 + 1)
     if not data or len(data) > 8 * 1024 * 1024:
         return jsonify(error="Envie uma imagem de até 8 MB."), 413
-    content_type = upload.mimetype
-    valid = (
-        (content_type == "image/png" and data.startswith(b"\x89PNG\r\n\x1a\n")) or
-        (content_type == "image/jpeg" and data.startswith(b"\xff\xd8\xff")) or
-        (content_type == "image/webp" and data.startswith(b"RIFF") and data[8:12] == b"WEBP")
-    )
-    if not valid:
-        return jsonify(error="Imagem inválida; use PNG, JPEG ou WebP."), 415
+    # Validate image bytes, constrain decompression and strip EXIF/location
+    # metadata before sending to the configured visual inference provider.
+    from PIL import Image, ImageOps, UnidentifiedImageError
+    Image.MAX_IMAGE_PIXELS = 16_000_000
+    try:
+        with Image.open(BytesIO(data)) as image:
+            if image.format not in {"PNG", "JPEG", "WEBP", "GIF", "BMP", "TIFF"}:
+                return jsonify(error="Formato de imagem não suportado."), 415
+            if image.width * image.height > 16_000_000:
+                return jsonify(error="Imagem muito grande em pixels (máximo 16 megapixels)."), 413
+            image.seek(0)  # Animated GIF/WebP: examine first frame only.
+            image = ImageOps.exif_transpose(image)
+            rgba = image.convert("RGBA")
+            background = Image.new("RGB", rgba.size, "white")
+            background.paste(rgba, mask=rgba.getchannel("A"))
+            normalized = BytesIO()
+            background.save(normalized, "JPEG", quality=88, optimize=True)
+            data = normalized.getvalue()
+    except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError):
+        return jsonify(error="Imagem inválida ou corrompida."), 415
     encoded = base64.b64encode(data).decode("ascii")
+    content_type = "image/jpeg"
     payload = {
         "model": model,
         "max_tokens": 1200,
