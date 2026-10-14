@@ -149,7 +149,14 @@
             <button type="button" data-insert="@site ">@site — colar e analisar um link</button>
             <button type="button" data-insert="@codigo ">@codigo — revisar programação</button>
           </div>
-           <form id="chat-form" class="composer modern-composer">
+           <div class="token-meter" role="group" aria-label="Tokens medidos na última resposta">
+            <span>Última resposta · THIGAS AI <strong id="model-used">—</strong></span>
+            <span>Enviados <strong id="tokens-input">—</strong></span>
+            <span>Recebidos <strong id="tokens-output">—</strong></span>
+            <span>Total <strong id="tokens-total">—</strong></span>
+            <small id="tokens-status">Aguardando dados reais da API</small>
+          </div>
+          <form id="chat-form" class="composer modern-composer">
             <label class="sr-only" for="chat-input">Sua mensagem</label>
             <textarea id="chat-input" rows="2" maxlength="60000" placeholder="Pergunte qualquer coisa…" autocomplete="off" spellcheck="false"></textarea>
             <div class="composer-actions">
@@ -183,13 +190,6 @@
           <input type="file" id="file-input" hidden accept=".pdf,.docx,.xlsx,.pptx,.txt,.md,.py,.js,.mjs,.cjs,.ts,.tsx,.jsx,.json,.yaml,.yml,.toml,.csv,.xml,.html,.css,.scss,.sh,.ps1,.bat,.c,.h,.cpp,.hpp,.cs,.java,.go,.rs,.rb,.php,.sql,.kt,.swift,.dart,.lua,.r">
           <input type="file" id="image-input" hidden accept="image/png,image/jpeg,image/webp">
           <small id="mode-hint" class="sr-only">O nível alto utiliza o modelo avançado somente quando habilitado no servidor.</small>
-          <div class="token-meter" role="group" aria-label="Tokens medidos na última resposta">
-            <span>Última resposta · THIGAS AI <strong id="model-used">—</strong></span>
-            <span>Enviados <strong id="tokens-input">—</strong></span>
-            <span>Recebidos <strong id="tokens-output">—</strong></span>
-            <span>Total <strong id="tokens-total">—</strong></span>
-            <small id="tokens-status">Aguardando dados reais da API</small>
-          </div>
           <div class="composer-footer">
             <span>Enter para enviar · Shift+Enter para nova linha</span>
             <span id="request-status" role="status">Pronto</span>
