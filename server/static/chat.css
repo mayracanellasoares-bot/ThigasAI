@@ -1143,20 +1143,26 @@ body.light-mode .composer{background:white}
 @keyframes thigas-think{0%,100%{transform:rotate(-8deg) scale(.95);opacity:.65}50%{transform:rotate(8deg) scale(1.12);opacity:1}}
 @media(prefers-reduced-motion:reduce){.thinking-icon{animation:none}}
 
-/* THIGAS AI: digitação de código e mensagens longas em até ~16 linhas.
-   No celular, evita que o teclado cubra toda a conversa. */
+/* Compact composer sits near the bottom with room for conversation.
+   Expands automatically when the user types/pastes code or multiple lines. */
 .modern-composer #chat-input,
 body:not(.light-mode) #chat-input {
-  min-height: 108px;
+  min-height: 52px;
   max-height: min(380px, 42dvh);
   overflow-y: auto;
   line-height: 1.5;
   resize: none;
 }
+.modern-composer, body:not(.light-mode) .composer {
+  min-height: 96px;
+}
 @media (max-width: 580px) {
   .modern-composer #chat-input,
   body:not(.light-mode) #chat-input {
-    min-height: 108px;
+    min-height: 52px;
     max-height: min(340px, 42dvh);
+  }
+  .modern-composer, body:not(.light-mode) .composer {
+    min-height: 94px;
   }
 }
