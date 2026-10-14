@@ -88,5 +88,48 @@ class MaritacaFluencyTests(unittest.TestCase):
         self.assertNotIn("secret thought", events)
 
 
+    def test_public_modes_reject_all_retired_cloud_adapters_without_network_calls(self):
+        from unittest.mock import Mock
+        with patch.object(gateway, "THIGAS_LEGACY_PROVIDERS_ENABLED", False), \
+             patch.object(gateway, "THIGAS_CLOUD_ENABLED", True), \
+             patch.object(gateway, "THIGAS_NVIDIA_ENABLED", True), \
+             patch.object(gateway, "THIGAS_AION_ENABLED", True), \
+             patch.object(gateway, "THIGAS_CLOUD_API_KEY", "retired-groq"), \
+             patch.dict(gateway.os.environ, {
+                 "NVIDIA_API_KEY": "retired-nvidia",
+                 "AION_API_KEY": "retired-aion",
+             }, clear=False), \
+             patch.object(gateway.requests, "post") as sender:
+            metadata = self.client.get("/api").get_json()
+            self.assertEqual(set(metadata["models"].keys()), {"fast", "balanced", "thinking"})
+            for field in ("cloud_enabled", "nvidia_enabled", "aion_enabled",
+                          "nvidia_thinking_enabled", "aion_thinking_enabled",
+                          "thinking_effort_high"):
+                self.assertNotIn(field, metadata)
+            for mode in ("cloud", "nvidia", "nvidia_thinking", "aion", "aion_thinking"):
+                with self.subTest(mode=mode):
+                    response = self.client.post("/chat", json={
+                        "message": "Teste de modo aposentado", "mode": mode,
+                    })
+                    self.assertEqual(response.status_code, 400)
+            sender.assert_not_called()
+
+    def test_only_three_modes_are_selectable_with_trusted_engine(self):
+        with patch.object(gateway, "THIGAS_LEGACY_PROVIDERS_ENABLED", False), \
+             patch.object(gateway, "THIGAS_ENABLE_THINKING", True), \
+             patch.object(gateway, "MARITACA_API_KEY", "configured-server-key"):
+            self.assertEqual(gateway.choose_model("fast"), gateway.MARITACA_FAST_MODEL)
+            self.assertEqual(gateway.choose_model("balanced"), gateway.MARITACA_MODEL)
+            self.assertEqual(gateway.choose_model("thinking"), gateway.MARITACA_THINKING_MODEL)
+            self.assertTrue(self.client.get("/api").get_json()["thinking_enabled"])
+        with patch.object(gateway, "THIGAS_LEGACY_PROVIDERS_ENABLED", False), \
+             patch.object(gateway, "THIGAS_ENABLE_THINKING", False), \
+             patch.object(gateway, "THIGAS_CLOUD_ENABLED", True), \
+             patch.object(gateway, "THIGAS_CLOUD_API_KEY", "legacy-key"):
+            with self.assertRaises(gateway.GatewayError) as exc:
+                gateway.choose_model("thinking")
+            self.assertEqual(exc.exception.status_code, 403)
+
+
 if __name__ == "__main__":
     unittest.main()
