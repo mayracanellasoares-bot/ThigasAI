@@ -53,7 +53,7 @@
       if (file.text.includes("\0")) throw new Error("O arquivo parece binário; envie texto ou código.");
       return { file, prefix: "\n\n[ARQUIVO: " + safeFilename(file.name) + "]\n", suffix: "\n[FIM DO ARQUIVO]" };
     });
-    let message = prompt || "Analise os arquivos anexados e explique seu conteúdo.";
+    let message = prompt || (files.length === 1 ? "Analise este arquivo e explique seu conteúdo." : "Analise os arquivos anexados e explique seu conteúdo.");
     const fixed = headings.reduce((n, item) => n + item.prefix.length + item.suffix.length + 26, 0);
     const quota = Math.floor((MAX_MESSAGE - message.length - fixed) / files.length);
     if (quota < 100) throw new Error("Reduza a pergunta para incluir os arquivos anexados.");
