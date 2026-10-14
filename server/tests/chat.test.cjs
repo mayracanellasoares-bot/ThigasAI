@@ -392,8 +392,11 @@ test("barra do chat inicia compacta no rodapé e expande com o texto", () => {
   const theme = fs.readFileSync(path.join(__dirname, "../static/mini-nano-theme.css"), "utf8");
   const script = fs.readFileSync(path.join(__dirname, "../static/chat.js"), "utf8");
   assert.match(html, /id="chat-input" rows="2"/);
+  assert.ok(html.indexOf('class="token-meter"') < html.indexOf('id="chat-form"'), "medidor de tokens deve estar acima da caixa");
+  assert.ok(html.indexOf('id="chat-form"') < html.indexOf('class="composer-footer"'), "campo deve estar próximo do rodapé");
   assert.match(css, /\.chat-panel > \.composer-wrap \{ margin-top: auto; flex: 0 0 auto; \}/);
   assert.match(css, /min-height: 56px/);
+  assert.match(css, /\.composer-wrap > \.token-meter \{ margin-top: 0; margin-bottom: 6px; \}/);
   assert.match(css, /max-height: min\(320px, 40dvh\)/);
   assert.match(theme, /min-height:56px;max-height:min\(360px,40dvh\)/);
   assert.match(script, /const minHeight = 56/);
