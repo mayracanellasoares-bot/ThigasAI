@@ -341,7 +341,7 @@
   let history = [];
   let conversations = [];
   let activeConversationId = null;
-  let attachment = null;
+  let attachment = [];
   let requestActive = false;
   let readingFile = false;
   let readingEpoch = 0;
@@ -762,9 +762,23 @@
   }
 
   function removeAttachment() {
-    attachment = null;
+    attachment = [];
     byId("file-input").value = "";
+    byId("image-input").value = "";
     byId("attachment-preview").hidden = true;
+    byId("attachment-label").textContent = "";
+  }
+
+  function displayAttachments() {
+    const preview = byId("attachment-preview");
+    preview.hidden = !attachment.length;
+    if (!attachment.length) return;
+    const names = attachment.map(item => safeFilename(item.name));
+    const prefix = attachment.length === 1 ? "1 arquivo" : attachment.length + " arquivos";
+    const shortened = names.slice(0, 3).join(", ") + (names.length > 3 ? " e mais " + (names.length - 3) : "");
+    byId("attachment-label").textContent = "📎 " + prefix + " · " + shortened +
+      (attachment.some(item => item.truncated) ? " · conteúdo parcial" : "") +
+      " (até " + MAX_ATTACHMENTS + " anexos)";
   }
 
   function clearConversation() {
@@ -835,7 +849,7 @@
     event.preventDefault();
     if (requestActive || readingFile) return;
     const raw = input.value.trim().replace(/^@(?:documento|codigo|site)\s+/i, (match) => ({ "@documento": "Considere o documento anexado: ", "@codigo": "Revise o código a seguir: ", "@site": "Analise o site a seguir: " })[match.trim().toLowerCase()] || match);
-    const command = attachment ? { handled: false, question: raw } : handleCommand(raw);
+    const command = attachment.length ? { handled: false, question: raw } : handleCommand(raw);
     if (command.handled) { input.value = ""; resizeInput(); return; }
     if (navigator.onLine === false) {
       info("Você está sem internet. O histórico continua disponível; conecte-se para pedir uma nova resposta.", true);
@@ -926,38 +940,56 @@
     }
   }
 
+  async function interpretPhoto(fetcher, file, signal) {
+    const form = new FormData();
+    form.append("image", file);
+    const response = await fetcher("/image/describe", { method: "POST", body: form, signal });
+    let result;
+    try { result = await response.json(); } catch (_) { throw new Error("Falha ao interpretar a foto."); }
+    if (!response.ok) throw new Error(result.error || "Análise de fotos indisponível.");
+    if (typeof result.description !== "string" || !result.description.trim()) throw new Error("A foto não possui descrição legível.");
+    return {name: safeFilename(file.name), text: "[Descrição da imagem]\n" + result.description.trim(), truncated: false};
+  }
+
   async function selectFile(event) {
-    const file = event.target.files[0];
-    if (!file) return;
+    const selected = Array.from(event.target.files || []);
+    if (!selected.length) return;
     const epoch = ++readingEpoch;
     readingFile = true;
     setBusy();
     try {
-      const kind = validateFile(file);
-      let next;
-      if (kind === "document") {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 60000);
-        try { next = await extractDocument(window.fetch.bind(window), file, controller.signal); }
-        finally { clearTimeout(timeout); }
-      } else {
-        const text = new TextDecoder("utf-8", { fatal: true }).decode(await file.arrayBuffer());
-        next = { name: safeFilename(file.name), text };
+      if (selected.length + attachment.length > MAX_ATTACHMENTS)
+        throw new Error("Máximo de " + MAX_ATTACHMENTS + " arquivos por mensagem. Remova alguns anexos.");
+      for (const file of selected) {
+        if (epoch !== readingEpoch) return;
+        const kind = validateFile(file);
+        let next;
+        if (kind === "document" || kind === "image") {
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 65000);
+          try {
+            next = kind === "document"
+              ? await extractDocument(window.fetch.bind(window), file, controller.signal)
+              : await interpretPhoto(window.fetch.bind(window), file, controller.signal);
+          } finally { clearTimeout(timeout); }
+        } else {
+          let content;
+          try { content = new TextDecoder("utf-8", { fatal: true }).decode(await file.arrayBuffer()); }
+          catch (_) { throw new Error("Arquivo " + safeFilename(file.name) + " não contém texto UTF-8 válido."); }
+          next = {name: safeFilename(file.name), text: content, truncated: false};
+        }
+        if (epoch !== readingEpoch) return;
+        const merged = [...attachment, next];
+        composeMessage(input.value, merged); // Ensure combined prompt remains bounded.
+        attachment = merged;
+        displayAttachments();
       }
-      if (epoch !== readingEpoch) return;
-      composeMessage(input.value, next);
-      attachment = next;
-      const ext = next.name.includes(".") ? next.name.split(".").pop().toUpperCase() : "TXT";
-      byId("attachment-label").textContent = "📎 " + ext + " · " + next.name + " · " + next.text.length.toLocaleString("pt-BR") + " caracteres" + (next.truncated ? " · conteúdo truncado" : "");
-      byId("attachment-preview").hidden = false;
     } catch (error) {
-      if (epoch !== readingEpoch) return;
-      info(error instanceof TypeError ? "O arquivo não é texto UTF-8 válido." : error.message, true);
+      if (epoch === readingEpoch) info(error.message || "Falha ao anexar arquivos.", true);
     } finally {
       if (epoch === readingEpoch) { readingFile = false; event.target.value = ""; setBusy(); }
     }
   }
-
   async function checkHealth() {
     if (navigator.onLine === false) { showOffline(); return; }
     const controller = new AbortController();
@@ -1087,37 +1119,7 @@
   byId("attach-document").addEventListener("click", () => { closeMenus(); byId("file-input").click(); });
   byId("attach-image").addEventListener("click", () => { closeMenus(); byId("image-input").click(); });
   byId("attach-workspace").addEventListener("click", () => { window.location.href = "/workspace"; });
-  byId("image-input").addEventListener("change", async event => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type) || file.size > 8 * 1024 * 1024) {
-      info("Use imagem PNG, JPEG ou WebP de até 8 MB.", true);
-      event.target.value = "";
-      return;
-    }
-    readingFile = true;
-    setBusy();
-    try {
-      const form = new FormData();
-      form.append("image", file);
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 60000);
-      let response;
-      try { response = await fetch("/image/describe", { method: "POST", body: form, signal: controller.signal }); }
-      finally { clearTimeout(timeout); }
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Não consegui analisar a imagem.");
-      attachment = { name: file.name + ".txt", text: "[Descrição da imagem enviada]\n" + result.description };
-      byId("attachment-preview").hidden = false;
-      byId("attachment-label").textContent = "▧ " + file.name + " · imagem interpretada";
-    } catch(error) {
-      info(error.message || "Erro ao processar a imagem.", true);
-    } finally {
-      event.target.value = "";
-      readingFile = false;
-      setBusy();
-    }
-  });
+  byId("image-input").addEventListener("change", selectFile);
   input.addEventListener("input", () => {
     const value = input.value.slice(0, input.selectionStart).trim();
     shortcutMenu.hidden = !(/^(?:\/|@)[\wÀ-ÿ]*$/.test(value) && value.length <= 24);
