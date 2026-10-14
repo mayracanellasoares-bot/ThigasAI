@@ -277,7 +277,10 @@
         answer: result.answer.trim(), model: typeof result.model === "string" ? result.model : null,
         usage: { prompt_tokens: measured(usage.prompt_tokens), completion_tokens: measured(usage.completion_tokens), total_tokens: measured(usage.total_tokens) },
         finish_reason: typeof result.finish_reason === "string" ? result.finish_reason : null,
-        quality_flags: [], reasoning_effort: null, provider_attempt_count: 0, provider_failover_used: false,
+        quality_flags: Array.isArray(result.quality_flags)
+          ? result.quality_flags.filter(flag => ["output_limit", "possible_repetition", "unclosed_code_block", "possible_python_syntax_error", "possible_json_syntax_error"].includes(flag))
+          : [],
+        reasoning_effort: null, provider_attempt_count: 0, provider_failover_used: false,
         sources: [], search_provider: null,
       };
     } finally {
@@ -717,7 +720,10 @@
 
   function resizeInput() {
     input.style.height = "auto";
-    input.style.height = Math.min(input.scrollHeight, 144) + "px";
+    // Four visible lines by default; expand to roughly sixteen lines as needed.
+    const maxHeight = Math.min(380, Math.round(window.innerHeight * 0.42));
+    input.style.height = Math.min(Math.max(input.scrollHeight, 108), maxHeight) + "px";
+    input.style.overflowY = input.scrollHeight > maxHeight ? "auto" : "hidden";
   }
 
   function setBusy() {
