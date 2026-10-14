@@ -314,3 +314,15 @@ O THIGAS AI identifica também pedidos de **jogos, apps, sites, interfaces, layo
 A caixa de digitação começa **compacta (duas linhas)** perto do rodapé e cresce automaticamente conforme o texto é digitado, até cerca de **360 px no computador ou 320 px no celular**, respeitando 40% da altura visível. Isso preserva espaço para a conversa e o teclado, sem perder a capacidade de escrever mensagens longas. O limite de conteúdo continua 60 mil caracteres por mensagem.
 
 Os modelos atuais suportam até **32.768 tokens de saída por geração**, mas o limite de tokens por minuto pode ser significativamente menor em contas com poucos créditos. Um teto maior **não garante** uma resposta longa nem código correto; ele permite que a aplicação solicite respostas mais extensas quando o modelo e a cota permitirem. Gerações extensas consomem mais créditos. Consulte https://docs.maritaca.ai/pt/modelos e https://docs.maritaca.ai/pt/rate-limits e prefira os modos Equilibrado ou Avançado para projetos complexos.
+
+## Anexos múltiplos, ZIP e fotos
+
+O THIGAS AI permite anexar **até 10 arquivos em uma mesma mensagem**, escolhidos juntos ou em lotes, sem substituir os selecionados anteriormente. O botão de remoção limpa a seleção inteira. Limites por arquivo: ZIP, PDF, DOCX, XLSX e PPTX até 20 MiB; TXT, HTML, JSON, CSS, código e formatos textuais até 2 MiB; fotos JPEG, PNG, WebP, GIF, BMP e TIFF até 8 MiB. HEIC e arquivos executáveis não são aceitos. As imagens podem vir pelo seletor de fotos ou pelo seletor geral.
+
+ZIP de projeto é inspecionado **somente em memória**, sem extração para disco nem execução de código. O inspetor lê entradas de texto e código reconhecidas (HTML, JS, CSS, Python, Markdown, etc.), ignorando executáveis e binários. Por segurança, rejeita caminhos de travessia, symlinks, arquivos criptografados, 100+ entradas, expansão acima de 6 MiB ou compressão excessiva. Cada entrada textual tem limite de 1 MiB; o texto consolidado do ZIP tem até 45 mil caracteres. ZIPs com apenas imagens ou binários não têm texto legível e serão rejeitados; envie essas fotos diretamente.
+
+As fotos são validadas com Pillow e normalizadas para JPEG no servidor, removendo metadados EXIF antes de chamar a API de visão configurada. GIFs animados são analisados pelo primeiro quadro. Limites: 8 MiB de upload e 16 megapixels de imagem. **A análise visual não funciona se THIGAS_VISION_MODEL, THIGAS_VISION_API_KEY e THIGAS_VISION_URL não estiverem configurados e válidos.** Nenhum resultado visual é inventado se o provedor não responder. Anexar diversas fotos pode consumir múltiplas consultas e créditos de visão.
+
+O contexto enviado ao modelo continua limitado a **60 mil caracteres por mensagem**. Para permitir até 10 anexos, o cliente distribui o espaço entre os arquivos e sinaliza os trechos truncados. Limites de contexto não são eliminados por permitir mais uploads. Anexos são removidos do histórico salvo localmente, mantendo a privacidade do conteúdo de arquivos. Usuários devem evitar anexar senhas e segredos.
+
+Testes não remunerados: `python -m unittest discover -s server/tests -v` e `node --test server/tests/*.test.cjs`.

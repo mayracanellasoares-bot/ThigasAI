@@ -155,7 +155,7 @@ class GatewayTests(unittest.TestCase):
         self.assertEqual(self.client.post("/document/extract").status_code, 400)
         response = self.client.post(
             "/document/extract",
-            data={"file": (BytesIO(b"abc"), "arquivo.zip")},
+            data={"file": (BytesIO(b"abc"), "arquivo.exe")},
             content_type="multipart/form-data",
         )
         self.assertEqual(response.status_code, 415)

@@ -3,6 +3,7 @@ import base64
 import re
 import hmac
 import document_agent
+from zip_inspector import extract_zip_text
 import link_inspector
 import web_search
 from groq_key_pool import configured_keys, is_groq_endpoint, post_with_failover
@@ -416,7 +417,7 @@ def ask_maritaca(question: str, history: Any) -> str:
 
 MAX_DOCUMENT_BYTES = 20 * 1024 * 1024
 MAX_EXTRACTED_CHARACTERS = 52000
-DOCUMENT_EXTENSIONS = {".pdf", ".docx", ".xlsx", ".pptx"}
+DOCUMENT_EXTENSIONS = {".pdf", ".docx", ".xlsx", ".pptx", ".zip"}
 
 
 def _limited_join(parts: list[str], limit: int = MAX_EXTRACTED_CHARACTERS) -> tuple[str, bool]:
@@ -446,6 +447,8 @@ def extract_document_text(filename: str, data: bytes) -> tuple[str, bool]:
         raise ValueError("Formato de documento não suportado.")
     if extension in {".docx", ".xlsx", ".pptx"}:
         document_agent.validate_archive(data)
+    if extension == ".zip":
+        return extract_zip_text(data)
     parts: list[str] = []
     if extension == ".pdf":
         reader = PdfReader(BytesIO(data))
@@ -494,7 +497,7 @@ def extract_document():
     filename = upload.filename.replace("\\", "/").split("/")[-1][:180]
     extension = Path(filename).suffix.lower()
     if extension not in DOCUMENT_EXTENSIONS:
-        return jsonify({"error": "Formato não suportado. Use PDF, DOCX, XLSX ou PPTX."}), 415
+        return jsonify({"error": "Formato não suportado. Use PDF, DOCX, XLSX, PPTX ou ZIP."}), 415
     data = upload.read(MAX_DOCUMENT_BYTES + 1)
     if len(data) > MAX_DOCUMENT_BYTES:
         return jsonify({"error": "O documento excede o limite de 20 MB."}), 413
@@ -706,15 +709,28 @@ def describe_uploaded_image():
     data = upload.read(8 * 1024 * 1024 + 1)
     if not data or len(data) > 8 * 1024 * 1024:
         return jsonify(error="Envie uma imagem de até 8 MB."), 413
-    content_type = upload.mimetype
-    valid = (
-        (content_type == "image/png" and data.startswith(b"\x89PNG\r\n\x1a\n")) or
-        (content_type == "image/jpeg" and data.startswith(b"\xff\xd8\xff")) or
-        (content_type == "image/webp" and data.startswith(b"RIFF") and data[8:12] == b"WEBP")
-    )
-    if not valid:
-        return jsonify(error="Imagem inválida; use PNG, JPEG ou WebP."), 415
+    # Validate image bytes, constrain decompression and strip EXIF/location
+    # metadata before sending to the configured visual inference provider.
+    from PIL import Image, ImageOps, UnidentifiedImageError
+    Image.MAX_IMAGE_PIXELS = 16_000_000
+    try:
+        with Image.open(BytesIO(data)) as image:
+            if image.format not in {"PNG", "JPEG", "WEBP", "GIF", "BMP", "TIFF"}:
+                return jsonify(error="Formato de imagem não suportado."), 415
+            if image.width * image.height > 16_000_000:
+                return jsonify(error="Imagem muito grande em pixels (máximo 16 megapixels)."), 413
+            image.seek(0)  # Animated GIF/WebP: examine first frame only.
+            image = ImageOps.exif_transpose(image)
+            rgba = image.convert("RGBA")
+            background = Image.new("RGB", rgba.size, "white")
+            background.paste(rgba, mask=rgba.getchannel("A"))
+            normalized = BytesIO()
+            background.save(normalized, "JPEG", quality=88, optimize=True)
+            data = normalized.getvalue()
+    except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError):
+        return jsonify(error="Imagem inválida ou corrompida."), 415
     encoded = base64.b64encode(data).decode("ascii")
+    content_type = "image/jpeg"
     payload = {
         "model": model,
         "max_tokens": 1200,
