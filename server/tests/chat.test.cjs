@@ -392,6 +392,8 @@ test("barra de mensagem inicia compacta embaixo e expande para texto longo", () 
   const theme = fs.readFileSync(path.join(__dirname, "../static/mini-nano-theme.css"), "utf8");
   const script = fs.readFileSync(path.join(__dirname, "../static/chat.js"), "utf8");
   assert.match(html, /id="chat-input" rows="2"/);
+  assert.ok(html.indexOf('class="token-meter"') < html.indexOf('id="chat-form"'), "medidor deve ficar acima da barra de chat");
+  assert.ok(html.indexOf('id="chat-form"') < html.indexOf('class="composer-footer"'), "barra deve ficar próxima do rodapé");
   assert.match(css, /min-height: 52px;/);
   assert.match(theme, /#chat-input\{min-height:52px;max-height:min\(380px,42dvh\)/);
   assert.match(css, /max-height: min\(380px, 42dvh\)/);
