@@ -1,6 +1,10 @@
 # THIGAS AI
 
-Assistente de programação distribuído como site e PWA instalável pelo navegador.
+Plataforma independente **THIGAS AI** para conversas, estudos, programação e criação, acessível no navegador e como PWA.
+
+**Interface pública:** o usuário escolhe somente **Rápido**, **Equilibrado** ou **Avançado**. Não há marca de provedores externos, modelos de terceiros ou opções aposentadas no seletor, nos títulos de resposta ou nos tooltips. Modos antigos (Groq, NVIDIA e Aion) são rejeitados pelas rotas de chat e não são publicados em `/api`, mesmo quando há chaves antigas presentes no Render.
+
+**Transparência técnica:** THIGAS AI é o produto, a identidade e a interface do projeto, não um modelo fundacional treinado do zero. O backend atual usa modelos hospedados pela Maritaca como motor de inferência; seus IDs técnicos permanecem disponíveis na API para depuração e auditoria, mas não são exibidos na experiência principal. A rotação de chaves de provedores aposentados está desativada no chat de produção, e as credenciais antigas não são removidas automaticamente do Render.
 
 **Site:** https://thigas-coder-gateway.onrender.com/
 
