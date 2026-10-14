@@ -33,9 +33,9 @@ class MaritacaFluencyTests(unittest.TestCase):
 
     def test_streamed_response_progress_and_real_token_counts(self):
         chunks = [
-            'data: {"choices":[{"delta":{"role":"assistant","content":"Olá, "}}]}\',
-            'data: {"choices":[{"delta":{"content":"**mundo**!"},"finish_reason":"stop"}]}\',
-            'data: {"choices":[],"usage":{"prompt_tokens":9,"completion_tokens":11,"total_tokens":20}}\',
+            'data: {"choices":[{"delta":{"role":"assistant","content":"Olá, "}}]}',
+            'data: {"choices":[{"delta":{"content":"**mundo**!"},"finish_reason":"stop"}]}',
+            'data: {"choices":[],"usage":{"prompt_tokens":9,"completion_tokens":11,"total_tokens":20}}',
             "data: [DONE]",
         ]
         provider = upstream_chunks(chunks)
