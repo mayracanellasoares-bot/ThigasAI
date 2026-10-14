@@ -124,12 +124,12 @@ A extração de texto não equivale a interpretação visual de páginas digital
 
 ## Tokens e contador real de consumo
 
-- Motor: Maritaca `sabia-4`, cujo limite documentado é até 32K tokens de saída; THIGAS solicita **até 16.384 tokens** de saída em cada requisição. Variável `MARITACA_MAX_TOKENS=16384` (o servidor impede valores acima de 16.384 e usa esse padrão se estiver ausente ou for inválido).
+- Motor: Maritaca `sabia-4`, cujo limite documentado é até 32K tokens de saída; THIGAS pode solicitar **até 32.768 tokens** de saída por requisição, conforme o máximo documentado para Sabiá 4/Sabiazinho 4/Thinking. Variável `MARITACA_MAX_TOKENS=32768` (limite entre 1 e 32768; este é o padrão quando a variável estiver ausente ou for inválida). A saída real depende da resposta do modelo e das cotas da conta.
 - A resposta de `POST /chat` inclui `usage.prompt_tokens` (enviados), `usage.completion_tokens` (recebidos), `usage.total_tokens` (total consumido), `max_output_tokens` e `finish_reason`. Todos os contadores vêm diretamente da resposta do provedor externo selecionado. Sem `usage`, os campos retornam `null` e o navegador mostra **— / não informado**; **não há estimativa por caractere ou soma fictícia**.
 - O painel de tokens mostra **apenas a última requisição de chat**, não uma soma entre múltiplas chamadas. Documentos no `/workspace` e comandos Telegram preservam o formato anterior e não exibem painel próprio de tokens.
 - O navegador pode encaminhar até 40 mensagens do histórico local para o backend, que seleciona **no máximo 12 mensagens** relevantes/recentes, dentro do orçamento de 60 mil caracteres incluindo a pergunta (além do prompt de sistema). Este valor **não é** uma medição de tokens.
 - Foram aumentados os tempos de espera para chamadas longas: timeout de leitura da API (300 s), cancelamento visual da conversa (325 s) e worker Gunicorn (660 s). Isso **não garante** que qualquer resposta de 16 mil tokens concluirá dentro desses prazos.
-- Para o site em produção, confirme no Render **Environment** que `MARITACA_MAX_TOKENS` não tenha um valor antigo como `3072`. O `render.yaml` define 16.384 para novos Blueprints, mas uma variável manual existente pode ter precedência.
+- Para o site em produção, confirme no Render **Environment** que `MARITACA_MAX_TOKENS` não tenha um valor antigo como `3072`. O `render.yaml` define 32.768 para novos Blueprints, mas uma variável manual existente pode ter precedência; ajuste-a no painel Render para habilitar o novo teto.
 - Cada resposta pode consumir mais tokens e saldo da Maritaca. Considere configurar limite de gastos e controle de uso por origem no backend, pois o chat permanece público e sem cadastro.
 
 Fontes: [Modelos Maritaca](https://docs.maritaca.ai/pt/modelos), [Resposta e contadores de tokens](https://docs.maritaca.ai/api/pt/completion-response).
@@ -190,7 +190,7 @@ Para obter um **baseline real**, veja [a auditoria e as instruções de avaliaç
 
 O backend agora considera até 40 mensagens anteriores recebidas do cliente, prioriza as trocas mais recentes e pode recuperar uma troca antiga quando ela compartilha termos significativos com a pergunta atual. Mantém a ordem original, pares íntegros e limite de até 12 mensagens na inferência. **Não adiciona memória permanente** nem altera pesos da LLM.
 
-O backend também pode devolver `quality_flags` quando encontra repetição contígua anormal, saída truncada, um bloco de código não fechado ou possível sintaxe Python inválida. São alertas de revisão apresentados no chat, e **não** uma verificação geral de veracidade; não executam o código.
+O backend também pode devolver `quality_flags` nas rotas convencional e progressiva quando encontra repetição contígua anormal, saída truncada, um bloco de código não fechado ou possível sintaxe Python inválida. São alertas de revisão apresentados no chat, e **não** uma verificação geral de veracidade; não executam o código.
 
 Para comparar o recorte anterior com a seleção atual, sem API externa:
 
@@ -285,7 +285,7 @@ O chat oferece agora **Aion Labs · padrão** e **Aion Labs · esforço alto** c
 - `THIGAS_AION_ENABLED`: chave de ativação, padrão `true`; `AION_ENABLED` é aceito como alternativa. Sem uma chave, ambos os modos permanecem desabilitados.
 - **Endpoint oficial e fixo:** `https://api.aionlabs.ai/v1/chat/completions`. Não aceita redirecionar tokens para URLs arbitrárias.
 - **Padrão:** modelos Aion 2.0/3.0/3.5 conhecidos enviam `reasoning_effort=low`; **alto:** envia `reasoning_effort=high`. O modelo roleplay 8B não oferece modo alto. Não inclui parâmetros exclusivos da Groq ou NVIDIA.
-- **Tokens:** a UI exibe somente números de uso recebidos na resposta da Aion, sem estimativas. O limite de saída do servidor permanece até 16384 tokens, mas o provedor pode impor limites próprios.
+- **Tokens:** a UI exibe somente números de uso recebidos na resposta da Aion, sem estimativas. O limite de saída do chat THIGAS é até 32768 tokens, com cotas próprias do provedor e custo adicional de gerações longas.
 - **Timeout:** a documentação Aion informa limite de 120 segundos para respostas não streaming; respostas extensas podem expirar. Este gateway continua não streaming.
 - **Preço e limites:** a disponibilidade de chaves, créditos e cobrança segue sua conta Aion Labs. Múltiplas chaves não garantem cotas independentes.
 
@@ -305,3 +305,12 @@ Os textos de respostas são apresentados com parágrafos e negrito renderizados 
 Variáveis no Render: `MARITACA_FAST_MODEL=sabiazinho-4`, `MARITACA_MODEL=sabia-4`, `MARITACA_THINKING_MODEL=sabia-4-thinking`, `THIGAS_ENABLE_THINKING=true`. **A chave existente `MARITACA_API_KEY` é preservada; não é enviada ao navegador.** Para trocar o modelo, use o Playground e teste instruções com casos reais antes de alterar os modelos do serviço. O Playground não treina os pesos; serve para comparar saídas e calibrar temperatura, custo e instruções.
 
 Documentação oficial: https://docs.maritaca.ai/pt/modelos e https://docs.maritaca.ai/api/pt/completion. A API remunera o consumo por tokens em reais: consulte sua conta e configure créditos e alertas antes de liberar modos avançados a um site público. Testes simulados: `python -m unittest discover -s server/tests -v` e `node --test server/tests/*.test.cjs`.
+
+
+## Programação e respostas extensas (THIGAS AI)
+
+O THIGAS AI identifica também pedidos de **jogos, apps, sites, interfaces, layout e projetos** como tarefas de programação, com instruções para entregar código por arquivo, com imports, eventos, implementações reais e cercas de linguagem. Respostas em streaming passam pela mesma **checagem estática** de blocos Python e JSON do chat convencional; erros encontrados são sinalizados para revisão, não corrigidos automaticamente nem executados no servidor.
+
+A caixa de digitação mostra **quatro linhas** inicialmente e expande até cerca de **16 linhas** no computador ou **14 no celular**, com altura limitada a 42% da janela para preservar o teclado e a conversa. O limite de conteúdo continua 60 mil caracteres por mensagem.
+
+Os modelos atuais suportam até **32.768 tokens de saída por geração**, mas o limite de tokens por minuto pode ser significativamente menor em contas com poucos créditos. Um teto maior **não garante** uma resposta longa nem código correto; ele permite que a aplicação solicite respostas mais extensas quando o modelo e a cota permitirem. Gerações extensas consomem mais créditos. Consulte https://docs.maritaca.ai/pt/modelos e https://docs.maritaca.ai/pt/rate-limits e prefira os modos Equilibrado ou Avançado para projetos complexos.

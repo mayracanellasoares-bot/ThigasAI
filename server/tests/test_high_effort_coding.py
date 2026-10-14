@@ -35,12 +35,12 @@ class HighEffortCodingTests(unittest.TestCase):
             payload = post.call_args.kwargs["json"]
             self.assertEqual(payload["reasoning_effort"], "high")
             self.assertIs(payload["include_reasoning"], False)
-            self.assertEqual(payload["max_completion_tokens"], 16384)
+            self.assertEqual(payload["max_completion_tokens"], gateway.MARITACA_MAX_TOKENS)
             self.assertNotIn("max_tokens", payload)
             self.assertEqual(result["reasoning_effort"], "high")
             self.assertEqual(result["usage"]["total_tokens"], 50)
-            self.assertIn("CRITÉRIOS DE ENTREGA DE CÓDIGO:", payload["messages"][0]["content"])
-            self.assertIn("\n- Entregue código executável", payload["messages"][0]["content"])
+            self.assertIn("REQUISITOS DE ENTREGA DE CÓDIGO", payload["messages"][0]["content"])
+            self.assertIn("\n- Entregue implementação real", payload["messages"][0]["content"])
 
     def test_groq_cloud_non_high_uses_medium(self):
         with patch.object(gateway, "THIGAS_ENABLE_THINKING", False), \
@@ -60,7 +60,7 @@ class HighEffortCodingTests(unittest.TestCase):
             result = gateway.ask_maritaca_result("Corrija o código", [], mode="thinking")
             sent = post.call_args.kwargs["json"]
             self.assertEqual(sent["model"], gateway.MARITACA_THINKING_MODEL)
-            self.assertEqual(sent["max_tokens"], 16384)
+            self.assertEqual(sent["max_tokens"], gateway.MARITACA_MAX_TOKENS)
             self.assertNotIn("reasoning_effort", sent)
             self.assertNotIn("include_reasoning", sent)
             self.assertIsNone(result["reasoning_effort"])
@@ -91,8 +91,8 @@ class HighEffortCodingTests(unittest.TestCase):
                 self.assertNotIn("fake-only", str(data))
 
     def test_coding_detection_not_used_for_general_question(self):
-        self.assertNotIn("CRITÉRIOS DE ENTREGA DE CÓDIGO:", gateway.build_messages("Bom dia", [])[0]["content"])
-        self.assertIn("CRITÉRIOS DE ENTREGA DE CÓDIGO:", gateway.build_messages("Faça um script Python", [])[0]["content"])
+        self.assertNotIn("REQUISITOS DE ENTREGA DE CÓDIGO", gateway.build_messages("Bom dia", [])[0]["content"])
+        self.assertIn("REQUISITOS DE ENTREGA DE CÓDIGO", gateway.build_messages("Faça um script Python", [])[0]["content"])
 
     def test_json_code_diagnostic_is_static_only(self):
         self.assertIn("possible_json_syntax_error", inspect_generation(

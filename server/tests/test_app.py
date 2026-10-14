@@ -194,7 +194,7 @@ class GatewayTests(unittest.TestCase):
         self.assertEqual(response.get_json()["answer"], "```python\nprint(1)\n```")
         self.assertIn("model", response.get_json())
         self.assertEqual(response.get_json()["usage"], {"prompt_tokens": 31, "completion_tokens": 42, "total_tokens": 73})
-        self.assertEqual(response.get_json()["max_output_tokens"], 16384)
+        self.assertEqual(response.get_json()["max_output_tokens"], gateway.MARITACA_MAX_TOKENS)
         self.assertEqual(response.get_json()["finish_reason"], "stop")
         ask.assert_called_once_with("Ajude", history)
 
@@ -241,7 +241,7 @@ class GatewayTests(unittest.TestCase):
         self.assertEqual(data["usage"], {"prompt_tokens": 128, "completion_tokens": 819, "total_tokens": 947})
         self.assertEqual(data["finish_reason"], "length")
         self.assertEqual(data["answer"], "Saída real")
-        self.assertEqual(request_post.call_args.kwargs["json"]["max_tokens"], 16384)
+        self.assertEqual(request_post.call_args.kwargs["json"]["max_tokens"], gateway.MARITACA_MAX_TOKENS)
         self.assertEqual(request_post.call_args.kwargs["timeout"], (10, 300))
 
     def test_missing_or_invalid_usage_is_null_not_fabricated(self):

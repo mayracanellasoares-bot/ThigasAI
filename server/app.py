@@ -59,11 +59,12 @@ THIGAS_BRAVE_SEARCH_KEY = os.getenv("THIGAS_BRAVE_SEARCH_KEY", "").strip()
 # Explicit opt-in avoids unexpectedly consuming paid search API quota.
 THIGAS_BRAVE_SEARCH_ENABLED = os.getenv("THIGAS_BRAVE_SEARCH_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
 try:
-    MARITACA_MAX_TOKENS = int(os.getenv("MARITACA_MAX_TOKENS", "16384"))
+    MARITACA_MAX_TOKENS = int(os.getenv("MARITACA_MAX_TOKENS", "32768"))
 except ValueError:
-    MARITACA_MAX_TOKENS = 16384
-# Limit this application to the requested output budget even if the environment is higher.
-MARITACA_MAX_TOKENS = min(16384, max(1, MARITACA_MAX_TOKENS))
+    MARITACA_MAX_TOKENS = 32768
+# The current Maritaca models support up to 32K output tokens. The actual
+# account tier may impose smaller per-minute limits; larger replies cost more.
+MARITACA_MAX_TOKENS = min(32768, max(1, MARITACA_MAX_TOKENS))
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 TELEGRAM_WEBHOOK_SECRET = os.getenv("TELEGRAM_WEBHOOK_SECRET", "").strip()
@@ -73,21 +74,27 @@ if not TELEGRAM_WEBHOOK_URL and RENDER_EXTERNAL_URL:
     TELEGRAM_WEBHOOK_URL = f"{RENDER_EXTERNAL_URL}/telegram/webhook"
 
 CODING_TASK_RE = re.compile(
-    r"(?i)\b(?:c[oó]digo|programa(?:[çc][aã]o|r|ndo)?|"
+    r"(?i)\b(?:c[oó]digo|codificar|programa(?:[çc][aã]o|r|ndo)?|"
     r"python|javascript|typescript|node\.?js|react|html|css|"
     r"sql|pwa|bug|depur(?:ar|a[çc][aã]o)|script|"
-    r"fun[çc][aã]o|erro de sintaxe|github)\b"
+    r"fun[çc][aã]o|erro de sintaxe|github|"
+    r"aplicativ[oa]s?|apps?|sites?|websites?|p[aá]ginas? web|"
+    r"jogos?|game|bot|interface|layout|responsiv[oa]|"
+    r"projetos? de software|frontend|backend|api|"
+    r"compilar|execut[aá]vel|corrij[ao]|corrigir|refatorar)\b"
+    r"|(?m:^`{3}(?:[a-zA-Z0-9_+.#-]*)[ \t]*$)"
 )
 CODE_REVIEW_INSTRUCTIONS = (
-    "\n\nCRITÉRIOS DE ENTREGA DE CÓDIGO:\n"
-    "- Identifique linguagem, versão, requisitos, entradas, saídas e ambiente mencionados.\n"
-    "- Faça uma checagem interna de sintaxe, imports, nomes, tipos, casos-limite e fluxo dos eventos antes de responder.\n"
-    "- Ao corrigir um bug, preserve as partes funcionais e explique a causa identificável.\n"
-    "- Entregue código executável e completo no escopo solicitado; não invente APIs, testes executados ou dependências.\n"
-    "- Se não conseguir conferir uma dependência externa, indique explicitamente o que precisa ser validado.\n"
-    "- Não substitua implementação por reticências ou placeholders disfarçados.\n"
-    "- Se o código for extenso e houver risco de corte, priorize uma implementação mínima funcional e indique limites.\n"
-    "- Não confunda checagem mental com compilação ou testes reais."
+    "\n\nREQUISITOS DE ENTREGA DE CÓDIGO (prioridade sobre estilo de prosa):\n"
+    "- Identifique os requisitos, linguagem, arquivos, ambiente de execução e restrições do pedido. Não mude a tecnologia escolhida pelo usuário.\n"
+    "- Entregue implementação real, completa no escopo solicitado: funções, imports, inicialização, eventos e tratamento de erros necessários.\n"
+    "- Em HTML único, inclua CSS e JavaScript necessários no mesmo arquivo, caso seja o formato pedido. Em projetos multifile, identifique cada caminho e entregue o conteúdo respectivo.\n"
+    "- Para cada arquivo de código, use cercas Markdown de três crases com a linguagem (ex.: python, html, javascript). Não inclua descrições ou símbolos decorativos dentro do código.\n"
+    "- Não substitua trechos essenciais por '...', TODO, 'restante igual', conteúdo fictício ou APIs inventadas. Se o pedido exceder o limite de saída, diga claramente o que falta.\n"
+    "- Faça revisão estática de sintaxe, referências, tipos, imports, indentação, fechamentos, nomes, eventos e caminhos de arquivo antes da entrega.\n"
+    "- Ao corrigir, explique a causa demonstrável e preserve o restante que funciona; se falta o erro original, não alegue que encontrou a causa exata.\n"
+    "- Separe instruções de instalação e validação do bloco de código. Não diga que executou, compilou ou testou algo que não foi realmente executado.\n"
+    "- Na impossibilidade de conferir uma API externa, sinalize o que depende da documentação oficial; evite dependências desnecessárias."
 )
 
 SYSTEM_PROMPT = """

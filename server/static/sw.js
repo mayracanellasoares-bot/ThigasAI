@@ -3,14 +3,14 @@
 // Apenas o shell PÚBLICO estático do chat é armazenado offline.
 // Nunca armazene respostas de API, documentos, anexos ou histórico no CacheStorage.
 const CACHE_PREFIX = "thigas-pwa-";
-const CACHE_NAME = CACHE_PREFIX + "v22-thigas";
+const CACHE_NAME = CACHE_PREFIX + "v23-longcode";
 const APP_SHELL = [
   "/",
   "/manifest.webmanifest",
-  "/static/chat.css?v=fluid8",
+  "/static/chat.css?v=code10",
   "/static/mini-nano-theme.css?v=audit3",
   "/static/history-sidebar.css?v=drawer2",
-  "/static/chat.js?v=thigas9",
+  "/static/chat.js?v=code10",
   "/static/pwa.js?v=llama2",
   "/static/icons/icon.svg",
   "/static/icons/icon-192.png",
