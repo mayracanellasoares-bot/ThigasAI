@@ -17,21 +17,33 @@ test("arquivo é incluído de verdade no texto encaminhado", () => {
   assert.match(chat.composeMessage("", { name: "a.txt", text: "conteúdo" }), /Analise este arquivo/);
 });
 
-test("anexos vazios, binários e mensagem acima do limite são rejeitados", () => {
+test("anexos vazios e binários são rejeitados; arquivos longos são limitados sem exceder 60 mil caracteres", () => {
   assert.throws(() => chat.composeMessage("a", { name: "a.py", text: " " }), /vazio/);
   assert.throws(() => chat.composeMessage("a", { name: "a.py", text: "a\0b" }), /binário/);
   assert.throws(() => chat.composeMessage("a".repeat(60001)), /60.000/);
-  assert.throws(() => chat.composeMessage("a", { name: "a.py", text: "b".repeat(60000) }), /60.000/);
+  const long = chat.composeMessage("a", { name: "a.py", text: "b".repeat(80000) });
+  assert.ok(long.length <= 60000);
+  assert.match(long, /CONTEÚDO PARCIAL/);
   assert.equal(chat.composeMessage("a".repeat(60000)).length, 60000);
 });
 
-test("aceita texto, código e documentos suportados; bloqueia formatos e tamanhos inválidos", () => {
-  for (const name of ["a.py", "a.CS", "a.tsx", "a.cpp", "a.html", "a.ps1"]) assert.equal(chat.validateFile({ name, size: 1024, type: "" }), "text");
+test("aceita ZIP HTML TXT diversos códigos e fotos com limites seguros", () => {
+  for (const name of ["a.py", "a.CS", "a.tsx", "a.cpp", "a.html", "a.ps1", "a.htm", "a.vue", "a.jsonl", "a.svg"]) {
+    assert.equal(chat.validateFile({ name, size: 1024, type: "" }), "text");
+  }
   assert.equal(chat.validateFile({ name: "README", size: 1024, type: "text/plain" }), "text");
-  for (const name of ["a.pdf", "a.docx", "a.xlsx", "a.pptx"]) assert.equal(chat.validateFile({ name, size: 1024, type: "" }), "document");
-  for (const name of ["a.png", "a.zip", "a.gguf"]) assert.throws(() => chat.validateFile({ name, size: 100, type: "" }), /Formato/);
-  assert.throws(() => chat.validateFile({ name: "a.txt", size: chat.MAX_TEXT_FILE_BYTES + 1 }), /512/);
-  assert.throws(() => chat.validateFile({ name: "a.pdf", size: chat.MAX_FILE_BYTES + 1 }), /20 MB/);
+  for (const name of ["a.pdf", "a.docx", "a.xlsx", "a.pptx", "projeto.zip"]) {
+    assert.equal(chat.validateFile({ name, size: 1024, type: "" }), "document");
+  }
+  for (const name of ["foto.JPG", "foto.png", "foto.webp", "foto.gif", "foto.bmp", "foto.tiff"]) {
+    assert.equal(chat.validateFile({ name, size: 100, type: "" }), "image");
+  }
+  for (const name of ["a.gguf", "a.exe", "a.heic"]) {
+    assert.throws(() => chat.validateFile({ name, size: 100, type: "" }), /Formato/);
+  }
+  assert.throws(() => chat.validateFile({ name: "a.txt", size: chat.MAX_TEXT_FILE_BYTES + 1 }), /2 MB/);
+  assert.throws(() => chat.validateFile({ name: "foto.png", size: chat.MAX_IMAGE_FILE_BYTES + 1 }), /8 MB/);
+  assert.throws(() => chat.validateFile({ name: "a.zip", size: chat.MAX_FILE_BYTES + 1 }), /20 MB/);
 });
 
 test("nomes de anexos não injetam novas linhas no marcador", () => {
@@ -420,4 +432,25 @@ test("resposta SSE conserva alerta de código incorreto sem inventar medição",
   assert.deepEqual(reply.quality_flags, ["possible_python_syntax_error", "output_limit"]);
   assert.equal(reply.usage.total_tokens, null);
   assert.equal(reply.finish_reason, "length");
+});
+
+test("seleção múltipla compõe até dez arquivos separados, com cortes seguros", () => {
+  const ten = Array.from({length: 10}, (_, i) => ({name: "arquivo_" + i + ".txt", text: ("código" + i).repeat(9500)}));
+  const result = chat.composeMessage("Analise o projeto", ten);
+  assert.ok(result.length <= chat.MAX_MESSAGE);
+  for (let i = 0; i < 10; i++) {
+    assert.match(result, new RegExp("ARQUIVO: arquivo_" + i + ".txt"));
+  }
+  assert.match(result, /CONTEÚDO PARCIAL/);
+  assert.throws(() => chat.composeMessage("Oi", [...ten, {name:"mais.txt", text:"mais"}]), /10 arquivos/);
+  assert.equal((chat.redactAttachmentFromHistory(result).match(/Anexo omitido/g) || []).length, 10);
+});
+
+test("picker HTML permite múltiplos tipos e diversas fotos", () => {
+  const html = fs.readFileSync(path.join(__dirname, "../static/index.html"), "utf8");
+  assert.match(html, /id="file-input" hidden multiple/);
+  assert.match(html, /id="image-input" hidden multiple/);
+  assert.match(html, /\.zip,\.pdf/);
+  assert.match(html, /image\/tiff/);
+  assert.match(html, /Arquivos e ZIP \(até 10\)/);
 });
