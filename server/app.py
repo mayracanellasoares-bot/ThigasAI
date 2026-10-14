@@ -81,7 +81,7 @@ CODING_TASK_RE = re.compile(
     r"jogos?|game|bot|interface|layout|responsiv[oa]|"
     r"projetos? de software|frontend|backend|api|"
     r"compilar|execut[aá]vel|corrij[ao]|corrigir|refatorar)\b"
-    r"|(?m)^`{3}(?:[a-zA-Z0-9_+.#-]*)[ \t]*$"
+    r"|(?m:^`{3}(?:[a-zA-Z0-9_+.#-]*)[ \t]*$)"
 )
 CODE_REVIEW_INSTRUCTIONS = (
     "\n\nREQUISITOS DE ENTREGA DE CÓDIGO (prioridade sobre estilo de prosa):\n"
