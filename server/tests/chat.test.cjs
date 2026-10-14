@@ -385,3 +385,29 @@ test("markdown seguro apresenta negrito sem asteriscos nem tags HTML", () => {
   assert.match(source, /COPIAR/);
   assert.doesNotMatch(source, /\.innerHTML\s*=/);
 });
+
+test("área de escrita começa com quatro linhas e expande no celular", () => {
+  const html = fs.readFileSync(path.join(__dirname, "../static/index.html"), "utf8");
+  const css = fs.readFileSync(path.join(__dirname, "../static/chat.css"), "utf8");
+  const script = fs.readFileSync(path.join(__dirname, "../static/chat.js"), "utf8");
+  assert.match(html, /id="chat-input" rows="4"/);
+  assert.match(css, /max-height: min\(380px, 42dvh\)/);
+  assert.match(script, /Math\.min\(window\.innerWidth <= 580 \? 340 : 380/);
+  assert.match(script, /input\.style\.overflowY = /);
+});
+
+test("resposta SSE conserva alerta de código incorreto sem inventar medição", async () => {
+  const packet = [
+    'event: delta\ndata: {"text":"```python\\nif True print(1)\\n```"}\n\n',
+    'event: done\ndata: {"answer":"```python\\nif True print(1)\\n```","quality_flags":["possible_python_syntax_error","output_limit","unsupported"],"finish_reason":"length","model":"sabia-4"}\n\n',
+  ].join("");
+  const stream = {getReader: () => {
+    let sent = false;
+    return {read: async () => sent ? {done:true} : (sent = true, {done:false,value:new TextEncoder().encode(packet)}),
+      cancel: async () => {}};
+  }};
+  const reply = await chat.requestChatStream(async () => ({ok:true,body:stream}), "Corrija o código", []);
+  assert.deepEqual(reply.quality_flags, ["possible_python_syntax_error", "output_limit"]);
+  assert.equal(reply.usage.total_tokens, null);
+  assert.equal(reply.finish_reason, "length");
+});
