@@ -3,6 +3,7 @@ import base64
 import re
 import hmac
 import document_agent
+from zip_inspector import extract_zip_text
 import link_inspector
 import web_search
 from groq_key_pool import configured_keys, is_groq_endpoint, post_with_failover
@@ -416,7 +417,7 @@ def ask_maritaca(question: str, history: Any) -> str:
 
 MAX_DOCUMENT_BYTES = 20 * 1024 * 1024
 MAX_EXTRACTED_CHARACTERS = 52000
-DOCUMENT_EXTENSIONS = {".pdf", ".docx", ".xlsx", ".pptx"}
+DOCUMENT_EXTENSIONS = {".pdf", ".docx", ".xlsx", ".pptx", ".zip"}
 
 
 def _limited_join(parts: list[str], limit: int = MAX_EXTRACTED_CHARACTERS) -> tuple[str, bool]:
@@ -446,6 +447,8 @@ def extract_document_text(filename: str, data: bytes) -> tuple[str, bool]:
         raise ValueError("Formato de documento não suportado.")
     if extension in {".docx", ".xlsx", ".pptx"}:
         document_agent.validate_archive(data)
+    if extension == ".zip":
+        return extract_zip_text(data)
     parts: list[str] = []
     if extension == ".pdf":
         reader = PdfReader(BytesIO(data))
@@ -494,7 +497,7 @@ def extract_document():
     filename = upload.filename.replace("\\", "/").split("/")[-1][:180]
     extension = Path(filename).suffix.lower()
     if extension not in DOCUMENT_EXTENSIONS:
-        return jsonify({"error": "Formato não suportado. Use PDF, DOCX, XLSX ou PPTX."}), 415
+        return jsonify({"error": "Formato não suportado. Use PDF, DOCX, XLSX, PPTX ou ZIP."}), 415
     data = upload.read(MAX_DOCUMENT_BYTES + 1)
     if len(data) > MAX_DOCUMENT_BYTES:
         return jsonify({"error": "O documento excede o limite de 20 MB."}), 413
