@@ -22,6 +22,10 @@ services:
         value: sabia-4-thinking
       - key: THIGAS_ENABLE_THINKING
         value: "true"
+      - key: THIGAS_DEEPQA_ENABLED
+        value: "true"
+      # THIGAS_DEEPQA_INDEX_PATH is deliberately unset on ephemeral free hosting.
+      # For durable corpora, use a persistent disk provisioned by the owner.
       # THIGAS AI now exposes only Rápido, Equilibrado and Avançado.
       # Retired providers are not configured by this blueprint.
       - key: THIGAS_BRAVE_SEARCH_KEY
