@@ -29,7 +29,9 @@ def measured_usage(data: Any) -> dict[str, int | None]:
     }
 
 
-def relay_maritaca_stream(upstream, *, model: str, max_tokens: int) -> Iterator[str]:
+def relay_maritaca_stream(upstream, *, model: str, max_tokens: int,
+                          qa_evidence: list[dict] | None = None,
+                          qa_support: str | None = None) -> Iterator[str]:
     """Stream sanitized content chunks; emit done only for a complete upstream SSE.
 
     A partial stream with a transport error is **never** marked complete.
@@ -97,6 +99,8 @@ def relay_maritaca_stream(upstream, *, model: str, max_tokens: int) -> Iterator[
             "quality_flags": inspect_generation(answer, finish_reason),
             "reasoning_effort": None,
             "search_provider": None, "sources": [],
+            "qa_evidence": (qa_evidence or [])[:6],
+            "qa_support": qa_support,
         })
     except Exception:
         # Untrusted upstream exceptions may contain URLs/headers: no stringification.
