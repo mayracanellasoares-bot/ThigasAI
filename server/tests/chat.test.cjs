@@ -454,3 +454,46 @@ test("picker HTML permite múltiplos tipos e diversas fotos", () => {
   assert.match(html, /image\/tiff/);
   assert.match(html, /Arquivos e ZIP \(até 10\)/);
 });
+
+
+test("DeepQA normaliza evidências e nunca aceita link inseguro", () => {
+  const result = chat.readQaEvidence([
+    {source_id: "A1", title: "Apostila", excerpt: "Uma passagem de estudo.", url: ""},
+    {source_id: "1", title: "Falso link", excerpt: "Texto externo.", url: "javascript:alert(1)"},
+    {source_id: "2", title: "Fonte segura", excerpt: "Descrição.", url: "https://pt.wikipedia.org/wiki/Teste"},
+    {title: 123, excerpt: "invalido"},
+  ]);
+  assert.equal(result.length, 3);
+  assert.equal(result[0].url, null);
+  assert.equal(result[1].url, null);
+  assert.match(result[2].url, /^https:\/\//);
+  assert.deepEqual(chat.readQaEvidence("invalid"), []);
+});
+
+test("resposta convencional preserva evidência rastreável e apoio qualitativo", async () => {
+  const output = await chat.requestChat(async () => ({ok:true,json:async()=>({
+    answer:"O autor foi Machado de Assis [A1].",
+    usage:{prompt_tokens:12,completion_tokens:9,total_tokens:21},
+    qa_support:"retrieved",
+    qa_evidence:[{source_id:"A1",title:"romance.txt",
+                  excerpt:"Dom Casmurro é romance de Machado de Assis.",url:""}],
+  })}), "Quem escreveu Dom Casmurro?", []);
+  assert.equal(output.qa_support, "retrieved");
+  assert.equal(output.qa_evidence.length, 1);
+  assert.equal(output.qa_evidence[0].source_id, "A1");
+});
+
+test("streaming preserva trechos recuperados sem inventar certeza", async () => {
+  const payload = [
+    'event: delta\ndata: {"text":"Texto [A1]."}\n\n',
+    'event: done\ndata: {"answer":"Texto [A1].","usage":{},"qa_support":"context_only","qa_evidence":[{"source_id":"A1","title":"a.txt","excerpt":"Texto de contexto","url":""}]}\n\n'
+  ].join("");
+  const stream = {getReader:()=>{let sent=false;return {
+    read:async()=>sent?{done:true}:(sent=true,{done:false,value:new TextEncoder().encode(payload)}),
+    cancel:async()=>{},
+  }}};
+  const result = await chat.requestChatStream(async()=>({ok:true,body:stream}),"Resuma",[]);
+  assert.equal(result.qa_support,"context_only");
+  assert.equal(result.qa_evidence[0].title,"a.txt");
+  assert.equal(result.usage.total_tokens,null);
+});

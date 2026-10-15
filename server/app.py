@@ -14,6 +14,7 @@ from maritaca_stream import relay_maritaca_stream, sse_event
 from cognitive_math import solve_simple_arithmetic
 from context_selector import select_relevant_history
 from generation_quality import inspect_generation
+import deepqa
 import time
 import threading
 from io import BytesIO
@@ -59,6 +60,8 @@ THIGAS_CLOUD_ENABLED = os.getenv("THIGAS_CLOUD_ENABLED", "false").strip().lower(
 THIGAS_BRAVE_SEARCH_KEY = os.getenv("THIGAS_BRAVE_SEARCH_KEY", "").strip()
 # Explicit opt-in avoids unexpectedly consuming paid search API quota.
 THIGAS_BRAVE_SEARCH_ENABLED = os.getenv("THIGAS_BRAVE_SEARCH_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
+THIGAS_DEEPQA_ENABLED = os.getenv("THIGAS_DEEPQA_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}
+THIGAS_DEEPQA_INDEX_PATH = os.getenv("THIGAS_DEEPQA_INDEX_PATH", "").strip()
 try:
     MARITACA_MAX_TOKENS = int(os.getenv("MARITACA_MAX_TOKENS", "32768"))
 except ValueError:
@@ -570,6 +573,8 @@ def api_info():
             "maritaca_stream_enabled": bool(MARITACA_API_KEY),
             "maritaca_thinking_stream_enabled": bool(THIGAS_ENABLE_THINKING and MARITACA_API_KEY),
             "web_search_enabled": True,
+            "deepqa_enabled": THIGAS_DEEPQA_ENABLED,
+            "deepqa_index_available": bool(THIGAS_DEEPQA_INDEX_PATH and Path(THIGAS_DEEPQA_INDEX_PATH).is_file()),
             "web_search_provider": "brave" if THIGAS_BRAVE_SEARCH_ENABLED and THIGAS_BRAVE_SEARCH_KEY else "wikipedia",
             "models": {
                 "fast": MARITACA_FAST_MODEL,
@@ -774,6 +779,28 @@ def _enforce_web_search_rate_limit() -> None:
             _web_search_hits.clear()
 
 
+
+def prepare_deepqa(question: str, *, web_sources: list[dict[str, str]] | None = None
+                   ) -> tuple[str, dict[str, Any] | None]:
+    """Retrieve evidence from request-scoped files, web snippets and optional FTS5."""
+    if not THIGAS_DEEPQA_ENABLED:
+        return question, None
+    user_query, uploaded = deepqa.split_attached_files(question)
+    docs = uploaded + deepqa.source_documents(web_sources or [])
+    if THIGAS_DEEPQA_INDEX_PATH:
+        docs += deepqa.search_corpus(THIGAS_DEEPQA_INDEX_PATH, user_query or question, 12)
+    if not docs:
+        return question, None
+    code_task = bool(CODING_TASK_RE.search(user_query))
+    index_question = (user_query or "Descreva os documentos anexados.")[:600]
+    report = deepqa.evidence_package(index_question, docs, limit=3 if code_task else 6)
+    context = deepqa.evidence_prompt(index_question, report)
+    if code_task:
+        # Code edits require entire attached files, not truncated retrieved snippets.
+        return question + "\n\n" + context[len(index_question):], report
+    return context, report
+
+
 @app.post("/chat/stream")
 def chat_stream():
     """Progressive Maritaca text; only explicitly selected Maritaca models.
@@ -816,6 +843,7 @@ def chat_stream():
 
     try:
         enriched = attach_public_web_context(question)
+        enriched, qa_report = prepare_deepqa(enriched)
         upstream = requests.post(
             MARITACA_URL,
             headers={"Authorization": "Bearer " + MARITACA_API_KEY,
@@ -837,7 +865,9 @@ def chat_stream():
 
     return Response(
         stream_with_context(relay_maritaca_stream(
-            upstream, model=model, max_tokens=MARITACA_MAX_TOKENS)),
+            upstream, model=model, max_tokens=MARITACA_MAX_TOKENS,
+            qa_evidence=qa_report["evidence"] if qa_report else [],
+            qa_support=qa_report["support_status"] if qa_report else None)),
         mimetype="text/event-stream",
         headers={"Cache-Control": "no-cache, no-transform",
                  "X-Accel-Buffering": "no", "Connection": "keep-alive"},
@@ -865,6 +895,7 @@ def chat():
         return jsonify(error="O campo web_search deve ser booleano."), 400
     sources: list[dict[str, str]] = []
     search_provider = None
+    qa_report = None
     try:
         choose_model(mode)
         # Somente expressão aritmética isolada: resultado exato, sem inferência externa.
@@ -894,8 +925,12 @@ def chat():
             search_provider = search_result["provider"]
             sources = search_result["sources"]
             enriched_question = web_search.attach_search_context(question, search_result)
+            extra, qa_report = prepare_deepqa(question, web_sources=sources)
+            if qa_report:
+                enriched_question += "\n\n" + extra[len(question):]
         else:
             enriched_question = attach_public_web_context(question)
+            enriched_question, qa_report = prepare_deepqa(enriched_question)
         # Keep the original two-argument contract for current clients and Telegram.
         if mode == "fast":
             result = ask_maritaca_result(enriched_question, body.get("history", []))
@@ -917,6 +952,8 @@ def chat():
         "provider_failover_used": result.get("provider_failover_used", False),
         "sources": sources,
         "search_provider": search_provider,
+        "qa_evidence": qa_report["evidence"] if qa_report else [],
+        "qa_support": qa_report["support_status"] if qa_report else None,
     })
 
 

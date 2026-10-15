@@ -326,3 +326,27 @@ As fotos são validadas com Pillow e normalizadas para JPEG no servidor, removen
 O contexto enviado ao modelo continua limitado a **60 mil caracteres por mensagem**. Para permitir até 10 anexos, o cliente distribui o espaço entre os arquivos e sinaliza os trechos truncados. Limites de contexto não são eliminados por permitir mais uploads. Anexos são removidos do histórico salvo localmente, mantendo a privacidade do conteúdo de arquivos. Usuários devem evitar anexar senhas e segredos.
 
 Testes não remunerados: `python -m unittest discover -s server/tests -v` e `node --test server/tests/*.test.cjs`.
+
+
+## THIGAS DeepQA — recuperação de evidências e corpus indexado
+
+O THIGAS AI incorpora uma **camada modular DeepQA**, ativada por `THIGAS_DEEPQA_ENABLED=true` (padrão). Ela não é um modelo fundacional novo e **não executa BERT, NLI neural ou embeddings** nesta versão. O que existe e pode ser verificado:
+
+1. Pré-processamento leve em português: tokenização Unicode, normalização de acentos, aproximação simples de radical (não é lematização linguística completa), tipos de pergunta e detecção heurística de nomes próprios.
+2. Recuperação híbrida econômica: pontuação **BM25 aproximada + trigramas de caracteres**, limite de 350 passagens por solicitação, janelas de até 900 caracteres, deduplicação e diversidade entre documentos.
+3. Hipóteses **extrativas**: frases candidatas e trechos retirados diretamente das fontes. **Nenhuma resposta é inventada pelo módulo de recuperação**. A formulação final ainda usa o modelo de inferência ativo do THIGAS AI.
+4. Evidências: cada trecho conserva identificador, título e URL quando disponível. O prompt proíbe citações sem lastro e orienta a declarar insuficiência. A interface exibe os trechos e informa que recuperação **não é validação factual**.
+5. Ranqueamento: relevância lexical, cobertura de termos, similaridade por trigramas e diversidade entre fontes. `support_score` é só um critério de ordenação; **não é uma probabilidade, nem confiança estatística calibrada**.
+6. Síntese: as passagens selecionadas enriquecem respostas normais e streaming. Se a pergunta inclui anexos TXT, PDF extraído, HTML ou código, os documentos são processados no escopo **da solicitação**, sem criar um corpus público persistente. Pedidos de **edição de código** preservam os arquivos completos em vez de descartá-los no RAG. Se a pesquisa online está ativada, os resumos da Wikipédia/Brave já obtidos alimentam o mecanismo de evidências. O DeepQA não realiza novas consultas de API paga.
+
+Para indexar um **corpus permanente** de documentos do proprietário, use o utilitário CLI:
+
+```bash
+python server/build_deepqa_index.py --source corpus --index /data/thigas/deepqa.sqlite
+```
+
+Ele constrói um índice **SQLite FTS5**, sem exigir Elasticsearch, a partir de TXT, Markdown, HTML e arquivos de código UTF-8 (limite de até 10 mil arquivos por execução, 1 MiB por arquivo e 60 mil caracteres indexados por arquivo). Depois configure no serviço `THIGAS_DEEPQA_INDEX_PATH=/data/thigas/deepqa.sqlite` **somente quando o arquivo já existir**. Para reconstruir de modo intencional use `--reset`. Em Render Free o sistema de arquivos é efêmero: **sem disco persistente, a base pode desaparecer a cada deploy**. Este PR **não cria disco, banco pago ou upload anônimo de corpus**. Não coloque dados privados em diretórios servidos ao público; forneça acesso controlado aos documentos em outra etapa.
+
+O índice FTS5 e o motor BM25/trigramas são uma **primeira implementação**. Para milhões de documentos, embeddings vetoriais, reranking neural e NLI verdadeiramente calibrado, seria necessária infraestrutura de busca especializada, corpora licenciados/fornecidos e avaliação de relevância, latência, segurança e custos. Essas capacidades **não devem ser anunciadas como prontas** até serem desenvolvidas e testadas.
+
+Teste: `python -m unittest discover -s server/tests -v` e `node --test server/tests/*.test.cjs`. Logs e monitoramento não devem registrar o conteúdo de documentos enviados.
