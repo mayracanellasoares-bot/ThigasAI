@@ -195,6 +195,19 @@
     }
   }
 
+  function readQaEvidence(data) {
+    if (!Array.isArray(data)) return [];
+    return data.slice(0, 6).filter(item =>
+      item && typeof item.source_id === "string" && typeof item.title === "string" &&
+      typeof item.excerpt === "string").map(item => ({
+        source_id: item.source_id.slice(0, 30),
+        title: item.title.slice(0, 180),
+        excerpt: item.excerpt.slice(0, 720),
+        url: safeSourceUrl(item.url) || null,
+        // The score is for ranking passages, NOT confidence of the answer.
+      }));
+  }
+
   async function requestChat(fetcher, message, history, signal, mode = "fast", webSearch = false) {
     const payload = { message, history: apiHistory(history, message) };
     if (["balanced", "thinking"].includes(mode)) payload.mode = mode;
@@ -235,6 +248,8 @@
             snippet: typeof source.snippet === "string" ? source.snippet.slice(0, 480) : "",
           })).slice(0, 5)
         : [],
+      qa_evidence: readQaEvidence(data.qa_evidence),
+      qa_support: data.qa_support === "retrieved" ? "retrieved" : data.qa_support === "insufficient" ? "insufficient" : null,
       quality_flags: Array.isArray(data.quality_flags)
         ? data.quality_flags.filter(flag => ["output_limit", "possible_repetition", "unclosed_code_block", "possible_python_syntax_error", "possible_json_syntax_error"].includes(flag))
         : [],
@@ -299,6 +314,8 @@
           : [],
         reasoning_effort: null, provider_attempt_count: 0, provider_failover_used: false,
         sources: [], search_provider: null,
+        qa_evidence: readQaEvidence(result.qa_evidence),
+        qa_support: result.qa_support === "retrieved" ? "retrieved" : result.qa_support === "insufficient" ? "insufficient" : null,
       };
     } finally {
       try { await reader.cancel(); } catch (_) {}
@@ -306,7 +323,7 @@
   }
   // Exportações puras permitem testar o contrato sem DOM, API externa ou saldo.
   if (typeof module !== "undefined" && module.exports) {
-    module.exports = { MAX_MESSAGE, MAX_FILE_BYTES, MAX_TEXT_FILE_BYTES, MAX_IMAGE_FILE_BYTES, MAX_ATTACHMENTS, safeFilename, validateFile, composeMessage, sanitizeHistory, apiHistory, splitCodeBlocks, codeFilename, extractDocument, requestChat, redactAttachmentFromHistory, classifyConversationDate, codeRevisionPrompt, safeSourceUrl, readableSegments, readableLines, streamingPreview, requestChatStream };
+    module.exports = { MAX_MESSAGE, MAX_FILE_BYTES, MAX_TEXT_FILE_BYTES, MAX_IMAGE_FILE_BYTES, MAX_ATTACHMENTS, safeFilename, validateFile, composeMessage, sanitizeHistory, apiHistory, splitCodeBlocks, codeFilename, extractDocument, requestChat, redactAttachmentFromHistory, classifyConversationDate, codeRevisionPrompt, safeSourceUrl, readableSegments, readableLines, streamingPreview, requestChatStream, readQaEvidence };
   }
   if (typeof document === "undefined") return;
 
@@ -830,6 +847,32 @@
     scrollBottom();
   }
 
+  function renderQaEvidence(evidence, support) {
+    if ((!Array.isArray(evidence) || evidence.length === 0) && support !== "insufficient") return;
+    const entry = make("div", "web-source-list deepqa-evidence");
+    entry.append(make("div", "web-source-title", "Evidências recuperadas · THIGAS AI"));
+    if (!evidence?.length) {
+      entry.append(make("p", "message-text", "Fontes insuficientes para fundamentar a resposta."));
+    } else {
+      entry.append(make("p", "message-text", "Trechos encontrados; sua presença não comprova, por si só, toda a resposta."));
+      for (const row of evidence) {
+        const label = "[" + row.source_id + "] " + row.title;
+        if (row.url) {
+          const link = make("a", "web-source-link", label);
+          link.href = row.url;
+          link.target = "_blank";
+          link.rel = "noopener noreferrer";
+          entry.append(link);
+        } else {
+          entry.append(make("div", "web-source-link", label));
+        }
+        entry.append(make("p", "message-text", row.excerpt));
+      }
+    }
+    logs.append(entry);
+    scrollBottom();
+  }
+
   function setWebSearch(enabled) {
     webSearchActive = enabled === true;
     searchButton.setAttribute("aria-pressed", String(webSearchActive));
@@ -903,6 +946,7 @@
       const answer = result.answer;
       renderMessage("assistant", answer);
       renderSources(result.sources, result.search_provider);
+      renderQaEvidence(result.qa_evidence, result.qa_support);
       showUsage(result.usage);
       // THIGAS AI is the product identity; provider model IDs remain
       // available to technical clients through the API, not displayed here.
