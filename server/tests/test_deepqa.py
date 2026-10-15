@@ -42,7 +42,6 @@ class DeepQATests(unittest.TestCase):
         self.assertEqual(report["support_status"], "retrieved")
         self.assertIn("Machado de Assis", prompt)
         self.assertIn("A1", prompt)
-        self.assertIn("FONTES", prompt.upper() if "FONTES" in prompt.upper() else "FONTES")
         self.assertNotIn("[ARQUIVO:", prompt)
         self.assertTrue(all("source_id" in item for item in report["evidence"]))
 
