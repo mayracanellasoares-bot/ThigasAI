@@ -249,7 +249,7 @@
           })).slice(0, 5)
         : [],
       qa_evidence: readQaEvidence(data.qa_evidence),
-      qa_support: data.qa_support === "retrieved" ? "retrieved" : data.qa_support === "insufficient" ? "insufficient" : null,
+      qa_support: data.qa_support === "retrieved" ? "retrieved" : ["insufficient", "context_only"].includes(data.qa_support) ? data.qa_support : null,
       quality_flags: Array.isArray(data.quality_flags)
         ? data.quality_flags.filter(flag => ["output_limit", "possible_repetition", "unclosed_code_block", "possible_python_syntax_error", "possible_json_syntax_error"].includes(flag))
         : [],
@@ -315,7 +315,7 @@
         reasoning_effort: null, provider_attempt_count: 0, provider_failover_used: false,
         sources: [], search_provider: null,
         qa_evidence: readQaEvidence(result.qa_evidence),
-        qa_support: result.qa_support === "retrieved" ? "retrieved" : result.qa_support === "insufficient" ? "insufficient" : null,
+        qa_support: result.qa_support === "retrieved" ? "retrieved" : ["insufficient", "context_only"].includes(result.qa_support) ? result.qa_support : null,
       };
     } finally {
       try { await reader.cancel(); } catch (_) {}
@@ -850,7 +850,8 @@
   function renderQaEvidence(evidence, support) {
     if ((!Array.isArray(evidence) || evidence.length === 0) && support !== "insufficient") return;
     const entry = make("div", "web-source-list deepqa-evidence");
-    entry.append(make("div", "web-source-title", "Evidências recuperadas · THIGAS AI"));
+    entry.append(make("div", "web-source-title", support === "context_only"
+      ? "Trechos dos anexos · THIGAS AI" : "Evidências recuperadas · THIGAS AI"));
     if (!evidence?.length) {
       entry.append(make("p", "message-text", "Fontes insuficientes para fundamentar a resposta."));
     } else {
