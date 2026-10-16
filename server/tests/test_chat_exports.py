@@ -31,7 +31,7 @@ class ChatExports(unittest.TestCase):
                 response.close()
 
     def test_invalid_payloads(self):
-        for payload in ([], {'format': 'exe', 'text': 'x'}, {'format': 'pdf', 'text': 'x'*40001}, {'format':'pptx','text':''}):
+        for payload in ([], {'format': [], 'text': 'x'}, {'format': 'exe', 'text': 'x'}, {'format': 'pdf', 'text': 'x'*40001}, {'format':'pptx','text':''}):
             response = self.client.post('/document/render', json=payload)
             self.assertEqual(response.status_code, 400)
 

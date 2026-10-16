@@ -513,7 +513,7 @@ def render_document():
     text = payload.get("text")
     makers = {"pdf": document_agent.make_pdf, "docx": document_agent.make_docx,
               "pptx": document_agent.make_pptx}
-    if kind not in makers or not isinstance(text, str) or not text.strip() or len(text) > 40000:
+    if not isinstance(kind, str) or kind not in makers or not isinstance(text, str) or not text.strip() or len(text) > 40000:
         return jsonify(error="Escolha PDF, Word ou PPTX e um texto de até 40.000 caracteres."), 400
     try:
         content = makers[kind](text)
