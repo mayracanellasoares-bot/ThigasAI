@@ -1346,3 +1346,6 @@ body,body.light-mode{--bg:#faf9f5;--surface:#fff;--surface-2:#eeede7;--text:#303
 .usage-details{margin-bottom:8px}.composer-footer{gap:8px}.log-entry,.message-text{overflow-wrap:anywhere;min-width:0}.code-block{max-width:100%;overflow:hidden}.code-block pre{overflow:auto}
 @media(max-width:780px){.welcome{min-height:42dvh}.welcome:has(+ #chat-logs:not(:empty)){min-height:42dvh}.history-drawer{width:min(300px,88vw)}.composer-wrap{width:calc(100% - 24px)}#chat-scroll{padding:16px}.chat-header,body.light-mode .chat-header{padding:8px 12px}.composer,body.light-mode .composer{padding:8px 12px}.starter-options{gap:8px}.starter-chip{padding:10px 12px}.welcome h1{font-size:30px}.composer-tools{flex:1}.composer-send-actions{margin-left:auto}.output-choice select{max-width:108px}.effort-wrap select{max-width:104px}.composer-footer{font-size:10px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;scroll-behavior:auto!important;transition:none!important}}
+.welcome:has(+ #chat-logs:not(:empty)){opacity:1;overflow:visible}
+.update-notice{color:var(--text);border-color:var(--border)}
+.send-btn,body.light-mode .send-btn,body:not(.light-mode) .send-btn{background:var(--accent)!important}
