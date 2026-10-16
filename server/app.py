@@ -4,6 +4,7 @@ import re
 import hmac
 import hashlib
 import document_agent
+import code_bundle
 from zip_inspector import extract_zip_text
 import link_inspector
 import web_search
@@ -101,7 +102,7 @@ CODE_REVIEW_INSTRUCTIONS = (
     "- Identifique os requisitos, linguagem, arquivos, ambiente de execução e restrições do pedido. Não mude a tecnologia escolhida pelo usuário.\n"
     "- Entregue implementação real, completa no escopo solicitado: funções, imports, inicialização, eventos e tratamento de erros necessários.\n"
     "- Em HTML único, inclua CSS e JavaScript necessários no mesmo arquivo, caso seja o formato pedido. Em projetos multifile, identifique cada caminho e entregue o conteúdo respectivo.\n"
-    "- Para cada arquivo de código, use cercas Markdown de três crases com a linguagem (ex.: python, html, javascript). Não inclua descrições ou símbolos decorativos dentro do código.\n"
+    "- Para cada arquivo de código, use cercas Markdown com linguagem e, em projetos de vários arquivos, filename=nome.ext (ex.: ```python filename=app.py). Use nomes de arquivo únicos, sem caminhos absolutos. Não coloque descrições dentro do código.\n"
     "- Não substitua trechos essenciais por '...', TODO, 'restante igual', conteúdo fictício ou APIs inventadas. Se o pedido exceder o limite de saída, diga claramente o que falta.\n"
     "- Faça revisão estática de sintaxe, referências, tipos, imports, indentação, fechamentos, nomes, eventos e caminhos de arquivo antes da entrega.\n"
     "- Ao corrigir, explique a causa demonstrável e preserve o restante que funciona; se falta o erro original, não alegue que encontrou a causa exata.\n"
@@ -524,6 +525,25 @@ def render_document():
         return jsonify(error="Não foi possível exportar. Seu texto continua no chat."), 500
     response = send_file(BytesIO(content), as_attachment=True,
                          download_name="thigas-documento." + kind)
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
+
+@app.post("/code/bundle")
+def render_code_bundle():
+    """Download real source files as a ZIP; no model-supplied code is executed."""
+    from flask import send_file
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify(error="Pedido inválido."), 400
+    try:
+        output = code_bundle.make_code_zip(payload.get("files"))
+    except ValueError as exc:
+        return jsonify(error=str(exc)), 422
+    response = send_file(BytesIO(output), mimetype="application/zip",
+                         as_attachment=True, download_name="thigas-codigo.zip")
     response.headers["Cache-Control"] = "no-store"
     response.headers["X-Content-Type-Options"] = "nosniff"
     return response

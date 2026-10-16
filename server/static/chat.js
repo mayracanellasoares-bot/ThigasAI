@@ -731,6 +731,44 @@
     } finally { clearTimeout(timer); button.disabled = false; }
   }
 
+  async function exportCodeBundle(codeParts, button) {
+    const label = button.textContent;
+    button.disabled = true;
+    button.textContent = "Preparando ZIP…";
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 60000);
+    try {
+      const files = codeParts.map((part, index) => ({
+        name: codeFilename(part.language, index + 1), content: part.text
+      }));
+      const response = await fetch("/code/bundle", {
+        method: "POST", headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({files}), signal: controller.signal
+      });
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.error || "Não foi possível criar o ZIP.");
+      }
+      const blob = await response.blob();
+      if (!blob.size) throw new Error("O ZIP recebido está vazio.");
+      const url = URL.createObjectURL(blob);
+      const link = make("a");
+      link.href = url;
+      link.download = "thigas-codigo.zip";
+      document.body.append(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      button.textContent = "Baixar ZIP novamente";
+    } catch (error) {
+      info(error.name === "AbortError" ? "A exportação ZIP demorou demais." : error.message, true);
+      button.textContent = label;
+    } finally {
+      clearTimeout(timer);
+      button.disabled = false;
+    }
+  }
+
   function renderMessage(role, text) {
     const entry = make("article", "log-entry " + role);
     const meta = make("div", "log-meta");
@@ -744,6 +782,7 @@
     }
     const parts = role === "assistant" ? splitCodeBlocks(text) : [{ type: "text", text }];
     let codeIndex = 0;
+    const codeParts = parts.filter(part => part.type === "code" && part.text.trim());
     for (const part of parts) {
       if (part.type === "text") {
         const prose = make("div", "message-text");
@@ -785,6 +824,12 @@
         info("Pedido de revisão preparado. Confira antes de enviar; nova consulta pode consumir créditos.");
       });
       actions.append(reviewButton);
+      if (codeParts.length > 1) {
+        const zipButton = make("button", "text-btn", "BAIXAR PROJETO .ZIP");
+        zipButton.type = "button";
+        zipButton.addEventListener("click", () => exportCodeBundle(codeParts, zipButton));
+        actions.append(zipButton);
+      }
     }
     if (role === "assistant") {
       for (const [format, label] of [["pptx", "PowerPoint"], ["docx", "Word"], ["pdf", "PDF"]]) {
