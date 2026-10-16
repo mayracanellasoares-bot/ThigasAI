@@ -102,7 +102,7 @@ CODE_REVIEW_INSTRUCTIONS = (
     "- Identifique os requisitos, linguagem, arquivos, ambiente de execução e restrições do pedido. Não mude a tecnologia escolhida pelo usuário.\n"
     "- Entregue implementação real, completa no escopo solicitado: funções, imports, inicialização, eventos e tratamento de erros necessários.\n"
     "- Em HTML único, inclua CSS e JavaScript necessários no mesmo arquivo, caso seja o formato pedido. Em projetos multifile, identifique cada caminho e entregue o conteúdo respectivo.\n"
-    "- Para cada arquivo de código, use cercas Markdown de três crases com a linguagem (ex.: python, html, javascript). Não inclua descrições ou símbolos decorativos dentro do código.\n"
+    "- Para cada arquivo de código, use cercas Markdown com linguagem e, em projetos de vários arquivos, filename=nome.ext (ex.: ```python filename=app.py). Use nomes de arquivo únicos, sem caminhos absolutos. Não coloque descrições dentro do código.\n"
     "- Não substitua trechos essenciais por '...', TODO, 'restante igual', conteúdo fictício ou APIs inventadas. Se o pedido exceder o limite de saída, diga claramente o que falta.\n"
     "- Faça revisão estática de sintaxe, referências, tipos, imports, indentação, fechamentos, nomes, eventos e caminhos de arquivo antes da entrega.\n"
     "- Ao corrigir, explique a causa demonstrável e preserve o restante que funciona; se falta o erro original, não alegue que encontrou a causa exata.\n"
