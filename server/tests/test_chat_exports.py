@@ -42,3 +42,17 @@ class ChatExports(unittest.TestCase):
         extracted = ' '.join(shape.text for slide in deck.slides for shape in slide.shapes if shape.has_text_frame)
         self.assertIn('FINAL_PRESERVADO', extracted)
         self.assertEqual(extracted.count('conteúdo'),160)
+
+    def test_powerpoint_respects_body_density(self):
+        body = '# Tema de estudo\n' + ('Um assunto relevante e exemplos práticos. ' * 100)
+        presentation = Presentation(BytesIO(gateway.document_agent.make_pptx(body)))
+        self.assertGreater(len(presentation.slides), 1)
+        for slide in presentation.slides:
+            content_boxes = [shape for shape in slide.shapes
+                             if shape.is_placeholder and shape.placeholder_format.idx == 1]
+            self.assertEqual(len(content_boxes), 1)
+            lines = [paragraph for paragraph in content_boxes[0].text_frame.paragraphs
+                     if paragraph.text]
+            self.assertLessEqual(len(lines), 4)
+            self.assertTrue(content_boxes[0].text_frame.word_wrap)
+
