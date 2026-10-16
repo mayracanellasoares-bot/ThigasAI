@@ -142,6 +142,9 @@ def make_pptx(text):
     """Generate an editable presentation from reviewed structured text."""
     from pptx import Presentation
     from pptx.util import Inches, Pt
+    from pptx.dml.color import RGBColor
+    from pptx.enum.shapes import MSO_SHAPE
+    from pptx.enum.text import MSO_AUTO_SIZE
 
     prs = Presentation()
     prs.slide_width = Inches(13.333)
@@ -156,15 +159,46 @@ def make_pptx(text):
         if len(prs.slides) >= 40:
             raise ValueError('A apresentação excede 40 slides; reduza o documento.')
         slide = prs.slides.add_slide(prs.slide_layouts[1])
-        slide.shapes.title.text = (current_title or 'THIGAS AI')
-        frame = slide.placeholders[1].text_frame
+        slide.background.fill.solid()
+        slide.background.fill.fore_color.rgb = RGBColor(250, 249, 245)
+        title_shape = slide.shapes.title
+        title_shape.text = current_title or 'THIGAS AI'
+        title_shape.left, title_shape.top = Inches(.85), Inches(.6)
+        title_shape.width, title_shape.height = Inches(11.7), Inches(1.2)
+        title_frame = title_shape.text_frame
+        title_frame.word_wrap = True
+        title_frame.auto_size = MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE
+        title_para = title_frame.paragraphs[0]
+        title_para.font.name = 'Aptos Display'
+        title_para.font.bold = True
+        title_para.font.size = Pt(30 if len(title_shape.text) < 60 else 25)
+        title_para.font.color.rgb = RGBColor(45, 64, 49)
+        accent = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(.85),
+                                        Inches(1.89), Inches(1.05), Inches(.07))
+        accent.fill.solid()
+        accent.fill.fore_color.rgb = RGBColor(131, 146, 106)
+        accent.line.fill.background()
+        body_shape = slide.placeholders[1]
+        body_shape.left, body_shape.top = Inches(.95), Inches(2.16)
+        body_shape.width, body_shape.height = Inches(11.4), Inches(4.65)
+        frame = body_shape.text_frame
         frame.clear()
         frame.word_wrap = True
+        frame.auto_size = MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE
         for index, (kind, value) in enumerate(items):
             para = frame.paragraphs[0] if index == 0 else frame.add_paragraph()
-            para.text = value
-            para.level = 1 if kind == 'bullet' else 0
-            para.font.size = Pt(22 if len(items) <= 5 else 18)
+            para.text = ('• ' if kind == 'bullet' else '') + value
+            para.level = 0
+            para.space_after = Pt(14)
+            para.font.name = 'Aptos'
+            para.font.color.rgb = RGBColor(46, 54, 46)
+            para.font.size = Pt(22)
+        number = slide.shapes.add_textbox(Inches(11.75), Inches(7.07),
+                                          Inches(.7), Inches(.22))
+        page = number.text_frame.paragraphs[0]
+        page.text = str(len(prs.slides))
+        page.font.size = Pt(10)
+        page.font.color.rgb = RGBColor(111, 121, 108)
         current_title = None
         items = []
 
@@ -177,7 +211,7 @@ def make_pptx(text):
             if len(value) > 120:
                 items.extend(('body', chunk) for chunk in textwrap.wrap(value[120:], 240))
         elif value:
-            for chunk in textwrap.wrap(value, 240, replace_whitespace=False):
+            for chunk in textwrap.wrap(value, 110, replace_whitespace=False):
                 if len(items) >= 4:
                     flush()
                     current_title = 'Continuação'
