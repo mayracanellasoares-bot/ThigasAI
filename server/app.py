@@ -489,7 +489,7 @@ def extract_document_text(filename: str, data: bytes) -> tuple[str, bool]:
             workbook.close()
     elif extension == ".pptx":
         presentation = Presentation(BytesIO(data))
-        for slide_index, slide in enumerate(presentation.slides[:200], start=1):
+        for slide_index, slide in enumerate(list(presentation.slides)[:200], start=1):
             parts.append(f"[Slide {slide_index}]")
             for shape in slide.shapes:
                 if hasattr(shape, "text") and shape.text:
@@ -500,6 +500,33 @@ def extract_document_text(filename: str, data: bytes) -> tuple[str, bool]:
             raise ValueError("Não encontrei texto no PDF. Ele pode ser digitalizado como imagem e exigir OCR.")
         raise ValueError("Não encontrei texto legível nesse documento.")
     return text, truncated
+
+
+@app.post("/document/render")
+def render_document():
+    """Serialize bounded text only; generated code is never executed."""
+    from flask import send_file
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify(error="Pedido inválido."), 400
+    kind = payload.get("format")
+    text = payload.get("text")
+    makers = {"pdf": document_agent.make_pdf, "docx": document_agent.make_docx,
+              "pptx": document_agent.make_pptx}
+    if kind not in makers or not isinstance(text, str) or not text.strip() or len(text) > 40000:
+        return jsonify(error="Escolha PDF, Word ou PPTX e um texto de até 40.000 caracteres."), 400
+    try:
+        content = makers[kind](text)
+    except ValueError as exc:
+        return jsonify(error=str(exc)), 422
+    except Exception:
+        app.logger.exception("Falha na exportação de documento")
+        return jsonify(error="Não foi possível exportar. Seu texto continua no chat."), 500
+    response = send_file(BytesIO(content), as_attachment=True,
+                         download_name="thigas-documento." + kind)
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
 
 
 @app.post("/document/extract")

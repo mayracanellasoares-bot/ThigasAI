@@ -7,6 +7,7 @@ import secrets
 import sqlite3
 import time
 import zipfile
+import textwrap
 from io import BytesIO
 from pathlib import Path
 from html import escape
@@ -155,13 +156,13 @@ def make_pptx(text):
         if len(prs.slides) >= 40:
             raise ValueError('A apresentação excede 40 slides; reduza o documento.')
         slide = prs.slides.add_slide(prs.slide_layouts[1])
-        slide.shapes.title.text = (current_title or 'THIGAS AI')[:120]
+        slide.shapes.title.text = (current_title or 'THIGAS AI')
         frame = slide.placeholders[1].text_frame
         frame.clear()
         frame.word_wrap = True
         for index, (kind, value) in enumerate(items):
             para = frame.paragraphs[0] if index == 0 else frame.add_paragraph()
-            para.text = value[:450]
+            para.text = value
             para.level = 1 if kind == 'bullet' else 0
             para.font.size = Pt(22 if len(items) <= 5 else 18)
         current_title = None
@@ -172,12 +173,15 @@ def make_pptx(text):
             continue
         if kind.startswith('heading'):
             flush()
-            current_title = value
+            current_title = value[:120]
+            if len(value) > 120:
+                items.extend(('body', chunk) for chunk in textwrap.wrap(value[120:], 240))
         elif value:
-            if len(items) >= 6:
-                flush()
-                current_title = 'Continuação'
-            items.append((kind, value))
+            for chunk in textwrap.wrap(value, 240, replace_whitespace=False):
+                if len(items) >= 4:
+                    flush()
+                    current_title = 'Continuação'
+                items.append((kind, chunk))
     flush()
     if not prs.slides:
         raise ValueError('Conteúdo vazio para apresentação.')

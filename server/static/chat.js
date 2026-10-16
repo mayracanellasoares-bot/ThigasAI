@@ -178,8 +178,10 @@
   }
 
   function codeFilename(language, index) {
-    const extensions = { python: "py", py: "py", javascript: "js", js: "js", typescript: "ts", ts: "ts", jsx: "jsx", tsx: "tsx", html: "html", css: "css", json: "json", java: "java", c: "c", cpp: "cpp", "c++": "cpp", "c#": "cs", csharp: "cs", cs: "cs", go: "go", rust: "rs", bash: "sh", shell: "sh", powershell: "ps1", sql: "sql", yaml: "yaml", php: "php" };
-    return "thigas_codigo_" + index + "." + (extensions[String(language).toLowerCase()] || "txt");
+    const explicit = String(language).match(/(?:^|\s)(?:filename=)?([a-zA-Z0-9_-][a-zA-Z0-9_.-]{0,100}\.[a-zA-Z0-9]{1,12})$/);
+    if (explicit && !explicit[1].includes("..")) return explicit[1];
+    const extensions = { ruby:"rb", rb:"rb", kotlin:"kt", swift:"swift", dart:"dart", lua:"lua", r:"r", scala:"scala", perl:"pl", elixir:"ex", haskell:"hs", clojure:"clj", vue:"vue", svelte:"svelte", scss:"scss", sass:"sass", xml:"xml", toml:"toml", markdown:"md", md:"md", dockerfile:"Dockerfile", python: "py", py: "py", javascript: "js", js: "js", typescript: "ts", ts: "ts", jsx: "jsx", tsx: "tsx", html: "html", css: "css", json: "json", java: "java", c: "c", cpp: "cpp", "c++": "cpp", "c#": "cs", csharp: "cs", cs: "cs", go: "go", rust: "rs", bash: "sh", shell: "sh", powershell: "ps1", sql: "sql", yaml: "yaml", php: "php" };
+    return "thigas_codigo_" + index + "." + (extensions[String(language).toLowerCase().split(/\s+/)[0]] || "txt");
   }
 
   async function extractDocument(fetcher, file, signal) {
@@ -633,6 +635,7 @@
   }
 
   function startNewConversation() {
+    window.speechSynthesis?.cancel();
     if (requestActive && activeController) activeController.abort();
     conversationEpoch++;
     readingEpoch++;
@@ -701,6 +704,33 @@
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
+  async function exportAnswer(text, format, button) {
+    const label = button.textContent;
+    button.disabled = true;
+    button.textContent = "Preparando…";
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 60000);
+    try {
+      const response = await fetch("/document/render", {method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({text, format}), signal: controller.signal});
+      if (!response.ok) {
+        const failure = await response.json();
+        throw new Error(failure.error || "Falha na exportação.");
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = make("a");
+      link.href = url; link.download = "thigas-documento." + format;
+      document.body.append(link); link.click(); link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      button.textContent = "Baixar novamente · " + format.toUpperCase();
+    } catch (error) {
+      info(error.name === "AbortError" ? "A exportação demorou demais. Tente novamente." : error.message, true);
+      button.textContent = label;
+    } finally { clearTimeout(timer); button.disabled = false; }
+  }
+
   function renderMessage(role, text) {
     const entry = make("article", "log-entry " + role);
     const meta = make("div", "log-meta");
@@ -755,6 +785,14 @@
         info("Pedido de revisão preparado. Confira antes de enviar; nova consulta pode consumir créditos.");
       });
       actions.append(reviewButton);
+    }
+    if (role === "assistant") {
+      for (const [format, label] of [["pptx", "PowerPoint"], ["docx", "Word"], ["pdf", "PDF"]]) {
+        const button = make("button", "text-btn export-button", label);
+        button.type = "button"; button.dataset.format = format;
+        button.addEventListener("click", () => exportAnswer(text, format, button));
+        actions.append(button);
+      }
     }
     entry.append(actions);
     logs.append(entry);
@@ -961,6 +999,12 @@
     let message;
     try { message = composeMessage(command.question, attachment); }
     catch (error) { info(error.message, true); beep("error"); return; }
+    const requestedFormat = byId("output-format").value ||
+      (/\b(crie|criar|gere|gerar|entregue|faça|exporte|monte)\b/i.test(raw) ?
+        (/\b(pptx?|powerpoint|apresentação)\b/i.test(raw) ? "pptx" : /\b(word|docx)\b/i.test(raw) ? "docx" : /\bpdf\b/i.test(raw) ? "pdf" : "") : "");
+    if (requestedFormat) message += "\nFormato solicitado: " + requestedFormat +
+      ". Escreva o conteúdo completo em Markdown, sem links de download inventados. " +
+      (requestedFormat === "pptx" ? "Use um título ## para cada slide e até quatro tópicos curtos por slide." : "Use títulos e parágrafos organizados.");
     const epoch = conversationEpoch;
     const originalText = input.value;
     const originalAttachment = attachment;
@@ -1021,6 +1065,16 @@
       pending.remove();
       const answer = result.answer;
       renderMessage("assistant", answer);
+      if (requestedFormat) {
+        const button = logs.lastElementChild.querySelector('[data-format="' + requestedFormat + '"]');
+        if (button) void exportAnswer(answer, requestedFormat, button);
+      }
+      if (byId("btn-voice").getAttribute("aria-pressed") === "true" && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+        const spoken = new SpeechSynthesisUtterance(answer.replace(/```[\s\S]*?```/g, "Código disponível para baixar.").replace(/[#*_`]/g, "").slice(0, 6000));
+        spoken.lang = "pt-BR";
+        window.speechSynthesis.speak(spoken);
+      }
       renderSources(result.sources, result.search_provider);
       renderQaEvidence(result.qa_evidence, result.qa_support);
       showUsage(result.usage);
@@ -1237,7 +1291,7 @@
   byId("btn-drawer-settings").addEventListener("click", () => { dismissMobileDrawer(); modal.showModal(); });
   document.addEventListener("keydown", event => { if (event.key === "Escape" && isDrawerOpen() && mobileHistory.matches) setDrawerOpen(false); });
   if (mobileHistory.addEventListener) mobileHistory.addEventListener("change", () => setDrawerOpen(false));
-  setDrawerOpen(false);
+  setDrawerOpen(!mobileHistory.matches);
   byId("btn-history").addEventListener("click", () => { renderConversationList(); historyModal.showModal(); });
   byId("btn-close-history").addEventListener("click", () => historyModal.close());
   byId("btn-help").addEventListener("click", () => modal.showModal());
@@ -1274,6 +1328,19 @@
   document.addEventListener("click", event => {
     if (!event.target.closest(".composer-tools") && !event.target.closest("#slash-menu")) closeMenus();
   });
+  const voice = byId("btn-voice");
+  voice.disabled = !(window.speechSynthesis && (window.SpeechRecognition || window.webkitSpeechRecognition));
+  voice.addEventListener("click", () => {
+    const enabled = voice.getAttribute("aria-pressed") !== "true";
+    voice.setAttribute("aria-pressed", String(enabled));
+    voice.textContent = enabled ? "Voz ligada" : "Voz";
+    window.speechSynthesis?.cancel();
+    if (!enabled) recognizer?.abort();
+    info(enabled ? "Voz ligada. Toque no microfone, fale e sua pergunta será enviada. A resposta será lida em voz alta. O reconhecimento usa o serviço de voz do navegador." : "Conversa por voz desligada.");
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) { window.speechSynthesis?.cancel(); recognizer?.abort(); }
+  });
   const mic = byId("btn-microphone");
   const BrowserSpeech = window.SpeechRecognition || window.webkitSpeechRecognition;
   let recognizer = null;
@@ -1283,6 +1350,8 @@
   } else {
     mic.addEventListener("click", () => {
       if (recognizer) { recognizer.stop(); return; }
+      window.speechSynthesis?.cancel();
+      if (requestActive || readingFile) return;
       const speech = new BrowserSpeech();
       recognizer = speech;
       speech.lang = "pt-BR";
@@ -1294,6 +1363,7 @@
           input.value = (input.value.trim() + " " + transcript).trim();
           resizeInput();
           input.focus();
+          if (byId("btn-voice").getAttribute("aria-pressed") === "true") byId("chat-form").requestSubmit();
         }
       };
       speech.onerror = event => { info("Ditado: " + (event.error || "não disponível"), true); };

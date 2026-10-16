@@ -1328,3 +1328,21 @@ textarea:focus-visible, summary:focus-visible, #chat-scroll:focus-visible {
 @media (max-width: 580px) {
   .composer-wrap { width: calc(100% - 24px); }
 }
+
+/* Quiet editorial workspace, with warm surfaces and a compact navigation. */
+body,body.light-mode{--bg:#faf9f5;--surface:#fff;--surface-2:#eeede7;--text:#30302c;--muted:#62615b;--border:#dedcd3;--accent:#a34f35;background:var(--bg);font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+.history-drawer{width:264px;flex-basis:264px;background:#f0eee6;border-right:1px solid var(--border)}
+.drawer-brand small{letter-spacing:.08em;text-transform:uppercase;font-size:10px}.drawer-new{background:#e5e1d6;color:var(--text);border:1px solid #d5d0c3}.drawer-new:hover{background:#dcd6c9}
+.chat-header,body.light-mode .chat-header{height:64px;min-height:64px;padding:12px 24px}.header-new-chat,.header-history{border:0}
+#chat-scroll{padding:24px max(24px,calc((100% - 800px)/2))}#chat-logs{max-width:800px}
+.welcome{min-height:56dvh;padding:32px 0;gap:16px;text-align:center}.welcome-mark{object-fit:contain}.welcome .welcome-eyebrow{font-size:10px;letter-spacing:.18em;font-weight:650;color:var(--accent)}
+.welcome h1{font:400 clamp(28px,3.5vw,44px)/1.15 Georgia,serif;letter-spacing:-1px}.welcome p{font-size:15px}
+.welcome:has(+ #chat-logs:not(:empty)){visibility:visible;height:auto;min-height:56dvh;padding:32px 0;gap:16px}
+.welcome:has(+ #chat-logs .user),.welcome:has(+ #chat-logs .assistant){display:none}
+.starter-options{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:16px}.starter-chip{display:flex;gap:20px;align-items:center;border:1px solid var(--border);background:var(--surface);color:var(--text);padding:12px 16px;border-radius:8px;font-size:13px;cursor:pointer}.starter-chip span{color:var(--accent)}
+.composer-wrap{width:min(800px,calc(100% - 48px));padding-bottom:16px}.composer,body.light-mode .composer{border-radius:16px;padding:12px 16px;box-shadow:0 3px 12px #302f2410}.composer:focus-within{border-color:#9a9080}
+.send-btn,body.light-mode .send-btn{background:var(--accent);color:white;border-radius:10px}.log-entry{font-size:16px}.log-meta{font-size:10px;letter-spacing:.05em}.log-entry.user .message-text{background:#eeece5!important;border-radius:12px}
+.output-choice select{max-width:130px;min-height:44px;border:0;background:transparent;color:var(--muted);font:inherit;font-size:13px}.composer-actions{gap:8px}.composer-tools,.composer-send-actions{flex-wrap:wrap}.message-actions{flex-wrap:wrap;gap:8px}.export-button{border:1px solid var(--border);border-radius:6px;padding:6px 10px;text-transform:none}.text-btn[aria-pressed=true]{color:var(--accent);background:var(--surface-2)}
+.usage-details{margin-bottom:8px}.composer-footer{gap:8px}.log-entry,.message-text{overflow-wrap:anywhere;min-width:0}.code-block{max-width:100%;overflow:hidden}.code-block pre{overflow:auto}
+@media(max-width:780px){.welcome{min-height:42dvh}.welcome:has(+ #chat-logs:not(:empty)){min-height:42dvh}.history-drawer{width:min(300px,88vw)}.composer-wrap{width:calc(100% - 24px)}#chat-scroll{padding:16px}.chat-header,body.light-mode .chat-header{padding:8px 12px}.composer,body.light-mode .composer{padding:8px 12px}.starter-options{gap:8px}.starter-chip{padding:10px 12px}.welcome h1{font-size:30px}.composer-tools{flex:1}.composer-send-actions{margin-left:auto}.output-choice select{max-width:108px}.effort-wrap select{max-width:104px}.composer-footer{font-size:10px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;scroll-behavior:auto!important;transition:none!important}}

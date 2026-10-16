@@ -14,8 +14,8 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/static/icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
-  <link rel="stylesheet" href="/static/chat-ui.css?v=446f7225e2310e82">
-  <script src="/static/chat.js?v=400855e2e6dff688" defer></script>
+  <link rel="stylesheet" href="/static/chat-ui.css?v=64268e027aeb3dc7">
+  <script src="/static/chat.js?v=33dfded3173bac91" defer></script>
   <script src="/static/pwa.js?v=90a93615620c09e8" defer></script>
 </head>
 <body class="theme-green light-mode history-drawer-collapsed">
@@ -112,8 +112,15 @@
 
         <div id="chat-scroll" tabindex="0" aria-label="Conversa">
           <section class="welcome" aria-label="Boas-vindas">
-            <h1>THIGAS AI</h1>
-            <p>O que vamos fazer hoje?</p>
+            <img class="welcome-mark" src="/static/icons/icon.svg" width="64" height="64" alt="">
+            <p class="welcome-eyebrow">SEU ESPAÇO PARA CRIAR</p>
+            <h1>O que vamos criar hoje?</h1>
+            <p>Uma ideia, uma apresentação ou seu próximo projeto.</p>
+            <div class="starter-options">
+              <button type="button" class="starter-chip" data-prompt="Crie uma apresentação em PPTX sobre ">Criar apresentação <span>↗</span></button>
+              <button type="button" class="starter-chip" data-prompt="Escreva um documento Word sobre ">Escrever documento <span>↗</span></button>
+              <button type="button" class="starter-chip" data-prompt="Crie os arquivos de código para ">Programar <span>↗</span></button>
+            </div>
           </section>
           <div id="chat-logs" role="log" aria-live="polite" aria-relevant="additions" aria-label="Mensagens"></div>
         </div>
@@ -152,6 +159,7 @@
                   <button type="button" id="attach-image">▧ &nbsp; Fotos (até 10)</button>
                   <button type="button" id="attach-workspace">◫ &nbsp; Criar PDF, Word, Excel ou PowerPoint</button>
                 </div>
+                <label class="output-choice"><span class="sr-only">Formato da resposta</span><select id="output-format" aria-label="Formato da resposta"><option value="">Auto</option><option value="pptx">PowerPoint</option><option value="docx">Word</option><option value="pdf">PDF</option></select></label>
                 <div class="effort-wrap">
                   <label class="sr-only" for="reasoning-mode">Nível de esforço</label>
                   <select id="reasoning-mode" aria-label="Nível de esforço">
@@ -162,6 +170,7 @@
                 </div>
               </div>
               <div class="composer-send-actions">
+                <button type="button" id="btn-voice" class="text-btn" aria-pressed="false" title="Enviar fala e ouvir respostas">Voz</button>
                 <button type="button" id="btn-microphone" class="icon-btn microphone-btn" aria-label="Ditar mensagem" aria-pressed="false" title="Ditar mensagem">🎙</button>
                  <button type="button" id="btn-web-search" class="icon-btn web-search-btn" aria-label="Ativar pesquisa online" aria-pressed="false" title="Pesquisar online (desativado)">🌐</button>
                 <button id="btn-stop" type="button" class="stop-btn" hidden>Parar resposta</button>
