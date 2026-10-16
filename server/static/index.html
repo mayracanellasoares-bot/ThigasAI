@@ -14,11 +14,9 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/static/icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
-  <link rel="stylesheet" href="/static/chat.css?v=bottom12">
-  <link rel="stylesheet" href="/static/history-sidebar.css?v=drawer2">
-  <link rel="stylesheet" href="/static/mini-nano-theme.css?v=readable16">
-  <script src="/static/chat.js?v=deepqa17" defer></script>
-  <script src="/static/pwa.js?v=llama2" defer></script>
+  <link rel="stylesheet" href="/static/chat-ui.css?v=446f7225e2310e82">
+  <script src="/static/chat.js?v=400855e2e6dff688" defer></script>
+  <script src="/static/pwa.js?v=90a93615620c09e8" defer></script>
 </head>
 <body class="theme-green light-mode history-drawer-collapsed">
   <div class="app-shell">
@@ -87,15 +85,6 @@
         <button id="btn-sound" type="button" aria-pressed="false">SOM: OFF</button>
       </div>
 
-      <div class="sidebar-bottom">
-        <div class="server-state">
-          <span id="power-lamp" class="lamp" aria-hidden="true"></span>
-          <div>
-            <span id="connection-status" role="status">Verificando servidor…</span>
-            <small>THIGAS v2.0</small>
-          </div>
-        </div>
-      </div>
     </aside>
 
     <section class="workspace">
@@ -135,7 +124,7 @@
             <button id="btn-remove-file" class="attachment-remove" type="button" aria-label="Remover todos os anexos" title="Remover todos os anexos">×</button>
           </div>
 
-          <div id="slash-menu" class="quick-menu" hidden role="listbox" aria-label="Atalhos e referências">
+          <div id="slash-menu" class="quick-menu" hidden role="group" aria-label="Atalhos e referências">
             <button type="button" data-insert="/ajuda">/ajuda — comandos disponíveis</button>
             <button type="button" data-insert="/limpar">/limpar — novo chat</button>
             <button type="button" data-insert="@documento ">@documento — abrir seus arquivos</button>
@@ -175,6 +164,7 @@
               <div class="composer-send-actions">
                 <button type="button" id="btn-microphone" class="icon-btn microphone-btn" aria-label="Ditar mensagem" aria-pressed="false" title="Ditar mensagem">🎙</button>
                  <button type="button" id="btn-web-search" class="icon-btn web-search-btn" aria-label="Ativar pesquisa online" aria-pressed="false" title="Pesquisar online (desativado)">🌐</button>
+                <button id="btn-stop" type="button" class="stop-btn" hidden>Parar resposta</button>
                 <button id="btn-send" type="submit" class="send-btn" aria-label="Enviar mensagem" title="Enviar">
                   <span class="send-arrow" aria-hidden="true">↑</span><span class="send-label">Enviar</span>
                 </button>
@@ -186,6 +176,7 @@
           <small id="mode-hint" class="sr-only">O nível alto utiliza o modelo avançado somente quando habilitado no servidor.</small>
           <div class="composer-footer">
             <span>Enter para enviar · Shift+Enter para nova linha</span>
+            <span class="connection-state"><span id="power-lamp" class="lamp" aria-hidden="true"></span><span id="connection-status" role="status">Verificando conexão…</span></span>
             <span id="request-status" role="status">Pronto</span>
           </div>
         </section>

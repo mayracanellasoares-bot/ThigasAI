@@ -156,6 +156,27 @@
     return String(source || "").replace(/^\s*`{3}[^\n]*$/gm, "");
   }
 
+  // Coalesce deltas without rebuilding formatted DOM. Format once on completion.
+  function createStreamPainter(draw, schedule, cancel) {
+    let frame = null, latest = "", disposed = false;
+    return {
+      update(text) {
+        if (disposed) return;
+        latest = text;
+        if (frame !== null) return;
+        frame = schedule(() => {
+          frame = null;
+          if (!disposed) draw(latest);
+        });
+      },
+      dispose() {
+        disposed = true;
+        if (frame !== null) cancel(frame);
+        frame = null;
+      },
+    };
+  }
+
   function codeFilename(language, index) {
     const extensions = { python: "py", py: "py", javascript: "js", js: "js", typescript: "ts", ts: "ts", jsx: "jsx", tsx: "tsx", html: "html", css: "css", json: "json", java: "java", c: "c", cpp: "cpp", "c++": "cpp", "c#": "cs", csharp: "cs", cs: "cs", go: "go", rust: "rs", bash: "sh", shell: "sh", powershell: "ps1", sql: "sql", yaml: "yaml", php: "php" };
     return "thigas_codigo_" + index + "." + (extensions[String(language).toLowerCase()] || "txt");
@@ -323,7 +344,7 @@
   }
   // Exportações puras permitem testar o contrato sem DOM, API externa ou saldo.
   if (typeof module !== "undefined" && module.exports) {
-    module.exports = { MAX_MESSAGE, MAX_FILE_BYTES, MAX_TEXT_FILE_BYTES, MAX_IMAGE_FILE_BYTES, MAX_ATTACHMENTS, safeFilename, validateFile, composeMessage, sanitizeHistory, apiHistory, splitCodeBlocks, codeFilename, extractDocument, requestChat, redactAttachmentFromHistory, classifyConversationDate, codeRevisionPrompt, safeSourceUrl, readableSegments, readableLines, streamingPreview, requestChatStream, readQaEvidence };
+    module.exports = { MAX_MESSAGE, MAX_FILE_BYTES, MAX_TEXT_FILE_BYTES, MAX_IMAGE_FILE_BYTES, MAX_ATTACHMENTS, safeFilename, validateFile, composeMessage, sanitizeHistory, apiHistory, splitCodeBlocks, codeFilename, extractDocument, requestChat, redactAttachmentFromHistory, classifyConversationDate, codeRevisionPrompt, safeSourceUrl, readableSegments, readableLines, streamingPreview, requestChatStream, readQaEvidence, createStreamPainter };
   }
   if (typeof document === "undefined") return;
 
@@ -337,6 +358,7 @@
   const usageStatus = byId("tokens-status");
   const modeSelector = byId("reasoning-mode");
   const searchButton = byId("btn-web-search");
+  const stopButton = byId("btn-stop");
   let webSearchActive = false;
   let searchProviderName = "Wikipédia";
   let maritacaStreaming = false;
@@ -453,16 +475,49 @@
   const drawerBackdrop = byId("history-backdrop");
   const drawerSearch = byId("history-search");
   const mobileHistory = window.matchMedia("(max-width: 780px)");
+  const workspace = document.querySelector(".workspace");
+  let drawerReturnFocus = null;
 
   function setDrawerOpen(open) {
     const mobile = mobileHistory.matches;
+    const wasModal = drawer.getAttribute("aria-modal") === "true";
+    if (mobile && open && !wasModal) drawerReturnFocus = document.activeElement;
+    // Move focus before hiding/inerting its current subtree.
+    if ((!open || !mobile) && wasModal) {
+      workspace.inert = false;
+      (drawerReturnFocus?.isConnected ? drawerReturnFocus : byId("btn-history-top")).focus();
+      drawerReturnFocus = null;
+    } else if (!open && drawer.contains(document.activeElement)) {
+      byId("btn-history-top").focus();
+    }
     document.body.classList.toggle("history-drawer-open", mobile && open);
     document.body.classList.toggle("history-drawer-collapsed", !mobile && !open);
     drawerBackdrop.hidden = !(mobile && open);
-    byId("btn-history-top").setAttribute("aria-expanded", String(mobile ? open : open));
+    byId("btn-history-top").setAttribute("aria-expanded", String(open));
     drawer.setAttribute("aria-hidden", String(!open));
+    drawer.inert = !open;
+    if (mobile && open) {
+      drawer.setAttribute("role", "dialog");
+      drawer.setAttribute("aria-modal", "true");
+    } else {
+      drawer.removeAttribute("role");
+      drawer.removeAttribute("aria-modal");
+    }
     if (mobile && open) drawerSearch.focus();
+    workspace.inert = mobile && open;
   }
+
+  drawer.addEventListener("keydown", event => {
+    if (event.key !== "Tab" || !mobileHistory.matches || !isDrawerOpen()) return;
+    const controls = [...drawer.querySelectorAll('button:not([disabled]), a[href], input:not([disabled])')]
+      .filter(element => element.getClientRects().length && !element.hidden);
+    const first = controls[0], last = controls[controls.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault(); last?.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault(); first?.focus();
+    }
+  });
 
   function isDrawerOpen() {
     return mobileHistory.matches
@@ -768,6 +823,8 @@
     const busy = requestActive || readingFile;
     searchButton.disabled = busy;
     byId("btn-send").disabled = busy;
+    if (!requestActive && document.activeElement === stopButton) input.focus();
+    stopButton.hidden = !requestActive;
     byId("btn-attach").disabled = busy;
     byId("btn-remove-file").disabled = requestActive;
     modeSelector.disabled = busy;
@@ -909,6 +966,12 @@
     const originalAttachment = attachment;
     const controller = new AbortController();
     activeController = controller;
+    let cancelledByUser = false;
+    const stopRequest = () => {
+      cancelledByUser = true;
+      controller.abort();
+    };
+    stopButton.addEventListener("click", stopRequest);
     requestActive = true;
     setBusy();
     renderMessage("user", message);
@@ -917,6 +980,9 @@
     thoughtIcon.setAttribute("aria-hidden", "true");
     const thoughtLabel = make("span", "thinking-label", "Pensando…");
     const preview = make("div", "message-text stream-preview");
+    const previewText = document.createTextNode("");
+    preview.append(previewText);
+    let displayedPreview = "";
     pending.append(thoughtIcon, thoughtLabel, preview);
     pending.setAttribute("role", "status");
     pending.setAttribute("aria-label", "Preparando a resposta");
@@ -924,25 +990,34 @@
     scrollBottom();
     beep("send");
     const timeout = setTimeout(() => controller.abort(), 325000);
+    let followOutput = true;
+    const updateFollowOutput = () => {
+      followOutput = scroll.scrollHeight - scroll.clientHeight - scroll.scrollTop < 80;
+    };
+    scroll.addEventListener("scroll", updateFollowOutput, { passive: true });
+    const painter = createStreamPainter(text => {
+      if (epoch !== conversationEpoch) return;
+      thoughtLabel.textContent = "Respondendo…";
+      const next = streamingPreview(text);
+      if (next.startsWith(displayedPreview)) previewText.appendData(next.slice(displayedPreview.length));
+      else previewText.data = next;
+      displayedPreview = next;
+      if (followOutput) scrollBottom();
+    }, requestAnimationFrame, cancelAnimationFrame);
     try {
       const selected = modeSelector.value;
       const canStream = !webSearchActive && maritacaStreaming &&
         (selected === "fast" || selected === "balanced" || (selected === "thinking" && maritacaThinkingStreaming));
-      let lastDraw = 0;
       const onDelta = text => {
         if (epoch !== conversationEpoch) return;
-        thoughtLabel.textContent = "Respondendo…";
-        const time = Date.now();
-        if (time - lastDraw > 75) {
-          lastDraw = time;
-          renderReadableText(preview, streamingPreview(text));
-          scrollBottom();
-        }
+        painter.update(text);
       };
       const result = canStream
         ? await requestChatStream(window.fetch.bind(window), message, history, controller.signal, selected, onDelta)
         : await requestChat(window.fetch.bind(window), message, history, controller.signal, selected, webSearchActive);
       if (epoch !== conversationEpoch) return;
+      painter.dispose();
+      const readingPosition = scroll.scrollTop;
       pending.remove();
       const answer = result.answer;
       renderMessage("assistant", answer);
@@ -972,17 +1047,28 @@
       if (input.value === originalText) input.value = "";
       if (attachment === originalAttachment) removeAttachment();
       resizeInput();
+      if (!followOutput) scroll.scrollTop = readingPosition;
       beep("reply");
     } catch (error) {
       if (epoch !== conversationEpoch) return;
+      painter.dispose();
+      const readingPosition = scroll.scrollTop;
       pending.remove();
       showUsage(null);
       byId("model-used").textContent = "—";
-      const explanation = error.name === "AbortError" ? "O tempo de espera terminou. O servidor pode estar despertando. A consulta enviada pode ter consumido saldo; não houve reenvio automático." : error instanceof TypeError ? "Não foi possível conectar ao servidor. Confira a internet e tente mais tarde." : error.message;
+      const explanation = error.name === "AbortError"
+        ? cancelledByUser
+          ? "Resposta interrompida. Sua mensagem foi preservada. O provedor pode já ter processado a consulta."
+          : "O tempo de espera terminou. Sua mensagem foi preservada. A consulta pode ter consumido saldo; não houve reenvio automático."
+        : error instanceof TypeError ? "Não foi possível conectar ao servidor. Confira a internet e tente mais tarde." : error.message;
       info(explanation, true);
+      if (!followOutput) scroll.scrollTop = readingPosition;
       beep("error");
     } finally {
       clearTimeout(timeout);
+      painter.dispose();
+      scroll.removeEventListener("scroll", updateFollowOutput);
+      stopButton.removeEventListener("click", stopRequest);
       if (epoch === conversationEpoch) { requestActive = false; activeController = null; setBusy(); }
     }
   }
@@ -1072,9 +1158,11 @@
 
   async function loadModelCapabilities() {
     // The UI never enables paid advanced modes without server authorization.
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
     try {
-      const response = await fetch("/api", { cache: "no-store" });
-      if (!response.ok) return;
+      const response = await fetch("/api", { cache: "no-store", signal: controller.signal });
+      if (!response.ok) throw new Error("capabilities_unavailable");
       const capabilities = await response.json();
       maritacaStreaming = capabilities?.maritaca_stream_enabled === true;
       maritacaThinkingStreaming = capabilities?.maritaca_thinking_stream_enabled === true;
@@ -1106,6 +1194,9 @@
         : "O modo Avançado está temporariamente indisponível.";
     } catch (_) {
       // Fail closed: existing fast mode works, advanced modes stay disabled.
+      if (!requestActive && !readingFile) byId("request-status").textContent = "Modos não verificados. Tente recarregar.";
+    } finally {
+      clearTimeout(timeout);
     }
   }
 

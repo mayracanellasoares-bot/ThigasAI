@@ -6,7 +6,7 @@ const vm = require("node:vm");
 const worker = require("../static/sw.js");
 const ORIGIN = "https://thigas.test";
 
-function workerHarness(fetcher) {
+function workerHarness(fetcher, timers = { setTimeout, clearTimeout }) {
   const listeners = {};
   const buckets = new Map();
   const key = request => new URL(typeof request === "string" ? request : request.url, ORIGIN).href;
@@ -34,7 +34,7 @@ function workerHarness(fetcher) {
   const source = fs.readFileSync(path.join(__dirname, "../static/sw.js"), "utf8");
   vm.runInNewContext(source, {
     self: { location: { origin: ORIGIN }, addEventListener: (type, callback) => { listeners[type] = callback; }, clients: { claim: async () => { claimed = true; } }, skipWaiting: async () => { skipped = true; } },
-    caches: cacheStorage, fetch: fetcher, URL, Request, Response, setTimeout, clearTimeout,
+    caches: cacheStorage, fetch: fetcher, URL, Request, Response, ...timers,
   });
   return {
     buckets, cacheStorage, claimed: () => claimed, skipped: () => skipped,
@@ -126,6 +126,43 @@ test("navegação online busca HTML novo e preserva shell offline no cache", asy
   assert.equal(await (await cache.match("/")).text(), "v1");
   assert.equal(await cache.match("/entrar"), undefined);
   assert.equal(await harness.request("/health"), undefined);
+});
+
+test("shell já instalado abre após prazo de rede e tolera HTTP 503", async () => {
+  let mode = "online", deadline;
+  const harness = workerHarness(async () => {
+    if (mode === "slow") return new Promise(() => {});
+    return new Response("shell", { status: mode === "error" ? 503 : 200 });
+  }, {
+    setTimeout(callback, delay) { assert.equal(delay, 4000); deadline = callback; return 1; },
+    clearTimeout() {},
+  });
+  await harness.lifecycle("install");
+  mode = "slow";
+  const navigation = harness.request("/", "GET", "navigate");
+  for (let i = 0; i < 10 && !deadline; i++) await Promise.resolve();
+  assert.equal(typeof deadline, "function");
+  deadline();
+  assert.equal(await (await navigation).text(), "shell");
+  mode = "error";
+  const fallback = await harness.request("/", "GET", "navigate");
+  assert.equal(fallback.status, 200);
+  assert.equal(await fallback.text(), "shell");
+});
+
+test("documentos e páginas de conta não recebem shell público em falhas de rede", async () => {
+  const harness = workerHarness(async () => { throw new TypeError("offline"); });
+  for (const path of ["/workspace", "/entrar", "/documents/private"]) {
+    assert.equal(await harness.request(path, "GET", "navigate"), undefined);
+  }
+});
+
+test("falha do CacheStorage não impede navegação nem assets online", async () => {
+  const harness = workerHarness(async () => new Response("online"));
+  harness.cacheStorage.open = async () => { throw new Error("storage blocked"); };
+  assert.equal(await (await harness.request("/", "GET", "navigate")).text(), "online");
+  const asset = worker.APP_SHELL.find(path => path.startsWith("/static/chat.js?"));
+  assert.equal(await (await harness.request(asset)).text(), "online");
 });
 
 test("primeiro acesso offline sem cache informa a necessidade de conexão", async () => {

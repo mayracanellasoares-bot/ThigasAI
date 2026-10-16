@@ -2,6 +2,7 @@ import os
 import base64
 import re
 import hmac
+import hashlib
 import document_agent
 from zip_inspector import extract_zip_text
 import link_inspector
@@ -32,6 +33,13 @@ from pptx import Presentation
 app = Flask(__name__)
 app.config["JSON_AS_ASCII"] = False
 app.config["MAX_CONTENT_LENGTH"] = 22 * 1024 * 1024
+# Exact content versions only: unversioned/old URLs must still revalidate.
+PUBLIC_ASSET_VERSIONS = {
+    "/static/" + path.relative_to(app.static_folder).as_posix():
+        hashlib.sha256(path.read_bytes()).hexdigest()[:16]
+    for path in Path(app.static_folder).rglob("*")
+    if path.is_file() and path.suffix in {".css", ".js"}
+}
 
 MARITACA_URL = os.getenv(
     "MARITACA_URL",
@@ -532,6 +540,10 @@ def add_security_headers(response):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "no-referrer"
     response.headers["Permissions-Policy"] = "camera=(), geolocation=(), microphone=(self)"
+    version = PUBLIC_ASSET_VERSIONS.get(request.path)
+    if (version and request.args.get("v") == version
+            and response.status_code in (200, 304)):
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
     return response
 
 

@@ -144,7 +144,15 @@ A interface responsiva do THIGAS AI usa a capivara fornecida como marca visual e
 
 ## Integração do layout Mini Nano
 
-A folha `server/static/mini-nano-theme.css` incorpora e adapta as regras visuais do projeto [THIGAS Mini Nano](https://github.com/thiagollipe-web/thigasai_mini_nano), mediante autorização do titular comunicada pelo usuário. Este estilo carrega por último, com cabeçalho limpo, chat centralizado de 810 px, sugestões em duas colunas e compositor responsivo em tons off-white e verde-oliva. Os contratos JavaScript, Flask, documentos, menus +, ditado, histórico e PWA do THIGAS AI permanecem os do aplicativo principal; não há dependência do backend ou das credenciais do Mini Nano.
+A folha `server/static/mini-nano-theme.css` incorpora e adapta as regras visuais do projeto [THIGAS Mini Nano](https://github.com/thiagollipe-web/thigasai_mini_nano), mediante autorização do titular comunicada pelo usuário. O tema atual é branco, com chat centralizado de até 1.040 px e compositor responsivo. As fontes CSS são combinadas em `chat-ui.css`, com tokens de acessibilidade aplicados ao final; o navegador faz uma única requisição de CSS. Não há dependência do backend ou das credenciais do Mini Nano.
+
+### Build e confiabilidade da interface
+
+Após editar o HTML, JS ou CSS público, execute `python scripts/build_web_assets.py`. O script combina o CSS e sincroniza versões por SHA-256 no HTML e no precache do PWA. `--check` valida que os arquivos gerados estão atualizados, inclusive na CI. O Render também gera os assets no build. Apenas CSS/JS cuja versão corresponde ao conteúdo atual recebem cache HTTP de um ano com `immutable`; versões antigas e URLs sem versão continuam revalidando. APIs e documentos continuam fora do cache público.
+
+O botão **Parar resposta** interrompe a requisição do navegador e conserva o rascunho. Isso não garante cancelamento de cobrança no provedor. O streaming atualiza um nó de texto por frame, formata a mensagem ao concluir e respeita a leitura de mensagens anteriores. O histórico móvel isola o fundo com `inert`, contém a navegação por Tab e devolve o foco ao fechar. O status de conexão aparece junto ao compositor.
+
+Em PWAs já preparados, a navegação inicial usa o shell local após quatro segundos de rede lenta ou HTTP 5xx. Apenas `/` recebe esse fallback; documentos e outras páginas não recebem o shell do chat. Isso não elimina o cold start da API no plano gratuito nem comprova 60/120 FPS; desempenho deve ser medido em aparelhos reais.
 
 
 ## Histórico lateral de conversas (outubro de 2026)

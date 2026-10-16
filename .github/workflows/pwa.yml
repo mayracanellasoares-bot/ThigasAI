@@ -21,6 +21,8 @@ jobs:
         with:
           node-version: '24'
       - run: pip install -r server/requirements.txt
+      - name: Verificar versões e bundle CSS reproduzíveis
+        run: python scripts/build_web_assets.py --check
       - run: python -m unittest discover -s server/tests -v
       - run: node --test server/tests/*.test.cjs
       - name: Comparar retenção de contexto (sem API externa)

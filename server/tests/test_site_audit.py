@@ -27,6 +27,30 @@ class SiteSecurityAuditTests(unittest.TestCase):
                                     headers={"Origin": "https://evil.example"})
         self.assertEqual(response.status_code, 403)
 
+    def test_only_exact_content_versions_receive_immutable_cache(self):
+        from hashlib import sha256
+        from pathlib import Path
+        asset = Path(gateway.app.static_folder) / "chat.js"
+        version = sha256(asset.read_bytes()).hexdigest()[:16]
+        for suffix, immutable in [("?v=" + version, True), ("", False), ("?v=old", False)]:
+            with self.subTest(suffix=suffix):
+                response = self.client.get("/static/chat.js" + suffix)
+                try:
+                    self.assertEqual(response.status_code, 200)
+                    self.assertEqual("immutable" in response.headers["Cache-Control"], immutable)
+                    if immutable:
+                        self.assertIn("max-age=31536000", response.headers["Cache-Control"])
+                        etag = response.headers["ETag"]
+                finally:
+                    response.close()
+        response = self.client.get("/static/chat.js?v=" + version, headers={"If-None-Match": etag})
+        try:
+            self.assertEqual(response.status_code, 304)
+            self.assertIn("immutable", response.headers["Cache-Control"])
+        finally:
+            response.close()
+        self.assertEqual(self.client.get("/api?v=" + version).headers["Cache-Control"], "no-store")
+
     def test_malformed_wikipedia_and_brave_responses_report_search_error(self):
         cases = [
             ({"query": ["invalid"]}, False),

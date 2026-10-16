@@ -3,17 +3,15 @@
 // Apenas o shell PÚBLICO estático do chat é armazenado offline.
 // Nunca armazene respostas de API, documentos, anexos ou histórico no CacheStorage.
 const CACHE_PREFIX = "thigas-pwa-";
-const CACHE_NAME = CACHE_PREFIX + "v30-deepqa";
+const CACHE_NAME = CACHE_PREFIX + "60507ba54a6bcc53";
 const APP_SHELL = [
   "/",
   "/manifest.webmanifest",
-  "/static/chat.css?v=bottom12",
-  "/static/mini-nano-theme.css?v=readable16",
-  "/static/history-sidebar.css?v=drawer2",
-  "/static/chat.js?v=deepqa17",
-  "/static/pwa.js?v=llama2",
   "/static/icons/icon.svg",
   "/static/icons/icon-192.png",
+  "/static/chat-ui.css?v=446f7225e2310e82",
+  "/static/chat.js?v=400855e2e6dff688",
+  "/static/pwa.js?v=90a93615620c09e8",
   "/static/icons/icon-512.png",
 ];
 
@@ -47,17 +45,31 @@ if (typeof self !== "undefined" && self.addEventListener) {
   });
 
   async function navigate(request) {
+    let timer;
+    let home;
+    try {
+      const cache = await caches.open(CACHE_NAME);
+      home = await cache.match("/");
+    } catch (_) { /* Storage restrictions must not break online navigation. */ }
     try {
       // O site é público. Não armazenar respostas dinâmicas nem histórico.
-      return await fetch(request);
+      const network = fetch(request);
+      const response = home ? await Promise.race([
+        network,
+        new Promise((_, reject) => {
+          timer = setTimeout(() => reject(new Error("navigation_timeout")), 4000);
+        }),
+      ]) : await network;
+      if (response.status >= 500 && home) return home;
+      return response;
     } catch (_) {
-      const cache = await caches.open(CACHE_NAME);
-      const home = await cache.match("/");
       if (home) return home;
       return new Response(
         "<!doctype html><html lang='pt-BR'><meta name='viewport' content='width=device-width'><title>THIGAS offline</title><p>Conecte-se à internet para conversar com o THIGAS AI.</p></html>",
         { status: 503, headers: { "Content-Type": "text/html; charset=utf-8" } }
       );
+    } finally {
+      clearTimeout(timer);
     }
   }
 
@@ -67,16 +79,22 @@ if (typeof self !== "undefined" && self.addEventListener) {
     const url = new URL(request.url);
     if (url.origin !== self.location.origin) return;
     if (request.mode === "navigate") {
-      event.respondWith(navigate(request));
+      // Documents/account pages must never receive a cached public chat shell.
+      if (url.pathname === "/") event.respondWith(navigate(request));
       return;
     }
     if (!cacheable(request, self.location.origin)) return;
     event.respondWith((async () => {
-      const cache = await caches.open(CACHE_NAME);
-      const saved = await cache.match(request);
-      if (saved) return saved;
+      let cache;
+      try {
+        cache = await caches.open(CACHE_NAME);
+        const saved = await cache.match(request);
+        if (saved) return saved;
+      } catch (_) { /* Continue online if CacheStorage is unavailable. */ }
       const response = await fetch(request);
-      if (response.ok) await cache.put(request, response.clone());
+      if (response.ok && cache) {
+        try { await cache.put(request, response.clone()); } catch (_) { /* Quota/storage error. */ }
+      }
       return response;
     })());
   });

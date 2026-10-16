@@ -4,6 +4,30 @@ const fs = require("node:fs");
 const path = require("node:path");
 const chat = require("../static/chat.js");
 
+test("streaming agrupa deltas no mesmo frame e descarta pinturas após cancelamento", () => {
+  const frames = new Map(), drawn = [];
+  let id = 0;
+  const painter = chat.createStreamPainter(
+    text => drawn.push(text),
+    callback => { frames.set(++id, callback); return id; },
+    frame => frames.delete(frame)
+  );
+  painter.update("O");
+  painter.update("Olá");
+  assert.equal(frames.size, 1);
+  const first = [...frames.values()][0];
+  frames.clear(); first();
+  assert.deepEqual(drawn, ["Olá"]);
+  painter.update("Olá mundo");
+  const pending = [...frames.values()][0];
+  painter.dispose();
+  assert.equal(frames.size, 0);
+  pending(); // A frame already dispatched must also respect disposal.
+  painter.update("resposta de conversa antiga");
+  assert.deepEqual(drawn, ["Olá"]);
+  assert.equal(frames.size, 0);
+});
+
 test("mensagem vazia é rejeitada; espaços externos são removidos", () => {
   assert.throws(() => chat.composeMessage(" ", null), /Escreva/);
   assert.equal(chat.composeMessage(" Olá ", null), "Olá");
