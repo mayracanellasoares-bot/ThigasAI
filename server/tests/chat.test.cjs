@@ -521,3 +521,12 @@ test("streaming preserva trechos recuperados sem inventar certeza", async () => 
   assert.equal(result.qa_evidence[0].title,"a.txt");
   assert.equal(result.usage.total_tokens,null);
 });
+
+
+test("pacote de código é oferecido somente para resposta multifile e usa backend seguro", () => {
+  const source = fs.readFileSync(path.join(__dirname, "../static/chat.js"), "utf8");
+  assert.match(source, /fetch\("\/code\/bundle"/);
+  assert.match(source, /BAIXAR PROJETO \.ZIP/);
+  assert.match(source, /codeParts\.length > 1/);
+  assert.match(source, /filename=/);
+});
