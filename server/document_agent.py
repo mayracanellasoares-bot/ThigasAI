@@ -209,7 +209,11 @@ def make_pptx(text):
             flush()
             current_title = value[:120]
             if len(value) > 120:
-                items.extend(('body', chunk) for chunk in textwrap.wrap(value[120:], 240))
+                for chunk in textwrap.wrap(value[120:], 110):
+                    if len(items) >= 4:
+                        flush()
+                        current_title = 'Continuação'
+                    items.append(('body', chunk))
         elif value:
             for chunk in textwrap.wrap(value, 110, replace_whitespace=False):
                 if len(items) >= 4:
