@@ -68,6 +68,32 @@ function addBubble(message, role) {
   $("conversation").append(bubble);
   $("conversation").scrollTop = $("conversation").scrollHeight;
 }
+function suggestWorkflow(prompt) {
+  const text = prompt.toLowerCase();
+  let trigger = "manual";
+  if (/reuni[aã]o|meeting/.test(text)) trigger = "google_calendar.meeting_ended";
+  else if (/(?:pull request|\bpr\b).*(?:mesclad|merged)|(?:mesclad|merged).*(?:pull request|\bpr\b)/.test(text)) trigger = "github.pr_merged";
+  else if (/sexta-feira|toda sexta/.test(text)) trigger = "gmail.friday";
+  else if (/notion/.test(text) && /p[aá]gina/.test(text)) trigger = "notion.page_created";
+  $("workflow-trigger").value = trigger;
+  const related = {
+    "google_calendar.meeting_ended": ["google_calendar", "gmail"],
+    "github.pr_merged": ["github"], "gmail.friday": ["gmail"],
+    "notion.page_created": ["notion"],
+  }[trigger] || [];
+  document.querySelectorAll('input[name="app"]').forEach(box => {
+    box.checked = related.includes(box.value);
+  });
+  $("workflow-title").value = {
+    "google_calendar.meeting_ended": "Acompanhamento após reunião",
+    "github.pr_merged": "Acompanhamento de PR",
+    "gmail.friday": "Revisão semanal de e-mails",
+    "notion.page_created": "Nova página no Notion",
+  }[trigger] || "";
+  if (trigger === "google_calendar.meeting_ended" && state.skills.some(x => x.slug === "post-meeting-followup")) {
+    $("workflow-skill").value = "post-meeting-followup";
+  }
+}
 function renderConnections() {
   const list = $("connection-list");
   list.replaceChildren();
@@ -319,6 +345,7 @@ $("chat-form").addEventListener("submit", async event => {
     const result = await call("/api/chat", "POST", { prompt, search: $("chat-search").checked });
     state.lastPrompt = prompt;
     $("workflow-prompt").value = prompt;
+    suggestWorkflow(prompt);
     addBubble(result.answer + (result.approval_id ? "\n\nAção proposta: revise na aba Aprovações." : ""), "assistant");
     $("prompt").value = "";
     await refresh();
