@@ -1412,6 +1412,9 @@ install_access_control(app)
 from web_workspace import install as install_workspace
 install_workspace(app, globals())
 
+from octonous import install as install_octonous
+install_octonous(app)
+
 
 if TELEGRAM_BOT_TOKEN:
     threading.Thread(
