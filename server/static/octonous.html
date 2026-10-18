@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f6f8fc">
+  <title>Thigas Fluxos · THIGAS AI</title>
+  <link rel="stylesheet" href="/static/octonous.css">
+  <script src="/static/octonous.js" defer></script>
+</head>
+<body>
+  <div id="login-screen" class="login-screen" hidden>
+    <form id="login-form" class="login-card">
+      <span class="mark">✳</span>
+      <p class="eyebrow">ÁREA DO PROPRIETÁRIO</p>
+      <h1>Seus fluxos, sob seu controle.</h1>
+      <p>Conexões e ações ficam protegidas. O chat público continua separado.</p>
+      <label for="owner-password">Senha de acesso</label>
+      <input id="owner-password" type="password" autocomplete="current-password" required>
+      <button class="primary" type="submit">Entrar</button>
+      <p id="login-message" class="message" role="alert"></p>
+      <a href="/">Voltar para THIGAS AI</a>
+    </form>
+  </div>
+  <div id="app" class="shell" hidden>
+    <aside class="sidebar">
+      <a class="brand" href="/"><span class="mark">✳</span><span>THIGAS <b>FLUXOS</b><small>Agentes e automações</small></span></a>
+      <nav aria-label="Navegação">
+        <button class="nav active" data-view="home" type="button"><span>◈</span> Visão geral</button>
+        <button class="nav" data-view="chat" type="button"><span>◌</span> Criar no chat</button>
+        <button class="nav" data-view="connections" type="button"><span>⌘</span> Conexões</button>
+        <button class="nav" data-view="workflows" type="button"><span>↝</span> Automações</button>
+        <button class="nav" data-view="approvals" type="button"><span>✓</span> Aprovações <em id="approval-count"></em></button>
+        <button class="nav" data-view="activity" type="button"><span>☷</span> Atividade</button>
+        <button class="nav" data-view="settings" type="button"><span>⚙</span> Modelo e Skills</button>
+      </nav>
+      <div class="sidebar-bottom"><span class="safe-dot"></span> Escritas exigem sua aprovação
+        <button id="logout" type="button">Sair</button>
+      </div>
+    </aside>
+    <main class="main">
+      <header class="topbar">
+        <button id="menu-toggle" class="mobile-menu" aria-label="Abrir menu" type="button">☰</button>
+        <span class="breadcrumb">THIGAS AI <span>/</span> <strong id="page-name">Visão geral</strong></span>
+        <span class="topbar-right"><span class="safe-dot"></span> Sessão protegida</span>
+      </header>
+      <div id="toast" class="toast" role="status" hidden></div>
+      <section id="view-home" class="view active">
+        <div class="hero">
+          <div class="hero-copy"><p class="eyebrow">TRABALHO CONECTADO</p>
+            <h1>Menos abas.<br><span>Mais trabalho concluído.</span></h1>
+            <p>Descreva uma tarefa, reúna o contexto dos aplicativos e revise cada ação antes que aconteça.</p>
+            <button class="primary" type="button" data-go="chat">Criar uma tarefa <span>↗</span></button>
+          </div>
+          <div class="hero-art" aria-hidden="true"><div class="orbit"><span>✉</span><span>⌘</span><span>▧</span><span>◷</span><i>✳</i></div></div>
+        </div>
+        <div class="stats">
+          <div class="stat"><strong id="stat-connections">0</strong><span>apps conectados</span></div>
+          <div class="stat"><strong id="stat-workflows">0</strong><span>automações salvas</span></div>
+          <div class="stat"><strong id="stat-approvals">0</strong><span>ações aguardando você</span></div>
+        </div>
+        <div class="section-heading"><div><p class="eyebrow">COMECE POR AQUI</p><h2>O que você quer fazer?</h2></div></div>
+        <div class="starter-grid">
+          <button type="button" data-prompt="Depois de cada reunião, prepare um e-mail de acompanhamento com os próximos passos." class="starter"><span>◷</span><b>Acompanhar reuniões</b><small>Transforme contexto em um e-mail para sua revisão.</small></button>
+          <button type="button" data-prompt="Quando um pull request for mesclado, resuma a mudança e prepare uma tarefa de acompanhamento." class="starter"><span>⌘</span><b>Resumir um PR</b><small>Crie um fluxo a partir de eventos do GitHub.</small></button>
+          <button type="button" data-prompt="Toda sexta-feira, revise minhas mensagens importantes e produza um resumo." class="starter"><span>✉</span><b>Revisar a semana</b><small>Programe um resumo para sexta-feira.</small></button>
+        </div>
+      </section>
+      <section id="view-chat" class="view">
+        <div class="section-heading"><div><p class="eyebrow">TESTE ANTES DE AUTOMATIZAR</p><h1>Descreva a tarefa.</h1><p>O agente pode buscar contexto e sugerir uma ação. Enviar ou criar exige sua aprovação.</p></div></div>
+        <div class="chat-layout">
+          <div class="panel chat-panel">
+            <div id="conversation" class="conversation"><div class="assistant-bubble">Olá. Conte o que você quer resolver nos aplicativos conectados.</div></div>
+            <form id="chat-form" class="composer"><label class="sr-only" for="prompt">Sua tarefa</label><textarea id="prompt" rows="3" maxlength="5000" placeholder="Ex.: Depois de cada reunião, prepare um e-mail de acompanhamento…" required></textarea>
+              <div class="composer-actions"><label><input id="chat-search" type="checkbox" checked> Buscar nos apps</label><button class="primary" type="submit">Testar tarefa ↗</button></div>
+            </form>
+          </div>
+          <div class="panel side-panel">
+            <p class="eyebrow">BUSCAR UMA VEZ</p><h2>Encontre em todos os apps.</h2>
+            <form id="search-form" class="search-form"><input id="search-query" type="search" maxlength="150" placeholder="Buscar e-mail, tarefa, pessoa…" required><button type="submit" aria-label="Buscar">⌕</button></form>
+            <div id="search-results" class="search-results muted">Conecte um app para pesquisar.</div>
+          </div>
+        </div>
+        <div class="panel save-panel"><div><p class="eyebrow">FUNCIONOU?</p><h2>Salve como automação.</h2><p>Defina quando o fluxo roda e quais aplicativos pode usar.</p></div><button class="secondary" type="button" data-go="workflows">Configurar automação ↗</button></div>
+      </section>
+      <section id="view-connections" class="view">
+        <div class="section-heading"><div><p class="eyebrow">O SEU ESPAÇO DE TRABALHO</p><h1>Conecte seus aplicativos.</h1><p>A autorização é feita diretamente em cada serviço. As credenciais ficam criptografadas.</p></div></div>
+        <div id="connection-list" class="connection-grid"></div>
+        <p class="note">Cada serviço exige um aplicativo OAuth próprio e um URI de retorno configurado pelo proprietário. Veja as instruções de instalação do projeto.</p>
+      </section>
+      <section id="view-workflows" class="view">
+        <div class="section-heading"><div><p class="eyebrow">AUTOMAÇÕES</p><h1>Uma tarefa, no momento certo.</h1><p>Escolha os aplicativos e as ações permitidas. Cada escrita continuará aguardando aprovação.</p></div></div>
+        <form id="workflow-form" class="panel workflow-form">
+          <div class="form-grid"><label>Nome do fluxo<input id="workflow-title" required maxlength="120" placeholder="Acompanhamento após reunião"></label>
+            <label>Gatilho<select id="workflow-trigger"><option value="manual">Manual</option><option value="google_calendar.meeting_ended">Reunião encerrada · Google Calendar</option><option value="github.pr_merged">PR mesclado · GitHub</option><option value="notion.page_created">Página criada · Notion</option><option value="gmail.friday">Sexta-feira · Gmail</option><option value="schedule.daily">Todos os dias</option><option value="schedule.weekly">Semanal</option></select></label></div>
+          <label>Instrução<textarea id="workflow-prompt" required maxlength="5000" rows="3" placeholder="O que o agente deve fazer?"></textarea></label>
+          <div class="form-grid"><label>Skill<select id="workflow-skill"><option value="">Sem Skill</option></select></label><div class="form-grid compact"><label>Hora (São Paulo)<input id="workflow-hour" type="number" min="0" max="23" value="9"></label><label>Dia da semana<select id="workflow-weekday"><option value="0">Segunda</option><option value="1">Terça</option><option value="2">Quarta</option><option value="3">Quinta</option><option value="4" selected>Sexta</option><option value="5">Sábado</option><option value="6">Domingo</option></select></label></div></div>
+          <fieldset><legend>Aplicativos que o fluxo pode consultar</legend><div id="workflow-apps" class="check-grid"></div></fieldset>
+          <fieldset><legend>Ações que pode propor para sua aprovação</legend><div id="workflow-actions" class="check-grid"></div></fieldset>
+          <button class="primary" type="submit">Salvar automação</button>
+        </form>
+        <div class="section-heading small"><h2>Seus fluxos</h2></div><div id="workflow-list" class="list"></div>
+      </section>
+      <section id="view-approvals" class="view">
+        <div class="section-heading"><div><p class="eyebrow">VOCÊ DECIDE</p><h1>Ações aguardando revisão.</h1><p>Confira e, se necessário, edite o conteúdo antes de aprovar.</p></div></div>
+        <div id="approval-list" class="list"></div>
+      </section>
+      <section id="view-activity" class="view">
+        <div class="section-heading"><div><p class="eyebrow">VISIBILIDADE</p><h1>O que aconteceu, passo a passo.</h1><p>Entradas e saídas são armazenadas criptografadas e exibidas apenas nesta área.</p></div></div>
+        <div id="log-list" class="list"></div>
+      </section>
+      <section id="view-settings" class="view">
+        <div class="section-heading"><div><p class="eyebrow">MODELO E INSTRUÇÕES</p><h1>Escolha como o agente pensa.</h1><p>Use sua chave da OpenAI, Anthropic ou um servidor Ollama acessível ao Render.</p></div></div>
+        <form id="model-form" class="panel settings-form">
+          <label>Provedor<select id="model-provider"><option value="openai">OpenAI</option><option value="anthropic">Anthropic</option><option value="ollama">Ollama</option></select></label>
+          <label>Modelo<input id="model-name" required placeholder="Nome exato do modelo"></label>
+          <label id="api-key-label">Chave de API<input id="model-key" type="password" autocomplete="new-password" placeholder="Guardada criptografada"></label>
+          <label id="ollama-label" hidden>Origem do Ollama<input id="ollama-origin" value="http://127.0.0.1:11434"></label>
+          <button class="primary" type="submit">Salvar modelo</button><p id="model-status" class="muted"></p>
+        </form>
+        <div class="section-heading small"><h2>Skills disponíveis</h2></div><div id="skill-list" class="list"></div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

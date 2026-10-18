@@ -26,4 +26,4 @@ jobs:
       - name: Sintaxe Python
         run: python -m compileall -q server
       - name: Sintaxe JavaScript
-        run: node --check server/static/chat.js
+        run: node --check server/static/chat.js && node --check server/static/octonous.js
