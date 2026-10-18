@@ -163,7 +163,13 @@ def api(store, provider, method, url, *, params=None, payload=None):
                     {"params": params, "payload": payload},
                     {"status_code": response.status_code}, "error")
         raise ProviderError(f"{provider}: API retornou {response.status_code}.")
-    result = response.json() if response.content else {}
+    try:
+        result = response.json() if response.content else {}
+    except ValueError as exc:
+        store.audit(CURRENT_RUN.get(), provider, method + " " + url,
+                    {"params": params, "payload": payload},
+                    {"error": "Resposta JSON inválida"}, "error")
+        raise ProviderError(f"{provider}: resposta inválida da API.") from exc
     store.audit(CURRENT_RUN.get(), provider, method + " " + url,
                 {"params": params, "payload": payload},
                 {"response": json.dumps(result, ensure_ascii=False, default=str)[:64000]},
@@ -242,7 +248,7 @@ def execute_action(store, action, payload):
             raise ProviderError("Destinatário de e-mail inválido.")
         msg = EmailMessage()
         msg["To"] = recipient
-        msg["Subject"] = str(payload.get("subject", ""))[:180]
+        msg["Subject"] = re.sub(r"[\r\n]+", " ", str(payload.get("subject", "")))[:180]
         msg.set_content(str(payload.get("body", ""))[:12000])
         raw = base64.urlsafe_b64encode(msg.as_bytes()).decode().rstrip("=")
         sent = api(store, "gmail", "POST",

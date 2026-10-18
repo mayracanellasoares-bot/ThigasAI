@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+import base64
 import importlib.util
 import json
 import os
@@ -180,3 +181,15 @@ class OctonousTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_model({"provider": "ollama", "model": "local",
                             "origin": "http://169.254.169.254"})
+
+    def test_email_action_cannot_inject_headers(self):
+        from octonous.providers import execute_action
+        with patch("octonous.providers.api", return_value={"id": "sent"}) as send:
+            execute_action(self.store, "gmail.send", {
+                "to": "pessoa@example.org", "subject": "Assunto\r\nBcc: outro@example.org",
+                "body": "Conteúdo para revisão",
+            })
+        encoded = send.call_args.kwargs["payload"]["raw"]
+        wire = base64.urlsafe_b64decode(encoded + "=" * (-len(encoded) % 4)).decode()
+        self.assertIn("Subject: Assunto Bcc: outro@example.org", wire)
+        self.assertNotIn("\r\nBcc:", wire)
