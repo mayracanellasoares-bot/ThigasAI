@@ -382,7 +382,7 @@ class OctonousTests(unittest.TestCase):
                     post.assert_not_called()
 
     def test_apps_script_search_without_google_oauth_and_fixed_secret(self):
-        from octonous.providers import search_one, drive_script_request
+        from octonous.providers import search_one, drive_script_request, ProviderError
         url = "https://script.google.com/macros/s/AKfycb_12345/exec"
         with patch.dict(os.environ, {"OCTONOUS_DRIVE_SCRIPT_URL": url,
                                       "OCTONOUS_DRIVE_SCRIPT_SECRET": "secret-" + "q" * 48}):
