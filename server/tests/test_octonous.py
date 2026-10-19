@@ -464,3 +464,43 @@ class OctonousTests(unittest.TestCase):
         self.assertIn("authorizedFolder_(roots, payload.folder_id)", source)
         self.assertIn("sameSecret_(message.secret, key)", source)
         self.assertNotIn("OCTONOUS_DRIVE_SCRIPT_SECRET=", source)
+
+    def test_database_status_requires_owner_and_rejects_invalid_uri(self):
+        self.assertEqual(self.client.get("/octonous/api/database/status", base_url="https://thigas-coder-gateway.onrender.com").status_code, 401)
+        with patch("octonous.routes.login_allowed", return_value=True):
+            self.owner()
+        with patch.dict(os.environ, {"OCTONOUS_DATABASE_URL": "thigas_octonous_db"}):
+            with patch("octonous.routes.psycopg.connect") as connect:
+                result = self.client.get("/octonous/api/database/status", base_url="https://thigas-coder-gateway.onrender.com")
+        self.assertFalse(result.get_json()["ok"])
+        self.assertEqual(result.get_json()["code"], "configuration")
+        connect.assert_not_called()
+
+    def test_database_status_checks_read_only_select(self):
+        with patch("octonous.routes.login_allowed", return_value=True):
+            self.owner()
+        with patch("octonous.routes.psycopg.connect") as connect:
+            result = self.client.get("/octonous/api/database/status", base_url="https://thigas-coder-gateway.onrender.com")
+        self.assertTrue(result.get_json()["ok"])
+        connect.assert_called_once()
+        connect.return_value.__enter__.return_value.execute.assert_called_once_with("SELECT 1")
+
+    def test_database_status_handles_connection_failure_without_traceback(self):
+        import psycopg
+        with patch("octonous.routes.login_allowed", return_value=True):
+            self.owner()
+        with patch("octonous.routes.psycopg.connect",
+                   side_effect=psycopg.OperationalError("Connection error")):
+            result = self.client.get("/octonous/api/database/status", base_url="https://thigas-coder-gateway.onrender.com")
+        self.assertFalse(result.get_json()["ok"])
+        self.assertEqual(result.get_json()["code"], "connection")
+        self.assertNotIn("Traceback", result.get_data(as_text=True))
+
+    def test_database_api_error_is_503(self):
+        import psycopg
+        with patch("octonous.routes.login_allowed", return_value=True):
+            self.owner()
+        with patch.object(self.routes, "db", side_effect=psycopg.OperationalError("Connection error")):
+            result = self.client.get("/octonous/api/workflows", base_url="https://thigas-coder-gateway.onrender.com")
+        self.assertEqual(result.status_code, 503)
+        self.assertTrue(result.is_json)

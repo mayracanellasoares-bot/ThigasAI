@@ -13,6 +13,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import requests
+import psycopg
 from flask import Blueprint, abort, jsonify, make_response, redirect, request
 from werkzeug.exceptions import HTTPException
 
@@ -61,7 +62,34 @@ def db():
     try:
         return Store()
     except (RuntimeError, ValueError):
-        abort(503, "Configure o banco de dados e a chave de criptografia.")
+        abort(503, "Configure OCTONOUS_DATABASE_URL com a Internal Database URL completa e confira OCTONOUS_ENCRYPTION_KEY.")
+
+
+@bp.errorhandler(psycopg.Error)
+def postgres_error(error):
+    if request.path.startswith("/octonous/api/"):
+        return jsonify(error="Falha no PostgreSQL. Confira a conexão no Render e use o diagnóstico do banco."), 503
+    return "Banco de dados indisponível.", 503
+
+
+@bp.get("/api/database/status")
+def database_status():
+    """Owner-only read-only connectivity test without returning credentials."""
+    require_owner()
+    try:
+        store = Store()
+    except (RuntimeError, ValueError) as exc:
+        message = ("OCTONOUS_DATABASE_URL deve conter a Internal Database URL completa do Render."
+                   if "Internal Database URL" in str(exc)
+                   else "Confira OCTONOUS_DATABASE_URL e OCTONOUS_ENCRYPTION_KEY em Environment no Render.")
+        return jsonify(ok=False, code="configuration", message=message)
+    try:
+        with psycopg.connect(store.dsn, connect_timeout=5) as connection:
+            connection.execute("SELECT 1")
+    except psycopg.Error:
+        return jsonify(ok=False, code="connection",
+                       message="PostgreSQL inacessível. Confira a URL interna, as credenciais e a região do banco no Render.")
+    return jsonify(ok=True, code="ready", message="PostgreSQL conectado.")
 
 
 def configured_model(store):
