@@ -76,6 +76,12 @@ def model_answer(config, prompt, context, skill=None):
         "{\"type\": string, \"payload\": object}. Uma ação apenas pode ser PROPOSTA, "
         "jamais executada; ela aguarda aprovação humana. Tipos permitidos: "
         + ", ".join(ACTION_PROVIDERS) + ". Se faltarem campos necessários, use null. "
+        "Campos do payload: gmail.send {to, subject, body}; "
+        "github.issue.create {repo no formato owner/repo, title, body}; "
+        "notion.page.create {parent_id, title, body}; "
+        "hubspot.contact.create {email, firstname opcional, lastname opcional}; "
+        "salesforce.task.create {subject, description}. "
+        "Nunca invente destinatários, repositórios ou IDs ausentes. "
         "Não inclua segredos ou tokens na resposta."
     )
     body = json.dumps({"task": prompt[:5000], "search_results": context[:16000],
@@ -119,7 +125,9 @@ def model_answer(config, prompt, context, skill=None):
         raise ProviderError("O modelo retornou um plano inválido.")
     answer = str(parsed.get("answer", ""))[:8000]
     proposed = parsed.get("proposed_action")
-    if not isinstance(proposed, dict) or proposed.get("type") not in ACTION_PROVIDERS or not isinstance(proposed.get("payload"), dict):
+    if (not isinstance(proposed, dict) or not isinstance(proposed.get("type"), str)
+            or proposed["type"] not in ACTION_PROVIDERS
+            or not isinstance(proposed.get("payload"), dict)):
         proposed = None
     else:
         proposed = {"type": proposed["type"],

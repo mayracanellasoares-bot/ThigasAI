@@ -7,7 +7,7 @@ import os
 import sys
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from cryptography.fernet import Fernet
 
@@ -193,3 +193,48 @@ class OctonousTests(unittest.TestCase):
         wire = base64.urlsafe_b64decode(encoded + "=" * (-len(encoded) % 4)).decode()
         self.assertIn("Subject: Assunto Bcc: outro@example.org", wire)
         self.assertNotIn("\r\nBcc:", wire)
+
+    def test_api_auth_errors_are_readable_json(self):
+        response = self.client.get("/octonous/api/workflows")
+        self.assertEqual(response.status_code, 401)
+        self.assertTrue(response.is_json)
+        self.assertTrue(response.get_json()["error"])
+
+    def test_malformed_workflow_permissions_are_rejected_without_saving(self):
+        headers = self.owner()
+        valid = {"title": "Teste", "prompt": "Preparar resumo", "trigger": "manual",
+                 "apps": ["github"], "actions": []}
+        for change in ({"apps": [{}]}, {"actions": [[]]}, {"trigger": {}}):
+            with self.subTest(change=change):
+                response = self.client.post("/octonous/api/workflows", json={**valid, **change},
+                    headers=headers, base_url="https://thigas-coder-gateway.onrender.com")
+                self.assertEqual(response.status_code, 400)
+                self.assertTrue(response.is_json)
+        self.assertEqual(self.store.all("workflow"), [])
+
+    def test_malformed_model_action_does_not_break_chat(self):
+        from octonous.agent import model_answer
+        for action_type in ([], {}, None):
+            with self.subTest(action_type=action_type):
+                upstream = Mock()
+                upstream.json.return_value = {"choices": [{"message": {"content": json.dumps({
+                    "answer": "Preciso de mais detalhes.",
+                    "proposed_action": {"type": action_type, "payload": {}},
+                })}}]}
+                with patch("octonous.agent.requests.post", return_value=upstream):
+                    result = model_answer({"provider": "openai", "model": "test",
+                                           "api_key": "fake"}, "Preparar resumo", "{}")
+                self.assertIsNone(result["proposed_action"])
+
+    def test_notion_action_preserves_approved_page_content(self):
+        from octonous.providers import execute_action
+        content = "Resumo aprovado. " * 180
+        with patch("octonous.providers.api", return_value={"id": "page"}) as create:
+            execute_action(self.store, "notion.page.create", {
+                "parent_id": "a" * 32, "title": "Acompanhamento", "body": content,
+            })
+        blocks = create.call_args.kwargs["payload"]["children"]
+        actual = "".join(x["paragraph"]["rich_text"][0]["text"]["content"] for x in blocks)
+        self.assertEqual(actual, content)
+        self.assertTrue(all(len(x["paragraph"]["rich_text"][0]["text"]["content"]) <= 2000
+                            for x in blocks))

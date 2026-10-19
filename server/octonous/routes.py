@@ -14,6 +14,7 @@ from zoneinfo import ZoneInfo
 
 import requests
 from flask import Blueprint, abort, jsonify, make_response, redirect, request
+from werkzeug.exceptions import HTTPException
 
 from .agent import model_answer, skill_by_slug, skills, validate_model
 from .providers import (ACTION_PROVIDERS, CURRENT_RUN, PROVIDERS, ProviderError, api,
@@ -26,6 +27,21 @@ bp = Blueprint("octonous", __name__, url_prefix="/octonous")
 STATIC = Path(__file__).resolve().parents[1] / "static"
 TRIGGERS = {"manual", "github.pr_merged", "google_calendar.meeting_ended",
             "notion.page_created", "gmail.friday", "schedule.daily", "schedule.weekly"}
+
+
+@bp.errorhandler(HTTPException)
+def api_error(error):
+    if not request.path.startswith(("/octonous/api/", "/octonous/hooks/")):
+        return error
+    defaults = {401: "Entre com a senha do proprietário para continuar.",
+                403: "Sessão inválida ou expirada. Entre novamente."}
+    message = error.description
+    if message == type(error).description:
+        message = defaults.get(error.code, message)
+    response = error.get_response()
+    response.set_data(json.dumps({"error": message}, ensure_ascii=False))
+    response.mimetype = "application/json"
+    return response
 
 
 @bp.after_request
@@ -238,7 +254,7 @@ def set_model():
 def queue_approval(store, run_id, proposal):
     action = proposal.get("type")
     payload = proposal.get("payload")
-    if action not in ACTION_PROVIDERS or not isinstance(payload, dict):
+    if not isinstance(action, str) or action not in ACTION_PROVIDERS or not isinstance(payload, dict):
         return None
     if not store.get("connection", ACTION_PROVIDERS[action]):
         return None
@@ -321,9 +337,11 @@ def create_workflow():
     trigger = data.get("trigger")
     apps = data.get("apps", [])
     actions = data.get("actions", [])
-    if (not title or not prompt or trigger not in TRIGGERS
-            or not isinstance(apps, list) or not set(apps).issubset(PROVIDERS)
-            or not isinstance(actions, list) or not set(actions).issubset(ACTION_PROVIDERS)):
+    if (not title or not prompt or not isinstance(trigger, str) or trigger not in TRIGGERS
+            or not isinstance(apps, list)
+            or any(not isinstance(item, str) or item not in PROVIDERS for item in apps)
+            or not isinstance(actions, list)
+            or any(not isinstance(item, str) or item not in ACTION_PROVIDERS for item in actions)):
         abort(400, "Definição de automação inválida.")
     if not all(ACTION_PROVIDERS[action] in apps for action in actions):
         abort(400, "Cada ação precisa de permissão para o aplicativo correspondente.")
