@@ -279,6 +279,11 @@ function renderLogs(logs) {
   }
 }
 async function refresh() {
+  const database = await call("/api/database/status");
+  const warning = $("database-status");
+  warning.hidden = database.ok;
+  warning.textContent = database.ok ? "" : database.message + " Abra Render → Environment para corrigir.";
+  if (!database.ok) return;
   const [connections, workflows, approvals, skills, model, logs] = await Promise.all([
     call("/api/connections"), call("/api/workflows"), call("/api/approvals"),
     call("/api/skills"), call("/api/model"), call("/api/logs"),
