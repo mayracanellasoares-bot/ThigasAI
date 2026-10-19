@@ -337,11 +337,20 @@ def _run_task(store, run_id, prompt, *, skill_slug="", workflow=None, event=None
         store.audit(run_id, "model", "plan", {"prompt": prompt, "context": context_text},
                     response, "ok")
         proposed = response.get("proposed_action")
+        blocked = ""
         if workflow and proposed and proposed["type"] not in workflow.get("actions", []):
+            blocked = "Esta ação não foi autorizada na configuração da automação."
             proposed = None
         approval_id = queue_approval(store, run_id, proposed) if proposed else None
+        if proposed and not approval_id:
+            provider = ACTION_PROVIDERS[proposed["type"]]
+            blocked = ("Conecte o Google Drive em Conexões ou configure a ponte Apps Script no Render."
+                       if provider == "google_drive" else
+                       f"Conecte {provider} na aba Conexões antes de tentar novamente.")
+        if blocked:
+            response["answer"] = response["answer"].rstrip() + "\n\nTarefa não executada: " + blocked
         store.put("run", run_id, {"prompt": prompt, "workflow_id": workflow.get("id") if workflow else None,
-                                  "status": "awaiting_approval" if approval_id else "completed",
+                                  "status": "awaiting_approval" if approval_id else "blocked" if blocked else "completed",
                                   "answer": response["answer"], "approval_id": approval_id,
                                   "created_at": now()})
         return {"run_id": run_id, "answer": response["answer"],
