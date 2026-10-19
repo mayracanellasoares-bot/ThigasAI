@@ -36,6 +36,55 @@ sem cabeçalhos de autorização. A sessão do proprietário dura até oito hora
 usa cookie Secure, HttpOnly, SameSite=Lax; ações no navegador também exigem
 um token CSRF. Não reutilize a senha do gateway antigo.
 
+## Google Drive sem cliente OAuth: ponte Google Apps Script
+
+Esta é uma alternativa à conexão OAuth direta. Não altera as integrações
+existentes de Gmail e Calendar e não compartilha sessões/tokens do ChatGPT.
+A ponte **não está ativa até a implantação na própria conta Google**.
+
+1. Crie/identifique uma pasta específica no Drive. Copie apenas o ID da URL
+   `https://drive.google.com/drive/folders/ID_DA_PASTA`. Pode autorizar mais
+   de uma pasta, separando os IDs com vírgulas.
+2. Em [script.google.com](https://script.google.com/), crie um projeto,
+   substitua o `Code.gs` pelo arquivo
+   [integrations/google_apps_script/Code.gs](../integrations/google_apps_script/Code.gs).
+3. Em **Configurações do projeto → Propriedades do script**, crie
+   `ALLOWED_FOLDER_IDS` com os IDs autorizados. Crie também `HUB_SECRET`:
+   um segredo aleatório exclusivo de pelo menos 32 caracteres. Gere com
+   `python -c "import secrets; print(secrets.token_urlsafe(48))"`.
+   Nunca coloque esse segredo no código nem no GitHub.
+4. Execute **autorizarAcesso** no editor e conceda as permissões Google
+   necessárias. Em **Implantar → Nova implantação → App da Web**, selecione
+   **Executar como: eu**, **Quem tem acesso: qualquer pessoa** e implante.
+   Copie o endereço HTTPS terminado em `/exec`.
+5. No serviço **thigas-coder-gateway** no Render, configure:
+   - `OCTONOUS_DRIVE_SCRIPT_URL`: URL HTTPS da implantação Apps Script `/exec`;
+   - `OCTONOUS_DRIVE_SCRIPT_SECRET`: o mesmo valor de `HUB_SECRET`.
+   Salve as variáveis e faça o deploy.
+6. Abra o THIGAS Hub, entre com a senha de proprietário, consulte
+   **Conexões** (Google Drive exibirá "Apps Script ativo"), e pesquise
+   um nome de arquivo ou use **pastas** para listar pastas permitidas.
+7. Solicite "Crie um Google Docs intitulado ... na pasta autorizada ...".
+   A proposta deve ser revisada em **Aprovações**. Para uma subpasta,
+   inclua `folder_id` no JSON aprovado. O script confirma a ancestralidade
+   em relação a `ALLOWED_FOLDER_IDS`, inclusive em requisições adulteradas.
+
+**Segurança:** "Qualquer pessoa" torna pública a URL do web app, mas **não
+autoriza operações sem o segredo de servidor**. Não divulgue a URL/segredo,
+restrinja os IDs a pastas dedicadas e rotacione o segredo se houver suspeita
+de vazamento. O script executa **com suas permissões Google**, portanto
+comprometer o segredo permite ler nomes de arquivos e criar documentos nas
+pastas listadas; não habilite essa ponte em instalações públicas sem entender
+essa delegação. Mantenha as aprovações do Hub e o login de proprietário.
+A solução tem cotas do Google Apps Script e as buscas são limitadas a
+50 pastas e 300 arquivos por solicitação.
+
+O OAuth original do Google Drive permanece disponível quando as variáveis
+da ponte não estiverem configuradas. Configurar a ponte dá preferência
+à ponte sobre o OAuth do Drive existente. Para desligar a ponte, **remova
+as duas variáveis no Render** e faça deploy; o botão de desconexão OAuth
+não desativa uma configuração no servidor.
+
 ## OAuth direto
 
 Crie um aplicativo OAuth em cada serviço e configure o client ID e o client
