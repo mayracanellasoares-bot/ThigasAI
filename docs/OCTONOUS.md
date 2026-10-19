@@ -27,6 +27,24 @@ Configure no serviço `thigas-coder-gateway`:
 - `OCTONOUS_GITHUB_WEBHOOK_SECRET`: segredo aleatório de pelo menos 24
   caracteres, também configurado no webhook do GitHub.
 
+### Diagnóstico do banco no próprio Render
+
+Após entrar com a senha de proprietário, o Hub consulta
+`GET /octonous/api/database/status` para testar a conexão PostgreSQL.
+A verificação executa apenas `SELECT 1`, sem escrever dados nem retornar
+a URL, usuário ou senha. Se a conexão falhar, o Hub mostra a orientação no
+topo da interface, em vez de deixar os painéis vazios e sem explicação.
+Erros de operações PostgreSQL são apresentados como HTTP 503, sem
+exibir credenciais ou stack traces.
+
+O banco `thigas-octonous-db` pode estar com status "available" no Render
+enquanto o serviço Flask ainda está com `OCTONOUS_DATABASE_URL` inválida.
+O nome isolado `thigas_octonous_db` **não funciona**: copie a
+**Internal Database URL** no painel privado do PostgreSQL e cole seu valor
+completo em **thigas-coder-gateway → Environment →
+OCTONOUS_DATABASE_URL**. Não envie a URL em mensagens, arquivos ou
+commits. Este código não consegue extrair credenciais privadas do Render.
+
 O Hub oferece seis temas persistidos no navegador: Aurora, Claro, Oceano, Violeta, Floresta e Coral. O login e a separação do chat público permanecem inalterados.
 
 O módulo não inicializa se faltar senha, segredo de sessão, banco ou chave de
