@@ -226,6 +226,13 @@ function renderApprovals() {
     editor.readOnly = item.status !== "pending";
     card.append(editor);
     if (item.error) card.append(node("p", "", item.error));
+    if (item.status === "executed" && /^https:\/\/docs\.google\.com\//.test(item.result?.url || "")) {
+      const link = node("a", "created-file-link", "Abrir documento criado ↗");
+      link.href = item.result.url;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      card.append(link);
+    }
     if (item.status === "pending") {
       const row = node("div", "card-actions");
       const approve = node("button", "primary", "Aprovar e executar");
