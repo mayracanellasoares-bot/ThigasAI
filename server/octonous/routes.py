@@ -64,6 +64,16 @@ def db():
         abort(503, "Configure o banco de dados e a chave de criptografia.")
 
 
+def configured_model(store):
+    saved = store.get("config", "model")
+    if saved:
+        return saved
+    if os.getenv("MARITACA_API_KEY"):
+        return {"provider": "maritaca", "model": os.getenv("MARITACA_MODEL", "sabia-4"),
+                "api_key": ""}
+    return None
+
+
 def body():
     value = request.get_json(silent=True)
     if not isinstance(value, dict):
@@ -234,7 +244,7 @@ def list_skills():
 @bp.get("/api/model")
 def get_model():
     require_owner()
-    value = db().get("config", "model")
+    value = configured_model(db())
     return jsonify(model={"provider": value["provider"], "model": value["model"],
                           "origin": value.get("origin", ""), "configured": True}
                   if value else {"configured": False})
@@ -286,7 +296,7 @@ def _run_task(store, run_id, prompt, *, skill_slug="", workflow=None, event=None
     store.put("run", run_id, {"prompt": prompt, "workflow_id": workflow.get("id") if workflow else None,
                               "status": "running", "created_at": now()})
     try:
-        response = model_answer(store.get("config", "model"), prompt, context_text, skill)
+        response = model_answer(configured_model(store), prompt, context_text, skill)
         store.audit(run_id, "model", "plan", {"prompt": prompt, "context": context_text},
                     response, "ok")
         proposed = response.get("proposed_action")
