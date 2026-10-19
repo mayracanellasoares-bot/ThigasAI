@@ -38,6 +38,8 @@ class Store:
         key = encryption_key or os.getenv("OCTONOUS_ENCRYPTION_KEY", "")
         if not self.dsn or not key:
             raise RuntimeError("Configure OCTONOUS_DATABASE_URL e OCTONOUS_ENCRYPTION_KEY.")
+        if not self.dsn.startswith(("postgresql://", "postgres://")):
+            raise ValueError("OCTONOUS_DATABASE_URL exige a Internal Database URL completa, não o nome do banco.")
         self.cipher = Fernet(key.encode() if isinstance(key, str) else key)
         self._initialized = False
 
