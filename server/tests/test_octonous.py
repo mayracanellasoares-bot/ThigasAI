@@ -238,3 +238,45 @@ class OctonousTests(unittest.TestCase):
         self.assertEqual(actual, content)
         self.assertTrue(all(len(x["paragraph"]["rich_text"][0]["text"]["content"]) <= 2000
                             for x in blocks))
+
+    def test_maritaca_uses_existing_render_key_and_preserves_approval_boundary(self):
+        from octonous.agent import model_answer, validate_model
+        with patch.dict(os.environ, {"MARITACA_API_KEY": "secret-from-render"}):
+            config = validate_model({"provider": "maritaca", "model": "sabia-4"})
+            self.assertEqual(config["api_key"], "")
+            upstream = Mock()
+            upstream.json.return_value = {"choices": [{"message": {"content": json.dumps({
+                "answer": "Prepararei o resumo.",
+                "proposed_action": None,
+            })}}]}
+            with patch("octonous.agent.requests.post", return_value=upstream) as post:
+                answer = model_answer(config, "Preparar resumo", "{}")
+        self.assertEqual(answer["answer"], "Prepararei o resumo.")
+        self.assertIsNone(answer["proposed_action"])
+        self.assertEqual(post.call_args.args[0],
+                         "https://chat.maritaca.ai/api/chat/completions")
+        self.assertEqual(post.call_args.kwargs["headers"]["Authorization"],
+                         "Bearer secret-from-render")
+        self.assertEqual(post.call_args.kwargs["json"]["model"], "sabia-4")
+
+    def test_maritaca_without_key_is_rejected(self):
+        from octonous.agent import validate_model
+        with patch.dict(os.environ, {"MARITACA_API_KEY": ""}):
+            with self.assertRaisesRegex(ValueError, "MARITACA_API_KEY"):
+                validate_model({"provider": "maritaca", "model": "sabia-4"})
+
+    def test_maritaca_becomes_default_when_render_has_key(self):
+        with patch.dict(os.environ, {"MARITACA_API_KEY": "server-key",
+                                      "MARITACA_MODEL": "sabia-4"}):
+            headers = self.owner()
+            model = self.client.get("/octonous/api/model", headers=headers,
+                base_url="https://thigas-coder-gateway.onrender.com").get_json()["model"]
+        self.assertEqual(model["provider"], "maritaca")
+        self.assertEqual(model["model"], "sabia-4")
+        self.assertTrue(model["configured"])
+        self.assertNotIn("api_key", model)
+
+    def test_database_name_is_not_treated_as_connection_url(self):
+        from octonous.storage import Store
+        with self.assertRaisesRegex(ValueError, "Internal Database URL"):
+            Store(dsn="thigas_octonous_db", encryption_key=Fernet.generate_key().decode())
