@@ -504,3 +504,85 @@ class OctonousTests(unittest.TestCase):
             result = self.client.get("/octonous/api/workflows", base_url="https://thigas-coder-gateway.onrender.com")
         self.assertEqual(result.status_code, 503)
         self.assertTrue(result.is_json)
+
+    def test_postgres_schema_initialization_is_thread_safe_and_once_per_database(self):
+        from concurrent.futures import ThreadPoolExecutor
+        from threading import Lock
+        from uuid import uuid4
+        from octonous.storage import Store
+        statements = []
+        sync = Lock()
+
+        class FakeConnection:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, trace):
+                return False
+
+            def execute(self, sql, *args):
+                with sync:
+                    statements.append(sql)
+                return self
+
+            def fetchone(self):
+                return None
+
+            def commit(self):
+                with sync:
+                    statements.append("COMMIT")
+
+        dsn = "postgresql://user:private@localhost/test_" + uuid4().hex
+        secret = Fernet.generate_key().decode()
+
+        def read_record(_):
+            store = Store(dsn=dsn, encryption_key=secret)
+            return store.get("config", "model")
+
+        with patch("octonous.storage.psycopg.connect",
+                   side_effect=lambda *args, **kwargs: FakeConnection()):
+            with ThreadPoolExecutor(max_workers=8) as pool:
+                self.assertEqual(list(pool.map(read_record, range(20))), [None] * 20)
+        self.assertEqual(sum(q.startswith("CREATE TABLE") for q in statements), 3)
+        self.assertEqual(statements.count("SELECT pg_advisory_xact_lock(81753024)"), 1)
+        self.assertEqual(statements.count("COMMIT"), 1)
+        self.assertEqual(sum(q.startswith("SELECT data FROM octonous_records")
+                             for q in statements), 20)
+
+    def test_missing_google_drive_blocks_task_instead_of_claiming_completion(self):
+        proposal = {"answer": "Vou criar o documento.",
+                    "proposed_action": {"type": "google_drive.document.create",
+                                         "payload": {"title": "Relatório", "body": "Conteúdo"}}}
+        with patch.object(self.routes, "model_answer", return_value=proposal), \
+             patch.object(self.routes, "drive_script_configured", return_value=False):
+            result = self.routes.run_task(self.store, "Criar documento", search_enabled=False)
+        self.assertIn("Tarefa não executada:", result["answer"])
+        self.assertIn("Google Drive", result["answer"])
+        self.assertIsNone(result["approval_id"])
+        self.assertEqual(self.store.get("run", result["run_id"])["status"], "blocked")
+        self.assertEqual(self.store.all("approval"), [])
+
+    def test_authorized_google_drive_proposal_still_requires_human_approval(self):
+        proposal = {"answer": "Documento preparado.",
+                    "proposed_action": {"type": "google_drive.document.create",
+                                         "payload": {"title": "Relatório", "body": "Conteúdo"}}}
+        self.store.put("connection", "google_drive", {"access_token": "test"})
+        with patch.object(self.routes, "model_answer", return_value=proposal), \
+             patch.object(self.routes, "drive_script_configured", return_value=False):
+            result = self.routes.run_task(self.store, "Criar documento", search_enabled=False)
+        self.assertIsNotNone(result["approval_id"])
+        self.assertEqual(self.store.get("run", result["run_id"])["status"], "awaiting_approval")
+        self.assertEqual(self.store.get("approval", result["approval_id"])["status"], "pending")
+
+    def test_workflow_without_permission_cannot_claim_action_completed(self):
+        proposal = {"answer": "O e-mail foi enviado.",
+                    "proposed_action": {"type": "gmail.send",
+                                        "payload": {"to": "test@example.org", "body": "Oi"}}}
+        self.store.put("connection", "gmail", {"access_token": "test"})
+        workflow = {"id": "workflow1", "apps": ["gmail"], "actions": []}
+        with patch.object(self.routes, "model_answer", return_value=proposal):
+            result = self.routes.run_task(self.store, "Enviar aviso", workflow=workflow,
+                                          search_enabled=False)
+        self.assertIn("não executada", result["answer"])
+        self.assertEqual(self.store.get("run", result["run_id"])["status"], "blocked")
+        self.assertEqual(self.store.all("approval"), [])
