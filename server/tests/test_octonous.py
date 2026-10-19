@@ -543,7 +543,7 @@ class OctonousTests(unittest.TestCase):
                    side_effect=lambda *args, **kwargs: FakeConnection()):
             with ThreadPoolExecutor(max_workers=8) as pool:
                 self.assertEqual(list(pool.map(read_record, range(20))), [None] * 20)
-        self.assertEqual(sum(q.startswith("CREATE TABLE") for q in statements), 3)
+        self.assertEqual(sum(q.lstrip().startswith("CREATE TABLE") for q in statements), 3)
         self.assertEqual(statements.count("SELECT pg_advisory_xact_lock(81753024)"), 1)
         self.assertEqual(statements.count("COMMIT"), 1)
         self.assertEqual(sum(q.startswith("SELECT data FROM octonous_records")
