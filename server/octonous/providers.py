@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import csv
+import io
 import base64
 from contextvars import ContextVar
 import json
@@ -24,6 +26,11 @@ PROVIDERS = {
         "env": "GOOGLE", "authorize": "https://accounts.google.com/o/oauth2/v2/auth",
         "token": "https://oauth2.googleapis.com/token",
         "scope": "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send",
+    },
+    "google_drive": {
+        "env": "GOOGLE", "authorize": "https://accounts.google.com/o/oauth2/v2/auth",
+        "token": "https://oauth2.googleapis.com/token",
+        "scope": "https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.file",
     },
     "google_calendar": {
         "env": "GOOGLE", "authorize": "https://accounts.google.com/o/oauth2/v2/auth",
@@ -85,7 +92,7 @@ def authorize_url(provider, state):
         params.update(owner="user", response_type="code")
     else:
         params.update(response_type="code", scope=config["scope"])
-    if provider in ("gmail", "google_calendar"):
+    if provider in ("gmail", "google_calendar", "google_drive"):
         params.update(access_type="offline", prompt="consent", include_granted_scopes="false")
     return config["authorize"] + "?" + urlencode(params)
 
@@ -194,6 +201,16 @@ def search_one(store, provider, query):
                            "detail": headers.get("from", "")[:120],
                            "url": "https://mail.google.com/mail/u/0/#all/" + item["id"]})
         return result
+    if provider == "google_drive":
+        escaped = q.replace("\\", "\\\\").replace("'", "\\'")
+        found = api(store, provider, "GET", "https://www.googleapis.com/drive/v3/files",
+                    params={"q": "trashed = false and name contains '" + escaped + "'",
+                            "fields": "nextPageToken,files(id,name,mimeType,description,webViewLink)",
+                            "pageSize": 10}).get("files", [])
+        return [{"title": x.get("name", "(sem nome)")[:200],
+                 "summary": (x.get("description") or x.get("mimeType", ""))[:350],
+                 "detail": x.get("mimeType", ""),
+                 "url": x.get("webViewLink", "")} for x in found[:10]]
     if provider == "google_calendar":
         events = api(store, provider, "GET",
                      "https://www.googleapis.com/calendar/v3/calendars/primary/events",
@@ -240,6 +257,12 @@ def search_one(store, provider, query):
     raise ProviderError("Busca não suportada.")
 
 
+def safe_google_id(value):
+    if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9_-]{8,150}", value):
+        raise ProviderError("ID inválido retornado pelo Google.")
+    return value
+
+
 def execute_action(store, action, payload):
     """Only explicit action IDs reach fixed provider endpoints after an approval."""
     if action == "gmail.send":
@@ -255,6 +278,77 @@ def execute_action(store, action, payload):
                    "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
                    payload={"raw": raw})
         return {"id": sent.get("id"), "threadId": sent.get("threadId")}
+    if action == "google_drive.document.create":
+        title = str(payload.get("title", "")).strip()[:180]
+        body = str(payload.get("body", "")).strip()[:12000]
+        if not title or not body:
+            raise ProviderError("Informe título e conteúdo do documento.")
+        doc = api(store, "google_drive", "POST",
+                  "https://docs.googleapis.com/v1/documents", payload={"title": title})
+        file_id = safe_google_id(doc.get("documentId"))
+        api(store, "google_drive", "POST",
+            f"https://docs.googleapis.com/v1/documents/{file_id}:batchUpdate",
+            payload={"requests": [{"insertText": {"endOfSegmentLocation": {}, "text": body}}]})
+        return {"id": file_id, "url": f"https://docs.google.com/document/d/{file_id}/edit"}
+    if action == "google_drive.spreadsheet.create":
+        title = str(payload.get("title", "")).strip()[:180]
+        csv_data = str(payload.get("csv", ""))
+        if not title or not csv_data.strip() or len(csv_data) > 12000:
+            raise ProviderError("Informe título e dados CSV de até 12 mil caracteres.")
+        try:
+            rows = list(csv.reader(io.StringIO(csv_data, newline="")))
+        except csv.Error as exc:
+            raise ProviderError("Dados CSV inválidos.") from exc
+        if not rows or len(rows) > 100 or any(not row or len(row) > 20 or any(len(cell) > 500 for cell in row) for row in rows):
+            raise ProviderError("A planilha aceita até 100 linhas, 20 colunas e 500 caracteres por célula.")
+        result = api(store, "google_drive", "POST",
+                     "https://sheets.googleapis.com/v4/spreadsheets",
+                     payload={"properties": {"title": title}})
+        file_id = safe_google_id(result.get("spreadsheetId"))
+        api(store, "google_drive", "PUT",
+            f"https://sheets.googleapis.com/v4/spreadsheets/{file_id}/values/A1",
+            params={"valueInputOption": "RAW"}, payload={"values": rows})
+        return {"id": file_id, "url": f"https://docs.google.com/spreadsheets/d/{file_id}/edit"}
+    if action == "google_drive.presentation.create":
+        title = str(payload.get("title", "")).strip()[:180]
+        outline = str(payload.get("outline", "")).strip()
+        parts = [part.strip() for part in outline.split("\n---\n") if part.strip()]
+        if not title or not parts or len(parts) > 8 or len(outline) > 10000:
+            raise ProviderError("Informe título e até oito slides separados por --- em linha própria.")
+        slides = []
+        for part in parts:
+            lines = part.splitlines()
+            heading = lines[0].lstrip("# ").strip()[:110]
+            content = "\n".join(lines[1:]).strip()[:1600]
+            if not heading:
+                raise ProviderError("Cada slide precisa de um título.")
+            slides.append((heading, content))
+        result = api(store, "google_drive", "POST",
+                     "https://slides.googleapis.com/v1/presentations",
+                     payload={"title": title})
+        file_id = safe_google_id(result.get("presentationId"))
+        requests_list = []
+        for index, (heading, content) in enumerate(slides):
+            slide_id = f"thigashub_slide_{index:02d}"
+            requests_list.append({"createSlide": {"objectId": slide_id,
+                                  "slideLayoutReference": {"predefinedLayout": "BLANK"}}})
+            for name, value, y, height in (("title", heading, 48, 65),
+                                            ("body", content, 132, 225)):
+                if not value:
+                    continue
+                shape_id = f"thigashub_{name}_{index:02d}"
+                requests_list.append({"createShape": {
+                    "objectId": shape_id, "shapeType": "TEXT_BOX",
+                    "elementProperties": {"pageObjectId": slide_id,
+                        "size": {"width": {"magnitude": 620, "unit": "PT"},
+                                 "height": {"magnitude": height, "unit": "PT"}},
+                        "transform": {"scaleX": 1, "scaleY": 1, "translateX": 50,
+                                      "translateY": y, "unit": "PT"}}}})
+                requests_list.append({"insertText": {"objectId": shape_id, "text": value}})
+        api(store, "google_drive", "POST",
+            f"https://slides.googleapis.com/v1/presentations/{file_id}:batchUpdate",
+            payload={"requests": requests_list})
+        return {"id": file_id, "url": f"https://docs.google.com/presentation/d/{file_id}/edit"}
     if action == "github.issue.create":
         repo = str(payload.get("repo", ""))
         if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repo):
@@ -309,7 +403,10 @@ def execute_action(store, action, payload):
 
 
 ACTION_PROVIDERS = {
-    "gmail.send": "gmail", "github.issue.create": "github",
+    "gmail.send": "gmail",
+    "google_drive.document.create": "google_drive",
+    "google_drive.spreadsheet.create": "google_drive",
+    "google_drive.presentation.create": "google_drive", "github.issue.create": "github",
     "notion.page.create": "notion", "hubspot.contact.create": "hubspot",
     "salesforce.task.create": "salesforce",
 }

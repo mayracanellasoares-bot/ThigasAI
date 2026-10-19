@@ -280,3 +280,84 @@ class OctonousTests(unittest.TestCase):
         from octonous.storage import Store
         with self.assertRaisesRegex(ValueError, "Internal Database URL"):
             Store(dsn="thigas_octonous_db", encryption_key=Fernet.generate_key().decode())
+
+    def test_drive_oauth_requests_scoped_access_and_escapes_search(self):
+        from octonous.providers import authorize_url, search_one
+        from urllib.parse import parse_qs, urlsplit
+        with patch.dict(os.environ, {"OCTONOUS_GOOGLE_CLIENT_ID": "test-client",
+                                      "OCTONOUS_GOOGLE_CLIENT_SECRET": "test-secret"}):
+            url = authorize_url("google_drive", "safe-state")
+        params = parse_qs(urlsplit(url).query)
+        self.assertIn("https://www.googleapis.com/auth/drive.file", params["scope"][0])
+        self.assertIn("https://www.googleapis.com/auth/drive.readonly", params["scope"][0])
+        self.assertEqual(params["redirect_uri"][0],
+                         "https://thigas-coder-gateway.onrender.com/octonous/oauth/google_drive/callback")
+        with patch("octonous.providers.api", return_value={
+            "files": [{"name": "Notas", "mimeType": "application/vnd.google-apps.document",
+                       "webViewLink": "https://docs.google.com/document/d/test-file"}]}) as call:
+            result = search_one(self.store, "google_drive", "quinn's")
+        self.assertEqual(result[0]["title"], "Notas")
+        self.assertIn(r"quinn\'s", call.call_args.kwargs["params"]["q"])
+
+    def test_drive_document_requires_approval_and_is_written_once(self):
+        headers = self.owner()
+        self.store.put("approval", "drive-doc", {
+            "status": "pending", "action": "google_drive.document.create",
+            "payload": {"title": "Relatório", "body": "Texto revisado."}, "run_id": "run-doc"})
+        calls = []
+        def mock_google_api(store, provider, method, url, **kwargs):
+            calls.append((provider, method, url, kwargs))
+            return {"documentId": "doc_12345678"} if url.endswith("/documents") else {}
+        with patch("octonous.providers.api", side_effect=mock_google_api):
+            first = self.client.post("/octonous/api/approvals/drive-doc/decision",
+                json={"decision": "approve"}, headers=headers,
+                base_url="https://thigas-coder-gateway.onrender.com")
+            again = self.client.post("/octonous/api/approvals/drive-doc/decision",
+                json={"decision": "approve"}, headers=headers,
+                base_url="https://thigas-coder-gateway.onrender.com")
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(again.status_code, 409)
+        self.assertEqual(first.get_json()["result"]["url"],
+                         "https://docs.google.com/document/d/doc_12345678/edit")
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(calls[1][3]["payload"]["requests"][0]["insertText"]["text"],
+                         "Texto revisado.")
+
+    def test_drive_spreadsheet_uses_raw_cells_not_formula_evaluation(self):
+        from octonous.providers import execute_action, ProviderError
+        calls = []
+        def mock_google_api(store, provider, method, url, **kwargs):
+            calls.append((method, url, kwargs))
+            return {"spreadsheetId": "sheet_12345678"} if method == "POST" else {}
+        with patch("octonous.providers.api", side_effect=mock_google_api):
+            result = execute_action(self.store, "google_drive.spreadsheet.create",
+                                    {"title": "Custos", "csv": "Item,Valor\nExemplo,=1+1"})
+        self.assertIn("spreadsheets/d/sheet_12345678", result["url"])
+        self.assertEqual(calls[1][2]["params"]["valueInputOption"], "RAW")
+        self.assertEqual(calls[1][2]["payload"]["values"][1][1], "=1+1")
+        with patch("octonous.providers.api") as api_call:
+            with self.assertRaises(ProviderError):
+                execute_action(self.store, "google_drive.spreadsheet.create",
+                               {"title": "Limite", "csv": "x\n" * 101})
+            api_call.assert_not_called()
+
+    def test_drive_presentation_creates_text_shapes_without_code_execution(self):
+        from octonous.providers import execute_action
+        calls = []
+        def mock_google_api(store, provider, method, url, **kwargs):
+            calls.append((method, url, kwargs))
+            return {"presentationId": "deck_12345678"} if method == "POST" and url.endswith("/presentations") else {}
+        with patch("octonous.providers.api", side_effect=mock_google_api):
+            result = execute_action(self.store, "google_drive.presentation.create",
+                {"title": "Plano", "outline": "# Abertura\nDescrição\n---\n# Etapas\nTarefa 1"})
+        self.assertIn("deck_12345678", result["url"])
+        requests_list = calls[1][2]["payload"]["requests"]
+        self.assertEqual(sum("createSlide" in x for x in requests_list), 2)
+        self.assertTrue(any(x.get("insertText", {}).get("text") == "Etapas" for x in requests_list))
+
+    def test_google_drive_requires_connection_before_queueing(self):
+        response = {"type": "google_drive.document.create",
+                    "payload": {"title": "Teste", "body": "Documento"}}
+        self.assertIsNone(self.routes.queue_approval(self.store, "run", response))
+        self.store.put("connection", "google_drive", {"access_token": "test-token"})
+        self.assertIsNotNone(self.routes.queue_approval(self.store, "run", response))
