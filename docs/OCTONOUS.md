@@ -1,4 +1,4 @@
-# THIGAS Fluxos em /octonous
+# THIGAS Hub em /octonous
 
 Módulo de automações integrado ao serviço existente em
 `https://thigas-coder-gateway.onrender.com/octonous`. A interface pública do
@@ -14,7 +14,7 @@ Configure no serviço `thigas-coder-gateway`:
 - `OCTONOUS_SESSION_SECRET`: segredo aleatório com pelo menos 32 caracteres.
 - `OCTONOUS_ENCRYPTION_KEY`: chave Fernet persistente, gerada uma única vez:
   `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`.
-- `OCTONOUS_DATABASE_URL`: URL **interna** de um PostgreSQL persistente. Não
+- `OCTONOUS_DATABASE_URL`: **Internal Database URL completa** de um PostgreSQL persistente, iniciando com `postgresql://` ou `postgres://`. O nome `thigas_octonous_db` sozinho **não é** uma URL. Copie a conexão pelo dashboard privado do Render; nunca cole credenciais no GitHub. Não
   troque a chave de criptografia sem migrar os dados: tokens, planos e logs
   anteriores ficariam ilegíveis.
 - `OCTONOUS_REDIS_URL`: URL interna do Render Key Value (Redis), usada para
@@ -26,6 +26,8 @@ Configure no serviço `thigas-coder-gateway`:
   o endpoint de agendamento.
 - `OCTONOUS_GITHUB_WEBHOOK_SECRET`: segredo aleatório de pelo menos 24
   caracteres, também configurado no webhook do GitHub.
+
+O Hub oferece seis temas persistidos no navegador: Aurora, Claro, Oceano, Violeta, Floresta e Coral. O login e a separação do chat público permanecem inalterados.
 
 O módulo não inicializa se faltar senha, segredo de sessão, banco ou chave de
 criptografia. Todas as linhas de dados do módulo no PostgreSQL são cifradas
@@ -58,7 +60,7 @@ autorizar. Cada conexão pode ser removida na página Conexões.
 
 1. Entre em `/octonous` com a senha de proprietário.
 2. Conecte os serviços OAuth que deseja usar.
-3. Configure um modelo OpenAI ou Anthropic. Para Ollama, o servidor precisa
+3. Por padrão, o Hub usa `MARITACA_API_KEY` e `MARITACA_MODEL` do gateway, quando presentes, sem duplicar chaves. Em **Modelo e Skills** é possível selecionar Maritaca/Sabiá 4, OpenAI ou Anthropic. Para Ollama, o servidor precisa
    conseguir alcançar uma origem predefinida em `OCTONOUS_OLLAMA_ORIGIN`;
    `localhost` no Render **não é** seu computador ou celular.
 4. Busque em todos os apps ou teste uma tarefa no chat.
