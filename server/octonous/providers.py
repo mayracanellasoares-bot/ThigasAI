@@ -190,7 +190,7 @@ def drive_script_configured():
     """The Apps Script bridge is optional and never accepts a browser-supplied URL."""
     url = os.getenv("OCTONOUS_DRIVE_SCRIPT_URL", "")
     secret = os.getenv("OCTONOUS_DRIVE_SCRIPT_SECRET", "")
-    return bool(re.fullmatch(r"https://script\\.google\\.com/macros/s/[A-Za-z0-9_-]+/exec", url)
+    return bool(re.fullmatch(r"https://script\.google\.com/macros/s/[A-Za-z0-9_-]+/exec", url)
                 and len(secret) >= 32)
 
 
