@@ -107,7 +107,9 @@ function renderConnections() {
     row.append(node("span", "badge" + (item.connected ? " connected" : ""),
       item.connected ? "Conectado" : "Desconectado"));
     card.append(row, node("h3", "", labels[item.provider]), node("p", "",
-      item.configured ? "Autorização direta pelo aplicativo." : "Configure o aplicativo OAuth no Render."));
+      item.mode === "script" ? "Apps Script ativo · acesso limitado às pastas autorizadas."
+        : item.configured ? "Autorização direta pelo aplicativo." : "Configure o aplicativo OAuth no Render."));
+    if (item.mode === "script") { list.append(card); continue; }
     const button = node("button", "", item.connected ? "Desconectar →" : "Conectar →");
     button.type = "button";
     button.addEventListener("click", async () => {
