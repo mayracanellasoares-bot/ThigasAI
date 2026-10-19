@@ -184,6 +184,9 @@ function renderWorkflows() {
   list.replaceChildren();
   $("stat-workflows").textContent = state.workflows.length;
   if (!state.workflows.length) return empty(list, "Você ainda não salvou uma automação.");
+  if (state.workflows.some(flow => flow.enabled && flow.trigger !== "manual")) {
+    list.append(node("p", "muted", "Automações programadas precisam de um agendador externo configurado no Render. Use Testar agora para executar manualmente."));
+  }
   for (const flow of state.workflows) {
     const card = node("article", "list-card");
     card.append(node("h3", "", flow.title), node("p", "", flow.prompt),
