@@ -108,6 +108,8 @@ function renderConnections() {
       item.connected ? "Conectado" : "Desconectado"));
     card.append(row, node("h3", "", labels[item.provider]), node("p", "",
       item.mode === "script" ? "Apps Script ativo · acesso limitado às pastas autorizadas."
+        : item.provider === "google_drive" && !item.connected && !item.configured
+          ? "Google Drive inativo. Configure a ponte Apps Script no Render ou autorize via OAuth."
         : item.configured ? "Autorização direta pelo aplicativo." : "Configure o aplicativo OAuth no Render."));
     if (item.mode === "script") { list.append(card); continue; }
     const button = node("button", "", item.connected ? "Desconectar →" : "Conectar →");
@@ -182,6 +184,9 @@ function renderWorkflows() {
   list.replaceChildren();
   $("stat-workflows").textContent = state.workflows.length;
   if (!state.workflows.length) return empty(list, "Você ainda não salvou uma automação.");
+  if (state.workflows.some(flow => flow.enabled && flow.trigger !== "manual")) {
+    list.append(node("p", "muted", "Automações programadas precisam de um agendador externo configurado no Render. Use Testar agora para executar manualmente."));
+  }
   for (const flow of state.workflows) {
     const card = node("article", "list-card");
     card.append(node("h3", "", flow.title), node("p", "", flow.prompt),

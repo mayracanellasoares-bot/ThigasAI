@@ -158,6 +158,31 @@ As Skills ficam em `skills/<nome>/SKILL.md`, com `name` e `description`
 no frontmatter YAML. `triggers` e `permissions` são metadados adicionais.
 O arquivo de acompanhamento pós-reunião vem incluído.
 
+## Quando uma tarefa não é executada
+
+- **Falha no banco**: faça login e confira o diagnóstico no topo do Hub.
+  Ele testa a conexão com o PostgreSQL, sem expor credenciais.
+- **Integração inativa**: a resposta agora mostra "Tarefa não executada" e
+  orienta conectar o aplicativo. Para o Google Drive, configure a ponte
+  Google Apps Script ou a conexão OAuth. O código sozinho não autoriza
+  acesso à sua conta Google.
+- **Ação aguardando aprovação**: abra **Aprovações** e revise antes de
+  clicar em **Aprovar e executar**. "Preparar um documento" não equivale
+  a "criar um documento no Google".
+- **Automação agendada**: salvar uma tarefa com gatilho diário, semanal
+  ou de evento não instala um agendador. É necessário configurar um cron
+  externo para chamar `POST /octonous/hooks/tick` com o segredo de
+  `OCTONOUS_TICK_SECRET`. Use **Testar agora** para validar o fluxo sem
+  aguardar pelo gatilho; as propostas continuam exigindo aprovação.
+- **Sem motor de IA**: configure o modelo em **Modelo e Skills**; a API
+  Maritaca usa `MARITACA_API_KEY` do servidor quando disponível.
+
+O armazenamento inicializa o esquema uma única vez por banco em cada
+processo e sincroniza a criação entre processos via bloqueio consultivo
+PostgreSQL, evitando colisões de criação de tabela sob requisições
+simultâneas. A inicialização só fica marcada como concluída depois do
+commit bem-sucedido.
+
 ## Gatilhos
 
 - GitHub: configure um webhook de evento **Pull requests** no repositório,
