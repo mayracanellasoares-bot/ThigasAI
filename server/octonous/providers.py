@@ -184,6 +184,46 @@ def api(store, provider, method, url, *, params=None, payload=None):
     return result
 
 
+
+
+def drive_script_configured():
+    """The Apps Script bridge is optional and never accepts a browser-supplied URL."""
+    url = os.getenv("OCTONOUS_DRIVE_SCRIPT_URL", "")
+    secret = os.getenv("OCTONOUS_DRIVE_SCRIPT_SECRET", "")
+    return bool(re.fullmatch(r"https://script\\.google\\.com/macros/s/[A-Za-z0-9_-]+/exec", url)
+                and len(secret) >= 32)
+
+
+def drive_script_request(action, payload):
+    """Only fixed bridge operations; secret stays server-side, never in URLs or audit logs."""
+    if not drive_script_configured():
+        raise ProviderError("Configure OCTONOUS_DRIVE_SCRIPT_URL e OCTONOUS_DRIVE_SCRIPT_SECRET no Render.")
+    allowed = {"search", "document.create", "spreadsheet.create", "presentation.create"}
+    if action not in allowed:
+        raise ProviderError("Operação não permitida na ponte Google Drive.")
+    if not isinstance(payload, dict) or len(json.dumps(payload, ensure_ascii=False)) > 15000:
+        raise ProviderError("Dados inválidos ou muito grandes para a ponte.")
+    response = requests.post(os.environ["OCTONOUS_DRIVE_SCRIPT_URL"],
+                             json={"secret": os.environ["OCTONOUS_DRIVE_SCRIPT_SECRET"],
+                                   "action": action, "payload": payload},
+                             timeout=35, allow_redirects=False)
+    if response.status_code in (302, 303):
+        from urllib.parse import urlsplit
+        location = response.headers.get("Location", "")
+        target = urlsplit(location)
+        if target.scheme != "https" or target.hostname != "script.googleusercontent.com":
+            raise ProviderError("Redirecionamento inesperado do Google Apps Script.")
+        response = requests.get(location, timeout=20, allow_redirects=False)
+    if not response.ok:
+        raise ProviderError("Ponte Google Drive indisponível ou sem autorização.")
+    try:
+        parsed = response.json()
+    except ValueError as exc:
+        raise ProviderError("A ponte Google Drive não retornou JSON. Verifique a implantação.") from exc
+    if not isinstance(parsed, dict) or not parsed.get("ok"):
+        raise ProviderError("A ponte Google Drive recusou a solicitação. Verifique as pastas autorizadas.")
+    return parsed.get("data", {})
+
 def search_one(store, provider, query):
     """Return a short, uniform list. Data never appears in another provider's request."""
     q = query[:150]
@@ -201,6 +241,15 @@ def search_one(store, provider, query):
                            "detail": headers.get("from", "")[:120],
                            "url": "https://mail.google.com/mail/u/0/#all/" + item["id"]})
         return result
+    if provider == "google_drive" and drive_script_configured():
+        results = drive_script_request("search", {"query": q})
+        if not isinstance(results, list):
+            raise ProviderError("Formato de busca inválido retornado pelo Drive.")
+        return [{"title": str(x.get("title", ""))[:200],
+                 "summary": str(x.get("summary", ""))[:350],
+                 "detail": str(x.get("detail", ""))[:120],
+                 "url": str(x.get("url", ""))[:600]} for x in results[:10]
+                if isinstance(x, dict)]
     if provider == "google_drive":
         escaped = q.replace("\\", "\\\\").replace("'", "\\'")
         found = api(store, provider, "GET", "https://www.googleapis.com/drive/v3/files",
@@ -265,6 +314,8 @@ def safe_google_id(value):
 
 def execute_action(store, action, payload):
     """Only explicit action IDs reach fixed provider endpoints after an approval."""
+    if action.startswith("google_drive.") and drive_script_configured():
+        return drive_script_request(action.removeprefix("google_drive."), payload)
     if action == "gmail.send":
         recipient = str(payload.get("to", "")).strip()
         if not re.fullmatch(r"[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+", recipient):
