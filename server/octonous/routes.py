@@ -18,7 +18,7 @@ from werkzeug.exceptions import HTTPException
 
 from .agent import model_answer, skill_by_slug, skills, validate_model
 from .providers import (ACTION_PROVIDERS, CURRENT_RUN, PROVIDERS, ProviderError, api,
-                        authorize_url, exchange_code, execute_action, search_one)
+                        authorize_url, drive_script_configured, exchange_code, execute_action, search_one)
 from .security import (COOKIE, check_password, configured, csrf, login_allowed,
                        new_session, owner_session, require_owner, serializer)
 from .storage import Store, new_id, now
@@ -90,6 +90,8 @@ def safe_error(exc):
 
 
 def public_connection(provider):
+    if provider == "google_drive" and drive_script_configured():
+        return {"provider": provider, "configured": True, "connected": True, "mode": "script"}
     return {"provider": provider,
             "configured": bool(os.getenv("OCTONOUS_" + PROVIDERS[provider]["env"] + "_CLIENT_ID")
                                and os.getenv("OCTONOUS_" + PROVIDERS[provider]["env"] + "_CLIENT_SECRET"))}
@@ -143,7 +145,9 @@ def connections():
     require_owner()
     store = db()
     return jsonify(connections=[
-        {**public_connection(name), "connected": bool(store.get("connection", name))}
+        {**public_connection(name),
+         "connected": (drive_script_configured() if name == "google_drive" and drive_script_configured()
+                       else bool(store.get("connection", name)))}
         for name in PROVIDERS
     ])
 
@@ -153,6 +157,8 @@ def connect(provider):
     user = require_owner(write=True)
     if provider not in PROVIDERS:
         abort(404)
+    if provider == "google_drive" and drive_script_configured():
+        abort(409, "Google Drive está conectado pelo Apps Script no Render.")
     state = secrets.token_urlsafe(32)
     try:
         url = authorize_url(provider, state)
@@ -195,6 +201,8 @@ def disconnect(provider):
     require_owner(write=True)
     if provider not in PROVIDERS:
         abort(404)
+    if provider == "google_drive" and drive_script_configured():
+        abort(409, "Desative a ponte Apps Script no Render para desconectar.")
     store = db()
     store.delete("connection", provider)
     store.audit(None, provider, "oauth.disconnect", {}, {}, "ok")
@@ -206,7 +214,7 @@ def search_all(store, query, run_id, allowed=None):
     for provider in PROVIDERS:
         if allowed is not None and provider not in allowed:
             continue
-        if not store.get("connection", provider):
+        if not (provider == "google_drive" and drive_script_configured()) and not store.get("connection", provider):
             continue
         try:
             matches = search_one(store, provider, query)
@@ -266,7 +274,8 @@ def queue_approval(store, run_id, proposal):
     payload = proposal.get("payload")
     if not isinstance(action, str) or action not in ACTION_PROVIDERS or not isinstance(payload, dict):
         return None
-    if not store.get("connection", ACTION_PROVIDERS[action]):
+    provider = ACTION_PROVIDERS[action]
+    if not (provider == "google_drive" and drive_script_configured()) and not store.get("connection", provider):
         return None
     record_id = new_id()
     store.put("approval", record_id,

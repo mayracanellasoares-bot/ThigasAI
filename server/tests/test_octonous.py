@@ -361,3 +361,106 @@ class OctonousTests(unittest.TestCase):
         self.assertIsNone(self.routes.queue_approval(self.store, "run", response))
         self.store.put("connection", "google_drive", {"access_token": "test-token"})
         self.assertIsNotNone(self.routes.queue_approval(self.store, "run", response))
+
+    def test_apps_script_requires_fixed_google_url_and_secret(self):
+        from octonous.providers import drive_script_configured, drive_script_request, ProviderError
+        valid = {"OCTONOUS_DRIVE_SCRIPT_URL":
+                 "https://script.google.com/macros/s/AKfycb_12345/exec",
+                 "OCTONOUS_DRIVE_SCRIPT_SECRET": "q" * 48}
+        with patch.dict(os.environ, valid):
+            self.assertTrue(drive_script_configured())
+        for url, key in (("https://example.org/exec", "q" * 48),
+                         ("http://script.google.com/macros/s/AKfycb_12345/exec", "q" * 48),
+                         (valid["OCTONOUS_DRIVE_SCRIPT_URL"], "weak")):
+            with self.subTest(url=url, key=key):
+                with patch.dict(os.environ, {"OCTONOUS_DRIVE_SCRIPT_URL": url,
+                                              "OCTONOUS_DRIVE_SCRIPT_SECRET": key}):
+                    self.assertFalse(drive_script_configured())
+                    with patch("octonous.providers.requests.post") as post:
+                        with self.assertRaises(ProviderError):
+                            drive_script_request("search", {"query": "teste"})
+                    post.assert_not_called()
+
+    def test_apps_script_search_without_google_oauth_and_fixed_secret(self):
+        from octonous.providers import search_one, drive_script_request, ProviderError
+        url = "https://script.google.com/macros/s/AKfycb_12345/exec"
+        with patch.dict(os.environ, {"OCTONOUS_DRIVE_SCRIPT_URL": url,
+                                      "OCTONOUS_DRIVE_SCRIPT_SECRET": "secret-" + "q" * 48}):
+            response = Mock(status_code=200, ok=True)
+            response.json.return_value = {"ok": True, "data": [
+                {"title": "Pasta de projetos", "summary": "Pasta autorizada",
+                 "detail": "Pasta", "url": "https://drive.google.com/drive/folders/1234567890"}]}
+            with patch("octonous.providers.requests.post", return_value=response) as post:
+                matches = search_one(self.store, "google_drive", "pastas")
+            self.assertEqual(matches[0]["title"], "Pasta de projetos")
+            self.assertEqual(post.call_args.args[0], url)
+            self.assertFalse(post.call_args.kwargs["allow_redirects"])
+            self.assertEqual(post.call_args.kwargs["json"]["action"], "search")
+            self.assertEqual(post.call_args.kwargs["json"]["payload"], {"query": "pastas"})
+            with patch("octonous.providers.requests.post", return_value=response):
+                with self.assertRaises(ProviderError):
+                    drive_script_request("delete", {"file_id": "1234567890"})
+
+    def test_apps_script_redirect_is_constrained_to_googleusercontent(self):
+        from octonous.providers import drive_script_request, ProviderError
+        url = "https://script.google.com/macros/s/AKfycb_12345/exec"
+        with patch.dict(os.environ, {"OCTONOUS_DRIVE_SCRIPT_URL": url,
+                                      "OCTONOUS_DRIVE_SCRIPT_SECRET": "q" * 48}):
+            redirected = Mock(status_code=302, headers={
+                "Location": "https://script.googleusercontent.com/macros/echo?user_content_key=ok"})
+            completed = Mock(status_code=200, ok=True)
+            completed.json.return_value = {"ok": True, "data": {"id": "test-doc-id"}}
+            with patch("octonous.providers.requests.post", return_value=redirected):
+                with patch("octonous.providers.requests.get", return_value=completed) as get:
+                    self.assertEqual(drive_script_request("document.create",
+                        {"title": "Teste", "body": "Conteúdo"})["id"], "test-doc-id")
+                    get.assert_called_once()
+            redirected.headers["Location"] = "https://attacker.example/token"
+            with patch("octonous.providers.requests.post", return_value=redirected):
+                with patch("octonous.providers.requests.get") as get:
+                    with self.assertRaisesRegex(ProviderError, "Redirecionamento"):
+                        drive_script_request("search", {"query": "teste"})
+                    get.assert_not_called()
+
+    def test_apps_script_connection_and_approval_work_without_oauth(self):
+        url = "https://script.google.com/macros/s/AKfycb_12345/exec"
+        with patch.dict(os.environ, {"OCTONOUS_DRIVE_SCRIPT_URL": url,
+                                      "OCTONOUS_DRIVE_SCRIPT_SECRET": "q" * 48}):
+            headers = self.owner()
+            connections = self.client.get("/octonous/api/connections",
+                base_url="https://thigas-coder-gateway.onrender.com").get_json()["connections"]
+            drive = next(item for item in connections if item["provider"] == "google_drive")
+            self.assertEqual(drive["mode"], "script")
+            self.assertTrue(drive["connected"])
+            self.assertNotIn("q" * 48, json.dumps(connections))
+            proposal = {"type": "google_drive.document.create",
+                        "payload": {"title": "Relatório", "body": "Texto revisado."}}
+            self.assertIsNotNone(self.routes.queue_approval(self.store, "run", proposal))
+            start = self.client.post("/octonous/api/connections/google_drive/start",
+                headers=headers, json={}, base_url="https://thigas-coder-gateway.onrender.com")
+            self.assertEqual(start.status_code, 409)
+            with patch.object(self.routes, "search_one", return_value=[{
+                    "title": "Planos", "summary": "Arquivo", "url": "https://drive.google.com"}]):
+                found = self.routes.search_all(self.store, "planos", "run")
+            self.assertIn("google_drive", found)
+
+    def test_apps_script_execution_preserves_explicit_approval(self):
+        from octonous.providers import execute_action
+        url = "https://script.google.com/macros/s/AKfycb_12345/exec"
+        with patch.dict(os.environ, {"OCTONOUS_DRIVE_SCRIPT_URL": url,
+                                      "OCTONOUS_DRIVE_SCRIPT_SECRET": "q" * 48}):
+            with patch("octonous.providers.drive_script_request", return_value={
+                    "url": "https://docs.google.com/document/d/test-doc/edit"}) as request:
+                result = execute_action(self.store, "google_drive.document.create",
+                                        {"title": "Plano", "body": "Texto", "folder_id": "allowed_id"})
+            request.assert_called_once_with("document.create", {
+                "title": "Plano", "body": "Texto", "folder_id": "allowed_id"})
+            self.assertIn("docs.google.com", result["url"])
+
+    def test_apps_script_source_uses_an_allowlist_and_no_embedded_secret(self):
+        source = (SERVER.parent / "integrations/google_apps_script/Code.gs").read_text()
+        self.assertIn("ALLOWED_FOLDER_IDS", source)
+        self.assertIn("getScriptProperties()", source)
+        self.assertIn("authorizedFolder_(roots, payload.folder_id)", source)
+        self.assertIn("sameSecret_(message.secret, key)", source)
+        self.assertNotIn("OCTONOUS_DRIVE_SCRIPT_SECRET=", source)
