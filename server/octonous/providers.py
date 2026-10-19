@@ -269,10 +269,18 @@ def execute_action(store, action, payload):
         if not re.fullmatch(r"[0-9a-fA-F-]{32,36}", parent):
             raise ProviderError("ID da página pai inválido.")
         title = str(payload.get("title", ""))[:200]
+        content = str(payload.get("body", ""))[:12000]
+        page = {"parent": {"page_id": parent},
+                "properties": {"title": {"type": "title", "title":
+                             [{"type": "text", "text": {"content": title}}]}}}
+        if content:
+            page["children"] = [
+                {"object": "block", "type": "paragraph", "paragraph": {"rich_text":
+                    [{"type": "text", "text": {"content": content[start:start + 2000]}}]}}
+                for start in range(0, len(content), 2000)
+            ]
         result = api(store, "notion", "POST", "https://api.notion.com/v1/pages",
-                     payload={"parent": {"page_id": parent},
-                              "properties": {"title": {"type": "title", "title":
-                                           [{"type": "text", "text": {"content": title}}]}}})
+                     payload=page)
         return {"url": result.get("url"), "id": result.get("id")}
     if action == "hubspot.contact.create":
         email = str(payload.get("email", "")).strip()
