@@ -45,12 +45,31 @@ secret correspondentes no Render:
 | --- | --- | --- |
 | Gmail | `OCTONOUS_GOOGLE_CLIENT_ID`, `OCTONOUS_GOOGLE_CLIENT_SECRET` | `/octonous/oauth/gmail/callback` |
 | Google Calendar | as mesmas credenciais Google | `/octonous/oauth/google_calendar/callback` |
+| Google Drive | as mesmas credenciais Google | `/octonous/oauth/google_drive/callback` |
 | GitHub | `OCTONOUS_GITHUB_CLIENT_ID`, `OCTONOUS_GITHUB_CLIENT_SECRET` | `/octonous/oauth/github/callback` |
 | Notion | `OCTONOUS_NOTION_CLIENT_ID`, `OCTONOUS_NOTION_CLIENT_SECRET` | `/octonous/oauth/notion/callback` |
 | HubSpot | `OCTONOUS_HUBSPOT_CLIENT_ID`, `OCTONOUS_HUBSPOT_CLIENT_SECRET` | `/octonous/oauth/hubspot/callback` |
 | Salesforce | `OCTONOUS_SALESFORCE_CLIENT_ID`, `OCTONOUS_SALESFORCE_CLIENT_SECRET` | `/octonous/oauth/salesforce/callback` |
 
 Prefixe os caminhos acima com `https://thigas-coder-gateway.onrender.com`.
+Para o Google Drive, habilite **Google Drive API, Google Docs API, Google Sheets API
+e Google Slides API** no Google Cloud do seu OAuth Client. Inclua a URL
+`https://thigas-coder-gateway.onrender.com/octonous/oauth/google_drive/callback`
+entre as URIs autorizadas. O Hub solicita `drive.readonly` para localizar arquivos
+já existentes e `drive.file` para criar e editar **apenas os arquivos acessíveis
+por esse escopo**. O uso de `drive.readonly` pode exigir verificação de consentimento
+e avaliação de segurança em aplicativos publicados externamente. O conector
+Google Drive do ChatGPT **não concede tokens** automaticamente ao site Render.
+
+O agente pode sugerir `google_drive.document.create` com `{title,body}`,
+`google_drive.spreadsheet.create` com `{title,csv}` e
+`google_drive.presentation.create` com `{title,outline}`.
+Cada slide do `outline` começa com um título e os slides são separados por
+uma linha com `---`. A criação no Google só acontece depois de uma aprovação
+explícita em **Aprovações**. Em caso de falha entre a criação do arquivo e seu
+preenchimento, verifique o Google Drive antes de repetir para não gerar
+arquivos duplicados.
+
 O Google pode exigir verificação do app para escopos Gmail. A integração
 Notion precisa receber acesso às páginas escolhidas. O GitHub solicita o
 escopo `repo`, que inclui repositórios privados; revise isso antes de
@@ -58,12 +77,12 @@ autorizar. Cada conexão pode ser removida na página Conexões.
 
 ## Uso
 
-1. Entre em `/octonous` com a senha de proprietário.
-2. Conecte os serviços OAuth que deseja usar.
+1. Entre em `/octonous` com a senha de proprietário. Antes, configure a **Internal Database URL** completa em `OCTONOUS_DATABASE_URL` no Render; apenas `thigas_octonous_db` não é uma string de conexão válida.
+2. Conecte os serviços OAuth que deseja usar, incluindo **Google Drive** em Conexões.
 3. Por padrão, o Hub usa `MARITACA_API_KEY` e `MARITACA_MODEL` do gateway, quando presentes, sem duplicar chaves. Em **Modelo e Skills** é possível selecionar Maritaca/Sabiá 4, OpenAI ou Anthropic. Para Ollama, o servidor precisa
    conseguir alcançar uma origem predefinida em `OCTONOUS_OLLAMA_ORIGIN`;
    `localhost` no Render **não é** seu computador ou celular.
-4. Busque em todos os apps ou teste uma tarefa no chat.
+4. Busque arquivos no Google Drive ou solicite no chat: "Crie um documento no Google Docs sobre [assunto]".
 5. Salve o prompt como automação e selecione os apps e as ações autorizadas.
 6. Revise o JSON da proposta em Aprovações. A escrita ocorre somente após
    clicar em **Aprovar e executar**.
