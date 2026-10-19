@@ -42,14 +42,16 @@ def skill_by_slug(slug):
 
 def validate_model(config):
     provider = config.get("provider")
-    if provider not in ("openai", "anthropic", "ollama"):
-        raise ValueError("Escolha OpenAI, Anthropic ou Ollama.")
+    if provider not in ("openai", "anthropic", "ollama", "maritaca"):
+        raise ValueError("Escolha OpenAI, Anthropic, Ollama ou Maritaca.")
     model = str(config.get("model", "")).strip()
     if not model or len(model) > 120:
         raise ValueError("Informe o nome exato do modelo.")
     key = str(config.get("api_key", "")).strip()
-    if provider != "ollama" and not key:
+    if provider not in ("ollama", "maritaca") and not key:
         raise ValueError("Informe a chave de API.")
+    if provider == "maritaca" and not (key or os.getenv("MARITACA_API_KEY")):
+        raise ValueError("Configure MARITACA_API_KEY no Render ou informe uma chave.")
     if provider == "ollama":
         # No user-supplied URLs to arbitrary internal services.
         origin = str(config.get("origin", "http://127.0.0.1:11434")).rstrip("/")
@@ -95,6 +97,15 @@ def model_answer(config, prompt, context, skill=None):
                 headers={"Authorization": "Bearer " + config["api_key"]},
                 json={"model": config["model"], "temperature": 0.2,
                       "response_format": {"type": "json_object"},
+                      "messages": [{"role": "system", "content": instructions},
+                                   {"role": "user", "content": body}]}, timeout=45)
+            response.raise_for_status()
+            raw = response.json()["choices"][0]["message"]["content"]
+        elif provider == "maritaca":
+            response = requests.post(
+                "https://chat.maritaca.ai/api/chat/completions",
+                headers={"Authorization": "Bearer " + (config["api_key"] or os.environ["MARITACA_API_KEY"])},
+                json={"model": config["model"], "temperature": 0.2, "max_tokens": 1600,
                       "messages": [{"role": "system", "content": instructions},
                                    {"role": "user", "content": body}]}, timeout=45)
             response.raise_for_status()
