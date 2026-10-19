@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f6f8fc">
-  <title>Thigas Fluxos · THIGAS AI</title>
+  <title>THIGAS Hub · Agentes e automações</title>
   <link rel="stylesheet" href="/static/octonous.css">
   <script src="/static/octonous.js" defer></script>
 </head>
@@ -24,7 +24,7 @@
   </div>
   <div id="app" class="shell" hidden>
     <aside class="sidebar">
-      <a class="brand" href="/"><span class="mark">✳</span><span>THIGAS <b>FLUXOS</b><small>Agentes e automações</small></span></a>
+      <a class="brand" href="/"><span class="mark">✳</span><span>THIGAS <b>HUB</b><small>Agentes e automações</small></span></a>
       <nav aria-label="Navegação">
         <button class="nav active" data-view="home" type="button"><span>◈</span> Visão geral</button>
         <button class="nav" data-view="chat" type="button"><span>◌</span> Criar no chat</button>
@@ -41,8 +41,8 @@
     <main class="main">
       <header class="topbar">
         <button id="menu-toggle" class="mobile-menu" aria-label="Abrir menu" type="button">☰</button>
-        <span class="breadcrumb">THIGAS AI <span>/</span> <strong id="page-name">Visão geral</strong></span>
-        <span class="topbar-right"><span class="safe-dot"></span> Sessão protegida</span>
+        <span class="breadcrumb">THIGAS HUB <span>/</span> <strong id="page-name">Visão geral</strong></span>
+        <div class="topbar-tools"><label for="theme-select">Tema</label><select id="theme-select" aria-label="Cor da interface"><option value="aurora">Aurora</option><option value="claro">Claro</option><option value="oceano">Oceano</option><option value="violeta">Violeta</option><option value="floresta">Floresta</option><option value="coral">Coral</option></select><span class="topbar-right"><span class="safe-dot"></span> Sessão protegida</span></div>
       </header>
       <div id="toast" class="toast" role="status" hidden></div>
       <section id="view-home" class="view active">
@@ -110,11 +110,11 @@
         <div id="log-list" class="list"></div>
       </section>
       <section id="view-settings" class="view">
-        <div class="section-heading"><div><p class="eyebrow">MODELO E INSTRUÇÕES</p><h1>Escolha como o agente pensa.</h1><p>Use sua chave da OpenAI, Anthropic ou um servidor Ollama acessível ao Render.</p></div></div>
+        <div class="section-heading"><div><p class="eyebrow">MODELO E INSTRUÇÕES</p><h1>Escolha como o agente pensa.</h1><p>Use o Sabiá 4 do gateway, sua chave da OpenAI/Anthropic ou um servidor Ollama acessível ao Render.</p></div></div>
         <form id="model-form" class="panel settings-form">
-          <label>Provedor<select id="model-provider"><option value="openai">OpenAI</option><option value="anthropic">Anthropic</option><option value="ollama">Ollama</option></select></label>
+          <label>Provedor<select id="model-provider"><option value="maritaca">Maritaca · Sabiá 4</option><option value="openai">OpenAI</option><option value="anthropic">Anthropic</option><option value="ollama">Ollama</option></select></label>
           <label>Modelo<input id="model-name" required placeholder="Nome exato do modelo"></label>
-          <label id="api-key-label">Chave de API<input id="model-key" type="password" autocomplete="new-password" placeholder="Guardada criptografada"></label>
+          <label id="api-key-label">Chave de API<input id="model-key" type="password" autocomplete="new-password" placeholder="Opcional para Maritaca: usa MARITACA_API_KEY do Render"></label>
           <label id="ollama-label" hidden>Origem do Ollama<input id="ollama-origin" value="http://127.0.0.1:11434"></label>
           <button class="primary" type="submit">Salvar modelo</button><p id="model-status" class="muted"></p>
         </form>
