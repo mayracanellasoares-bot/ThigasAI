@@ -2,11 +2,14 @@
 
 const labels = {
   gmail: "Gmail", google_calendar: "Google Calendar", github: "GitHub",
-  notion: "Notion", hubspot: "HubSpot", salesforce: "Salesforce",
+  notion: "Notion", google_drive: "Google Drive", hubspot: "HubSpot", salesforce: "Salesforce",
 };
 const actionLabels = {
   "gmail.send": "Enviar e-mail", "github.issue.create": "Criar issue no GitHub",
   "notion.page.create": "Criar página no Notion",
+  "google_drive.document.create": "Criar documento no Google Docs",
+  "google_drive.spreadsheet.create": "Criar planilha no Google Sheets",
+  "google_drive.presentation.create": "Criar apresentação no Google Slides",
   "hubspot.contact.create": "Criar contato no HubSpot",
   "salesforce.task.create": "Criar tarefa no Salesforce",
 };
