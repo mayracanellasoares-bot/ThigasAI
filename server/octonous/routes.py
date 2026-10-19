@@ -348,7 +348,7 @@ def _run_task(store, run_id, prompt, *, skill_slug="", workflow=None, event=None
                        if provider == "google_drive" else
                        f"Conecte {provider} na aba Conexões antes de tentar novamente.")
         if blocked:
-            response["answer"] = response["answer"].rstrip() + "\n\nTarefa não executada: " + blocked
+            response["answer"] = "Tarefa não executada: " + blocked
         store.put("run", run_id, {"prompt": prompt, "workflow_id": workflow.get("id") if workflow else None,
                                   "status": "awaiting_approval" if approval_id else "blocked" if blocked else "completed",
                                   "answer": response["answer"], "approval_id": approval_id,
