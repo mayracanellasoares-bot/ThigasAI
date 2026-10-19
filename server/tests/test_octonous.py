@@ -467,7 +467,8 @@ class OctonousTests(unittest.TestCase):
 
     def test_database_status_requires_owner_and_rejects_invalid_uri(self):
         self.assertEqual(self.client.get("/octonous/api/database/status", base_url="https://thigas-coder-gateway.onrender.com").status_code, 401)
-        self.owner()
+        with patch("octonous.routes.login_allowed", return_value=True):
+            self.owner()
         with patch.dict(os.environ, {"OCTONOUS_DATABASE_URL": "thigas_octonous_db"}):
             with patch("octonous.routes.psycopg.connect") as connect:
                 result = self.client.get("/octonous/api/database/status", base_url="https://thigas-coder-gateway.onrender.com")
@@ -476,7 +477,8 @@ class OctonousTests(unittest.TestCase):
         connect.assert_not_called()
 
     def test_database_status_checks_read_only_select(self):
-        self.owner()
+        with patch("octonous.routes.login_allowed", return_value=True):
+            self.owner()
         with patch("octonous.routes.psycopg.connect") as connect:
             result = self.client.get("/octonous/api/database/status", base_url="https://thigas-coder-gateway.onrender.com")
         self.assertTrue(result.get_json()["ok"])
@@ -485,7 +487,8 @@ class OctonousTests(unittest.TestCase):
 
     def test_database_status_handles_connection_failure_without_traceback(self):
         import psycopg
-        self.owner()
+        with patch("octonous.routes.login_allowed", return_value=True):
+            self.owner()
         with patch("octonous.routes.psycopg.connect",
                    side_effect=psycopg.OperationalError("Connection error")):
             result = self.client.get("/octonous/api/database/status", base_url="https://thigas-coder-gateway.onrender.com")
@@ -495,7 +498,8 @@ class OctonousTests(unittest.TestCase):
 
     def test_database_api_error_is_503(self):
         import psycopg
-        self.owner()
+        with patch("octonous.routes.login_allowed", return_value=True):
+            self.owner()
         with patch.object(self.routes, "db", side_effect=psycopg.OperationalError("Connection error")):
             result = self.client.get("/octonous/api/workflows", base_url="https://thigas-coder-gateway.onrender.com")
         self.assertEqual(result.status_code, 503)
