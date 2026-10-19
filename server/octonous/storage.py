@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+import threading
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from uuid import uuid4
@@ -32,6 +34,10 @@ CREATE TABLE IF NOT EXISTS octonous_audit (
 """
 
 
+_SCHEMA_LOCK = threading.Lock()
+_SCHEMA_READY = set()
+
+
 class Store:
     def __init__(self, dsn=None, encryption_key=None):
         self.dsn = dsn or os.getenv("OCTONOUS_DATABASE_URL", "")
@@ -41,16 +47,22 @@ class Store:
         if not self.dsn.startswith(("postgresql://", "postgres://")):
             raise ValueError("OCTONOUS_DATABASE_URL exige a Internal Database URL completa, não o nome do banco.")
         self.cipher = Fernet(key.encode() if isinstance(key, str) else key)
-        self._initialized = False
 
     @contextmanager
     def connection(self):
+        global _SCHEMA_READY
+        identity = hashlib.sha256(self.dsn.encode()).digest()
         with psycopg.connect(self.dsn, connect_timeout=5) as conn:
-            if not self._initialized:
-                for statement in SCHEMA.strip().split(";"):
-                    if statement.strip():
-                        conn.execute(statement)
-                self._initialized = True
+            if identity not in _SCHEMA_READY:
+                with _SCHEMA_LOCK:
+                    if identity not in _SCHEMA_READY:
+                        # Serialize CREATE TABLE across web workers/instances as well as threads.
+                        conn.execute("SELECT pg_advisory_xact_lock(81753024)")
+                        for statement in SCHEMA.strip().split(";"):
+                            if statement.strip():
+                                conn.execute(statement)
+                        conn.commit()
+                        _SCHEMA_READY.add(identity)
             yield conn
 
     def seal(self, value):
