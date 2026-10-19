@@ -278,15 +278,18 @@ async function refresh() {
     $("model-provider").value = model.model.provider;
     $("model-name").value = model.model.model;
     $("ollama-origin").value = model.model.origin || "http://127.0.0.1:11434";
-    $("model-status").textContent = "Modelo configurado. Para alterar, informe novamente a chave.";
+    $("model-status").textContent = model.model.provider === "maritaca"
+      ? "Sabiá configurado. Sem chave informada, será usada a do Render."
+      : "Modelo configurado. Para alterar, informe novamente a chave.";
     toggleModelFields();
   }
 }
 function toggleModelFields() {
-  const local = $("model-provider").value === "ollama";
+  const provider = $("model-provider").value;
+  const local = provider === "ollama";
   $("api-key-label").hidden = local;
   $("ollama-label").hidden = !local;
-  $("model-key").required = !local;
+  $("model-key").required = !local && provider !== "maritaca";
 }
 async function bootstrap() {
   try {
@@ -385,6 +388,16 @@ $("model-form").addEventListener("submit", async event => {
   } catch (error) { toast(error.message); }
   finally { busy(button, false); }
 });
+const themes = new Set(["aurora", "claro", "oceano", "violeta", "floresta", "coral"]);
+let storedTheme = "aurora";
+try { storedTheme = localStorage.getItem("thigas-hub-theme") || "aurora"; } catch {}
+$("theme-select").value = themes.has(storedTheme) ? storedTheme : "aurora";
+document.body.dataset.theme = $("theme-select").value;
+$("theme-select").addEventListener("change", event => {
+  document.body.dataset.theme = event.target.value;
+  try { localStorage.setItem("thigas-hub-theme", event.target.value); } catch {}
+});
+$("model-name").value = "sabia-4";
 renderWorkflowChoices();
 toggleModelFields();
 bootstrap();
